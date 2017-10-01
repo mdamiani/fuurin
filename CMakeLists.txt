@@ -33,6 +33,12 @@ set (LIB_SOURCES
     src/fuurin.cpp
 )
 
+set(LIB_PUBLIC_HEADERS
+    include/fuurin/fuurin.h
+    include/fuurin/broker.h
+    include/fuurin/worker.h
+)
+
 set (LIB_DEPS
     zeromq
 )
@@ -56,3 +62,17 @@ if (DEFINED TESTS AND TESTS EQUAL 1)
 else()
     message("-- Tests disabled")
 endif()
+
+
+# Install
+include(GNUInstallDirs)
+
+install(
+    TARGETS fuurin_shared fuurin_static
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}/${CMAKE_LIBRARY_ARCHITECTURE}"
+)
+
+install(
+    FILES ${LIB_PUBLIC_HEADERS}
+    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/${PROJECT_NAME}"
+)
