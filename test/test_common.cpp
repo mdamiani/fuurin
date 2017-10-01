@@ -8,14 +8,14 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
+#include "fuurin/fuurin.h"
+
 #define BOOST_TEST_MODULE common
 #define BOOST_TEST_MAIN
 #include <boost/test/unit_test.hpp>
 
 #include <cstdio>
 #include <string>
-
-#include "fuurin.h"
 
 BOOST_AUTO_TEST_CASE(version) {
     char buf[16];

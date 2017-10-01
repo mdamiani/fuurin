@@ -30,7 +30,7 @@ ExternalProject_Add(zeromq
 )
 
 set (LIB_SOURCES
-    fuurin.cpp
+    src/fuurin.cpp
 )
 
 set (LIB_DEPS
@@ -46,7 +46,7 @@ set_target_properties(fuurin_static PROPERTIES OUTPUT_NAME ${PROJECT_NAME})
 add_dependencies(fuurin_shared ${LIB_DEPS})
 add_dependencies(fuurin_static ${LIB_DEPS})
 
-include_directories(${3RDPARTY_DIR}/include)
+include_directories(include ${3RDPARTY_DIR}/include)
 link_directories(${3RDPARTY_DIR}/lib)
 
 if (DEFINED TESTS AND TESTS EQUAL 1)
