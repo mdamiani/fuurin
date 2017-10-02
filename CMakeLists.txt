@@ -8,11 +8,11 @@
  # file, You can obtain one at http://mozilla.org/MPL/2.0/.
  ##
 
-cmake_minimum_required (VERSION 3.5.1)
+cmake_minimum_required(VERSION 3.5.1)
 
-project (fuurin)
+project(fuurin)
 
-set (CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 14)
 
 add_definitions(
     -Wall
@@ -29,7 +29,7 @@ ExternalProject_Add(zeromq
     CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
 )
 
-set (LIB_SOURCES
+set(LIB_SOURCES
     src/fuurin.cpp
 )
 
@@ -39,7 +39,7 @@ set(LIB_PUBLIC_HEADERS
     include/fuurin/worker.h
 )
 
-set (LIB_DEPS
+set(LIB_DEPS
     zeromq
 )
 
@@ -55,7 +55,7 @@ add_dependencies(fuurin_static ${LIB_DEPS})
 include_directories(include ${3RDPARTY_DIR}/include)
 link_directories(${3RDPARTY_DIR}/lib)
 
-if (DEFINED TESTS AND TESTS EQUAL 1)
+if(DEFINED TESTS AND TESTS EQUAL 1)
     message("-- Tests enabled")
     include(CTest)
     add_subdirectory(${PROJECT_SOURCE_DIR}/test)
