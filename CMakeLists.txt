@@ -10,6 +10,8 @@
 
 cmake_minimum_required(VERSION 3.5.1)
 
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+
 project(fuurin)
 
 set(CMAKE_CXX_STANDARD 14)
@@ -67,7 +69,7 @@ add_dependencies(fuurin_static ${LIB_DEPS})
 include_directories(include ${3RDPARTY_DIR}/include)
 link_directories(${3RDPARTY_DIR}/lib)
 
-if(DEFINED TESTS AND TESTS EQUAL 1)
+if(DEFINED BUILD_TESTS AND BUILD_TESTS EQUAL 1)
     message("-- Tests enabled")
     include(CTest)
     add_subdirectory(${PROJECT_SOURCE_DIR}/test)
@@ -76,64 +78,35 @@ else()
 endif()
 
 
-# CPack configuration
-set(CPACK_PACKAGE_DESCRIPTION_SUMMARY
-    "Simple and fast ZeroMQ communication library for microservices")
-set(CPACK_PACKAGE_VERSION_MAJOR ${LIB_VERSION_MAJOR})
-set(CPACK_PACKAGE_VERSION_MINOR ${LIB_VERSION_MINOR})
-set(CPACK_PACKAGE_VERSION_PATCH ${LIB_VERSION_PATCH})
-set(CPACK_SET_DESTDIR true)
-set(CPACK_COMPONENTS_ALL libfuurin libfuurin-dev)
+if(DEFINED BUILD_DEB_PACKAGE AND BUILD_DEB_PACKAGE EQUAL 1)
+    message("-- CPack Debian enabled")
 
-# Debian package
-if(CMAKE_SYSTEM_NAME MATCHES Linux)
-    execute_process(COMMAND dpkg --print-architecture
-        OUTPUT_STRIP_TRAILING_WHITESPACE
-        OUTPUT_VARIABLE CPACK_DEBIAN_PACKAGE_ARCHITECTURE)
+    # CPack configuration
+    set(CPACK_PACKAGE_DESCRIPTION_SUMMARY
+        "Simple and fast ZeroMQ communication library for microservices")
+    set(CPACK_PACKAGE_VERSION_MAJOR ${LIB_VERSION_MAJOR})
+    set(CPACK_PACKAGE_VERSION_MINOR ${LIB_VERSION_MINOR})
+    set(CPACK_PACKAGE_VERSION_PATCH ${LIB_VERSION_PATCH})
+    set(CPACK_SET_DESTDIR true)
+    set(CPACK_COMPONENTS_ALL libfuurin libfuurin-dev)
 
-    set(CPACK_GENERATOR "DEB")
-    set(CPACK_INSTALL_PREFIX /usr)
-    set(CPACK_STRIP_FILES true)
-    set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS true)
-    set(CPACK_DEBIAN_PACKAGE_CONTROL_STRICT_PERMISSION true)
+    include(CPackDebianConfig)
+    include(CPack)
 
-    set(CPACK_DEBIAN_LIBFUURIN_PACKAGE_NAME "libfuurin${LIB_VERSION_MAJOR}")
-    set(CPACK_DEBIAN_LIBFUURIN_PACKAGE_SECTION "libs")
-    set(CPACK_DEBIAN_LIBFUURIN_PACKAGE_CONTROL_EXTRA
-        "${CMAKE_SOURCE_DIR}/cpack/deb/control/postinst"
-        "${CMAKE_SOURCE_DIR}/cpack/deb/control/postrm")
+    cpack_add_component(libfuurin
+        DISPLAY_NAME "Runtime"
+        DESCRIPTION "${PROJECT_NAME} library runtime"
+    )
 
-    set(CPACK_DEBIAN_LIBFUURIN-DEV_PACKAGE_NAME "libfuurin${LIB_VERSION_MAJOR}-dev")
-    set(CPACK_DEBIAN_LIBFUURIN-DEV_PACKAGE_DEPENDS "libfuurin${LIB_VERSION_MAJOR}")
-    set(CPACK_DEBIAN_LIBFUURIN-DEV_PACKAGE_SECTION "libdevel")
-
-    set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Community (hopefully)")
-    set(CPACK_DEBIAN_PACKAGE_PREDEPENDS "multiarch-support")
-    set(CPACK_DEBIAN_PACKAGE_DEPENDS "libc6 (>= 2.23), libstdc++6 (>= 5.4.0)")
-
-    string(CONCAT DEB_FILE_NAME
-        "${CMAKE_PROJECT_NAME}_"
-        "${LIB_VERSION_MAJOR}."
-        "${LIB_VERSION_MINOR}."
-        "${LIB_VERSION_PATCH}_"
-        "${CPACK_DEBIAN_PACKAGE_ARCHITECTURE}")
-
-    set(CPACK_DEB_COMPONENT_INSTALL 1)
-    set(CPACK_PACKAGE_FILE_NAME ${DEB_FILE_NAME})
+    cpack_add_component(libfuurin-dev
+        DISPLAY_NAME "Development"
+        DESCRIPTION "${PROJECT_NAME} library development files"
+        DEPENDS libfuurin
+    )
+else()
+    message("-- CPack Debian disabled")
 endif()
 
-include(CPack)
-
-cpack_add_component(libfuurin
-    DISPLAY_NAME "Runtime"
-    DESCRIPTION "${PROJECT_NAME} library runtime"
-)
-
-cpack_add_component(libfuurin-dev
-    DISPLAY_NAME "Development"
-    DESCRIPTION "${PROJECT_NAME} library development files"
-    DEPENDS libfuurin
-)
 
 # Install
 include(GNUInstallDirs)
