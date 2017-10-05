@@ -43,11 +43,23 @@ set(LIB_DEPS
     zeromq
 )
 
-add_library (fuurin_shared SHARED ${LIB_SOURCES})
-add_library (fuurin_static STATIC ${LIB_SOURCES})
+set(LIB_VERSION_MAJOR 0)
+set(LIB_VERSION_MINOR 1)
+set(LIB_VERSION_PATCH 1)
+set(LIB_VERSION_FULL ${LIB_VERSION_MAJOR}.${LIB_VERSION_MINOR}.${LIB_VERSION_PATCH})
 
-set_target_properties(fuurin_shared PROPERTIES OUTPUT_NAME ${PROJECT_NAME})
-set_target_properties(fuurin_static PROPERTIES OUTPUT_NAME ${PROJECT_NAME})
+add_library(fuurin_shared SHARED ${LIB_SOURCES})
+add_library(fuurin_static STATIC ${LIB_SOURCES})
+
+set_target_properties(fuurin_shared PROPERTIES
+    OUTPUT_NAME ${PROJECT_NAME}
+    VERSION ${LIB_VERSION_FULL}
+    SOVERSION ${LIB_VERSION_MAJOR}
+)
+
+set_target_properties(fuurin_static PROPERTIES
+    OUTPUT_NAME ${PROJECT_NAME}
+)
 
 add_dependencies(fuurin_shared ${LIB_DEPS})
 add_dependencies(fuurin_static ${LIB_DEPS})
@@ -64,15 +76,91 @@ else()
 endif()
 
 
+# CPack configuration
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY
+    "Simple and fast ZeroMQ communication library for microservices")
+set(CPACK_PACKAGE_VERSION_MAJOR ${LIB_VERSION_MAJOR})
+set(CPACK_PACKAGE_VERSION_MINOR ${LIB_VERSION_MINOR})
+set(CPACK_PACKAGE_VERSION_PATCH ${LIB_VERSION_PATCH})
+set(CPACK_SET_DESTDIR true)
+set(CPACK_COMPONENTS_ALL libfuurin libfuurin-dev)
+
+# Debian package
+if(CMAKE_SYSTEM_NAME MATCHES Linux)
+    execute_process(COMMAND dpkg --print-architecture
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        OUTPUT_VARIABLE CPACK_DEBIAN_PACKAGE_ARCHITECTURE)
+
+    set(CPACK_GENERATOR "DEB")
+    set(CPACK_INSTALL_PREFIX /usr)
+    set(CPACK_STRIP_FILES true)
+    set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS true)
+    set(CPACK_DEBIAN_PACKAGE_CONTROL_STRICT_PERMISSION true)
+
+    set(CPACK_DEBIAN_LIBFUURIN_PACKAGE_NAME "libfuurin${LIB_VERSION_MAJOR}")
+    set(CPACK_DEBIAN_LIBFUURIN_PACKAGE_SECTION "libs")
+    set(CPACK_DEBIAN_LIBFUURIN_PACKAGE_CONTROL_EXTRA
+        "${CMAKE_SOURCE_DIR}/cpack/deb/control/postinst"
+        "${CMAKE_SOURCE_DIR}/cpack/deb/control/postrm")
+
+    set(CPACK_DEBIAN_LIBFUURIN-DEV_PACKAGE_NAME "libfuurin${LIB_VERSION_MAJOR}-dev")
+    set(CPACK_DEBIAN_LIBFUURIN-DEV_PACKAGE_DEPENDS "libfuurin${LIB_VERSION_MAJOR}")
+    set(CPACK_DEBIAN_LIBFUURIN-DEV_PACKAGE_SECTION "libdevel")
+
+    set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Community (hopefully)")
+    set(CPACK_DEBIAN_PACKAGE_PREDEPENDS "multiarch-support")
+    set(CPACK_DEBIAN_PACKAGE_DEPENDS "libc6 (>= 2.23), libstdc++6 (>= 5.4.0)")
+
+    string(CONCAT DEB_FILE_NAME
+        "${CMAKE_PROJECT_NAME}_"
+        "${LIB_VERSION_MAJOR}."
+        "${LIB_VERSION_MINOR}."
+        "${LIB_VERSION_PATCH}_"
+        "${CPACK_DEBIAN_PACKAGE_ARCHITECTURE}")
+
+    set(CPACK_DEB_COMPONENT_INSTALL 1)
+    set(CPACK_PACKAGE_FILE_NAME ${DEB_FILE_NAME})
+endif()
+
+include(CPack)
+
+cpack_add_component(libfuurin
+    DISPLAY_NAME "Runtime"
+    DESCRIPTION "${PROJECT_NAME} library runtime"
+)
+
+cpack_add_component(libfuurin-dev
+    DISPLAY_NAME "Development"
+    DESCRIPTION "${PROJECT_NAME} library development files"
+    DEPENDS libfuurin
+)
+
 # Install
 include(GNUInstallDirs)
 
+set(INSTALL_LIBDIR "${CMAKE_INSTALL_LIBDIR}/${CMAKE_LIBRARY_ARCHITECTURE}")
+set(INSTALL_INCDIR "${CMAKE_INSTALL_INCLUDEDIR}/${PROJECT_NAME}")
+
 install(
-    TARGETS fuurin_shared fuurin_static
-    DESTINATION "${CMAKE_INSTALL_LIBDIR}/${CMAKE_LIBRARY_ARCHITECTURE}"
+    TARGETS fuurin_shared
+    LIBRARY DESTINATION "${INSTALL_LIBDIR}" NAMELINK_SKIP
+    COMPONENT libfuurin
+)
+
+install(
+    TARGETS fuurin_shared
+    LIBRARY DESTINATION "${INSTALL_LIBDIR}" NAMELINK_ONLY
+    COMPONENT libfuurin-dev
+)
+
+install(
+    TARGETS fuurin_static
+    ARCHIVE DESTINATION "${INSTALL_LIBDIR}"
+    COMPONENT libfuurin-dev
 )
 
 install(
     FILES ${LIB_PUBLIC_HEADERS}
     DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/${PROJECT_NAME}"
+    COMPONENT libfuurin-dev
 )
