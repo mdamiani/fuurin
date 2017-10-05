@@ -9,19 +9,26 @@ execute_process(COMMAND dpkg --print-architecture
 set(CPACK_GENERATOR "DEB")
 set(CPACK_INSTALL_PREFIX /usr)
 set(CPACK_STRIP_FILES true)
-set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS true)
+set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS false)
 set(CPACK_DEBIAN_PACKAGE_CONTROL_STRICT_PERMISSION true)
 
-set(CPACK_DEBIAN_LIBFUURIN_PACKAGE_NAME "libfuurin${LIB_VERSION_MAJOR}")
+set(FILE_POSTINST "${CMAKE_CURRENT_BINARY_DIR}/deb/control/postinst")
+set(FILE_POSTRM   "${CMAKE_CURRENT_BINARY_DIR}/deb/control/postrm")
+set(FILE_SHLIBS   "${CMAKE_CURRENT_BINARY_DIR}/deb/control/shlibs")
+
+set(CPACK_DEBIAN_LIBFUURIN_PACKAGE_NAME "${LIB_NAME}${LIB_SOVERSION}")
 set(CPACK_DEBIAN_LIBFUURIN_PACKAGE_SECTION "libs")
 set(CPACK_DEBIAN_LIBFUURIN_PACKAGE_CONTROL_EXTRA
-    "${CMAKE_SOURCE_DIR}/cmake/deb/control/postinst"
-    "${CMAKE_SOURCE_DIR}/cmake/deb/control/postrm")
+    "${FILE_POSTINST}"
+    "${FILE_POSTRM}"
+    "${FILE_SHLIBS}"
+)
 
-set(CPACK_DEBIAN_LIBFUURIN-DEV_PACKAGE_NAME "libfuurin${LIB_VERSION_MAJOR}-dev")
-set(CPACK_DEBIAN_LIBFUURIN-DEV_PACKAGE_DEPENDS "libfuurin${LIB_VERSION_MAJOR} (= ${LIB_VERSION_FULL})")
+set(CPACK_DEBIAN_LIBFUURIN-DEV_PACKAGE_NAME "${LIB_NAME}${LIB_SOVERSION}-dev")
+set(CPACK_DEBIAN_LIBFUURIN-DEV_PACKAGE_DEPENDS "${LIB_NAME}${LIB_SOVERSION} (= ${LIB_VERSION_FULL})")
 set(CPACK_DEBIAN_LIBFUURIN-DEV_PACKAGE_SECTION "libdevel")
 
+set(CPACK_DEBIAN_PACKAGE_SOURCE ${PROJECT_NAME})
 set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Community (hopefully)")
 set(CPACK_DEBIAN_PACKAGE_PRIORITY "optional")
 set(CPACK_DEBIAN_PACKAGE_PREDEPENDS "multiarch-support")
@@ -32,7 +39,36 @@ string(CONCAT DEB_FILE_NAME
     "${LIB_VERSION_MAJOR}."
     "${LIB_VERSION_MINOR}."
     "${LIB_VERSION_PATCH}_"
-    "${CPACK_DEBIAN_PACKAGE_ARCHITECTURE}")
+    "${CPACK_DEBIAN_PACKAGE_ARCHITECTURE}"
+)
 
 set(CPACK_DEB_COMPONENT_INSTALL 1)
 set(CPACK_PACKAGE_FILE_NAME ${DEB_FILE_NAME})
+
+
+# Generate postinst and prerm hooks
+file(WRITE "${FILE_POSTINST}"
+"#!/bin/sh
+set -e
+
+if [ \"$1\" = \"configure\" ]; then
+    dpkg-trigger ldconfig
+fi
+")
+
+file(WRITE "${FILE_POSTRM}"
+"#!/bin/sh
+set -e
+
+if [ \"$1\" = \"remove\" ]; then
+    dpkg-trigger ldconfig
+fi
+")
+
+# Generate shlibs
+file(WRITE "${FILE_SHLIBS}"
+"${LIB_NAME} ${LIB_SOVERSION} ${CPACK_DEBIAN_LIBFUURIN_PACKAGE_NAME} (>= ${LIB_VERSION_FULL})
+")
+
+execute_process(COMMAND chmod 755 "${FILE_POSTINST}" "${FILE_POSTRM}")
+execute_process(COMMAND chmod 644 "${FILE_SHLIBS}")

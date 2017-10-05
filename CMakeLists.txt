@@ -49,6 +49,8 @@ set(LIB_VERSION_MAJOR 0)
 set(LIB_VERSION_MINOR 1)
 set(LIB_VERSION_PATCH 1)
 set(LIB_VERSION_FULL ${LIB_VERSION_MAJOR}.${LIB_VERSION_MINOR}.${LIB_VERSION_PATCH})
+set(LIB_SOVERSION ${LIB_VERSION_MAJOR})
+set(LIB_NAME "lib${PROJECT_NAME}")
 
 add_library(fuurin_shared SHARED ${LIB_SOURCES})
 add_library(fuurin_static STATIC ${LIB_SOURCES})
@@ -56,7 +58,7 @@ add_library(fuurin_static STATIC ${LIB_SOURCES})
 set_target_properties(fuurin_shared PROPERTIES
     OUTPUT_NAME ${PROJECT_NAME}
     VERSION ${LIB_VERSION_FULL}
-    SOVERSION ${LIB_VERSION_MAJOR}
+    SOVERSION ${LIB_SOVERSION}
 )
 
 set_target_properties(fuurin_static PROPERTIES
