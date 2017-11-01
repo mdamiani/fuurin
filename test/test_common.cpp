@@ -11,7 +11,6 @@
 #include "fuurin/fuurin.h"
 
 #define BOOST_TEST_MODULE common
-#define BOOST_TEST_MAIN
 #include <boost/test/unit_test.hpp>
 
 #include <cstdio>
@@ -25,5 +24,5 @@ BOOST_AUTO_TEST_CASE(version) {
         fuurin::VERSION_MINOR,
         fuurin::VERSION_PATCH);
 
-    BOOST_CHECK_EQUAL(std::string(fuurin::version()), std::string(buf));
+    BOOST_TEST(std::string(fuurin::version()) == std::string(buf));
 }

@@ -8,17 +8,25 @@
  # file, You can obtain one at http://mozilla.org/MPL/2.0/.
  ##
 
-set(Boost_USE_STATIC_LIBS ON)
+include_directories("../vendor/boost")
 
-find_package(Boost 1.58 COMPONENTS unit_test_framework REQUIRED)
-
-include_directories(${Boost_INCLUDE_DIRS})
+ExternalProject_Add(boost_utf
+    SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../vendor/boost/libs/test/build"
+    INSTALL_DIR "${3RDPARTY_DIR}"
+    CMAKE_ARGS
+        -D CMAKE_INSTALL_PREFIX=<INSTALL_DIR>
+        -D CMAKE_BUILD_TYPE=Release
+)
 
 function (AddTest TEST)
     message("-- Adding test ${TEST}")
+
     add_executable(${TEST} ${TEST}.cpp)
-    target_link_libraries(${TEST} fuurin_static ${Boost_UNIT_TEST_FRAMEWORK_LIBRARY})
+    add_dependencies(${TEST} boost_utf)
+
+    target_link_libraries(${TEST} fuurin_static boost_test_framework)
     target_include_directories(${TEST} PRIVATE ../)
+
     add_test(NAME ${TEST}
         WORKING_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
         COMMAND $<TARGET_FILE:${TEST}>)
