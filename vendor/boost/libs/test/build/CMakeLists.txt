@@ -108,3 +108,12 @@ add_library(boost_test_framework
 target_compile_definitions(boost_test_framework PUBLIC "-DBOOST_TEST_DYN_LINK=0")
 target_include_directories(boost_test_framework PUBLIC ${BOOST_TEST_ROOT_DIR}/include/)
 set_target_properties(boost_test_framework PROPERTIES FOLDER "UTF")
+
+
+# install target
+include(GNUInstallDirs)
+
+install(
+    TARGETS boost_test_framework
+    ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+)
