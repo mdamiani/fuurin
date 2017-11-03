@@ -12,8 +12,7 @@
 #define ZMQLOW_H
 
 
-#include <cstddef>
-#include <cstdint>
+#include "types.h"
 
 
 #if defined(FUURIN_ENDIANESS_BIG) && defined(FUURIN_ENDIANESS_LITTLE)
@@ -58,6 +57,7 @@ void memcpyWithEndian(void *dest, const void *source, size_t size);
  *
  * \see memcpyWithEndian
  */
+///@{
 template <typename T>
 void dataToNetworkEndian(const T &data, uint8_t *dest)
 {
@@ -65,23 +65,34 @@ void dataToNetworkEndian(const T &data, uint8_t *dest)
 }
 
 
+template <>
+void dataToNetworkEndian(const ByteArray &data, uint8_t *dest);
+///@}
+
+
 /**
  * \brief Applies the correct endianess to a data, that was received from network.
  *
  * \param[in] source Data received from the network, as an array of bytes.
+ * \param[in] size Size of the \c source buffer.
  *
  * \return Data with correct host endianess.
  *
  * \see memcpyWithEndian
  */
+///@{
 template <typename T>
-T dataFromNetworkEndian(const uint8_t *source)
+T dataFromNetworkEndian(const uint8_t *source, size_t size)
 {
     T ret;
-    memcpyWithEndian(&ret, source, sizeof(T));
+    memcpyWithEndian(&ret, source, size);
     return ret;
 }
 
+
+template <>
+ByteArray dataFromNetworkEndian(const uint8_t *source, size_t size);
+///@}
 
 }
 }

@@ -14,22 +14,28 @@
 
 #include "../src/zmqlow.h"
 
+#include <cstring>
 
-namespace fzmq = fuurin::zmq;
+
+using namespace fuurin;
 
 typedef boost::mpl::list<
     uint8_t,
     uint16_t,
     uint32_t,
     uint64_t
-> networkDataTypes;
+> networkIntTypes;
+
+typedef boost::mpl::list<
+    ByteArray
+> networkArrayTypes;
 
 static const uint8_t networkDataBuf[] = {
     0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xAA,
 };
 
 
-BOOST_AUTO_TEST_CASE_TEMPLATE(endianessSend, T, networkDataTypes)
+BOOST_AUTO_TEST_CASE_TEMPLATE(endianessSendInt, T, networkIntTypes)
 {
     T val = 0;
     for (size_t i = 0; i < sizeof(T); ++i) {
@@ -37,7 +43,7 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(endianessSend, T, networkDataTypes)
     }
 
     uint8_t dest[sizeof(T)];
-    fzmq::dataToNetworkEndian(val, &dest[0]);
+    zmq::dataToNetworkEndian(val, &dest[0]);
 
     for (size_t i = 0; i < sizeof(T); ++i) {
         #if defined(FUURIN_ENDIANESS_BIG)
@@ -51,9 +57,20 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(endianessSend, T, networkDataTypes)
 }
 
 
-BOOST_AUTO_TEST_CASE_TEMPLATE(endianessRecv, T, networkDataTypes)
+BOOST_AUTO_TEST_CASE_TEMPLATE(endianessSendArray, T, networkArrayTypes)
 {
-    const T val = fzmq::dataFromNetworkEndian<T>(&networkDataBuf[0]);
+    T val(networkDataBuf, networkDataBuf+sizeof(networkDataBuf));
+
+    uint8_t dest[val.size()];
+    zmq::dataToNetworkEndian(val, &dest[0]);
+
+    BOOST_TEST(std::memcmp(&dest[0], &val[0], sizeof(networkDataBuf)) == 0);
+}
+
+
+BOOST_AUTO_TEST_CASE_TEMPLATE(endianessRecvInt, T, networkIntTypes)
+{
+    const T val = zmq::dataFromNetworkEndian<T>(&networkDataBuf[0], sizeof(T));
 
     for (size_t i = 0; i < sizeof(T); ++i) {
         const uint8_t byte = (val >> (8*i)) & 0xFF;
@@ -65,4 +82,12 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(endianessRecv, T, networkDataTypes)
         BOOST_TEST(false, "network endianess not defined!");
         #endif
     }
+}
+
+
+BOOST_AUTO_TEST_CASE_TEMPLATE(endianessRecvArray, T, networkArrayTypes)
+{
+    const T val = zmq::dataFromNetworkEndian<T>(&networkDataBuf[0], sizeof(networkDataBuf));
+
+    BOOST_TEST(std::memcmp(&val[0], &networkDataBuf[0], sizeof(networkDataBuf)) == 0);
 }

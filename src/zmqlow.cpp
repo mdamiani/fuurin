@@ -40,5 +40,20 @@ void memcpyWithEndian(void *dest, const void *source, size_t size)
 #endif
 }
 
+
+template <>
+void dataToNetworkEndian(const ByteArray &data, uint8_t *dest)
+{
+    std::memcpy(dest, data.data(), data.size());
+}
+
+
+template <>
+ByteArray dataFromNetworkEndian(const uint8_t *source, size_t size)
+{
+    return ByteArray(source, source+size);
+}
+
+
 }
 }
