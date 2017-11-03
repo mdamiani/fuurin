@@ -33,3 +33,4 @@ function (AddTest TEST)
 endfunction (AddTest)
 
 AddTest(test_common)
+AddTest(test_zmqlow)

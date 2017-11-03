@@ -9,3 +9,36 @@
  */
 
 #include "zmqlow.h"
+
+#include <cerrno>
+#include <cstring>
+#include <algorithm>
+
+
+#if defined(FUURIN_ENDIANESS_BIG)
+#define ENDIANESS_STRAIGHT __BIG_ENDIAN
+#define ENDIANESS_OPPOSITE __LITTLE_ENDIAN
+#endif
+
+#if defined (FUURIN_ENDIANESS_LITTLE)
+#define ENDIANESS_STRAIGHT __LITTLE_ENDIAN
+#define ENDIANESS_OPPOSITE __BIG_ENDIAN
+#endif
+
+
+namespace fuurin {
+namespace zmq {
+
+void memcpyWithEndian(void *dest, const void *source, size_t size)
+{
+#if __BYTE_ORDER == ENDIANESS_STRAIGHT
+    std::memcpy(dest, source, size);
+#elif __BYTE_ORDER == ENDIANESS_OPPOSITE
+    std::reverse_copy((char *) source, ((char *) source) + size, (char *) dest);
+#else
+    #error "Unable to detect endianness"
+#endif
+}
+
+}
+}

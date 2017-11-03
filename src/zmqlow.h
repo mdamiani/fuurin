@@ -11,12 +11,9 @@
 #ifndef ZMQLOW_H
 #define ZMQLOW_H
 
-#include <zmq.h>
 
-#include <cerrno>
-#include <cstring>
-#include <algorithm>
-
+#include <cstddef>
+#include <cstdint>
 
 
 #if defined(FUURIN_ENDIANESS_BIG) && defined(FUURIN_ENDIANESS_LITTLE)
@@ -27,18 +24,10 @@
 #define FUURIN_ENDIANESS_BIG
 #endif
 
-#if defined(FUURIN_ENDIANESS_BIG)
-#define ENDIANESS_STRAIGHT __BIG_ENDIAN
-#define ENDIANESS_OPPOSITE __LITTLE_ENDIAN
-#endif
 
-#if defined (FUURIN_ENDIANESS_LITTLE)
-#define ENDIANESS_STRAIGHT __LITTLE_ENDIAN
-#define ENDIANESS_OPPOSITE __BIG_ENDIAN
-#endif
+namespace fuurin {
+namespace zmq {
 
-
-namespace {
 
 /**
  * \brief Copies data, taking care of the network send endianess.
@@ -58,16 +47,8 @@ namespace {
  * \see dataToNetworkEndian
  * \see dataFromNetworkEndian
  */
-void memcpyWithEndian(void *dest, const void *source, size_t size)
-{
-#if __BYTE_ORDER == ENDIANESS_STRAIGHT
-    std::memcpy(dest, source, size);
-#elif __BYTE_ORDER == ENDIANESS_OPPOSITE
-    std::reverse_copy((char *) source, ((char *) source) + size, (char *) dest);
-#else
-    #error "Unable to detect endianness"
-#endif
-}
+void memcpyWithEndian(void *dest, const void *source, size_t size);
+
 
 /**
  * \brief Applies the correct endianess to a \c data, in order to send it over network.
@@ -83,6 +64,7 @@ void dataToNetworkEndian(const T &data, uint8_t *dest)
     memcpyWithEndian(dest, &data, sizeof(data));
 }
 
+
 /**
  * \brief Applies the correct endianess to a data, that was received from network.
  *
@@ -96,10 +78,12 @@ template <typename T>
 T dataFromNetworkEndian(const uint8_t *source)
 {
     T ret;
-    memcpyWithEndian(&ret, source, sizeof(source));
+    memcpyWithEndian(&ret, source, sizeof(T));
     return ret;
 }
 
+
+}
 }
 
 #endif // ZMQLOW_H
