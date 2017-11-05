@@ -10,6 +10,8 @@
 
 #include "zmqlow.h"
 
+#include <boost/preprocessor/seq/for_each.hpp>
+
 #include <cerrno>
 #include <cstring>
 #include <algorithm>
@@ -29,6 +31,7 @@
 namespace fuurin {
 namespace zmq {
 
+
 void memcpyWithEndian(void *dest, const void *source, size_t size)
 {
 #if __BYTE_ORDER == ENDIANESS_STRAIGHT
@@ -41,10 +44,26 @@ void memcpyWithEndian(void *dest, const void *source, size_t size)
 }
 
 
+template <typename T>
+void dataToNetworkEndian(const T &data, uint8_t *dest)
+{
+    memcpyWithEndian(dest, &data, sizeof(data));
+}
+
+
 template <>
 void dataToNetworkEndian(const ByteArray &data, uint8_t *dest)
 {
     std::memcpy(dest, data.data(), data.size());
+}
+
+
+template <typename T>
+T dataFromNetworkEndian(const uint8_t *source, size_t size)
+{
+    T ret;
+    memcpyWithEndian(&ret, source, size);
+    return ret;
 }
 
 
@@ -54,6 +73,21 @@ ByteArray dataFromNetworkEndian(const uint8_t *source, size_t size)
     return ByteArray(source, source+size);
 }
 
+
+#define TEMPLATE_TO_NETWORK(r, data, T) \
+    template void dataToNetworkEndian(const T &, uint8_t *);
+
+#define TEMPLATE_FROM_NETWORK(r, data, T) \
+    template T dataFromNetworkEndian(const uint8_t *, size_t);
+
+#define MSG_PART_INT_TYPES \
+    (uint8_t)              \
+    (uint16_t)             \
+    (uint32_t)             \
+    (uint64_t)
+
+BOOST_PP_SEQ_FOR_EACH(TEMPLATE_TO_NETWORK, _, MSG_PART_INT_TYPES)
+BOOST_PP_SEQ_FOR_EACH(TEMPLATE_FROM_NETWORK, _, MSG_PART_INT_TYPES)
 
 }
 }

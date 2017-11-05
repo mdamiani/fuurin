@@ -29,19 +29,23 @@ namespace zmq {
 
 
 /**
- * \brief Copies data, taking care of the network send endianess.
+ * \brief Copies data, according to the target network endianess.
  *
  * Given data is copied from \c source to \c dest. Both of these
  * pointers must no overlap, otherwise the result is undefined.
  *
- * The actual endianess can be choosen through compiter macros:
+ * The network endianess can be choosen at compile time,
+ * by defining one of these macros:
  *
- *  - \c FUURIN_ENDIANESS_BIG: network data has Big Endian format.
- *  - \c FUURIN_ENDIANESS_LITTLE: network data has Little Endian format.
+ *  - \c FUURIN_ENDIANESS_BIG: network endianess is Big Endian.
+ *  - \c FUURIN_ENDIANESS_LITTLE: network endianess is Little Endian.
  *
- * \param[out] dest Destination data.
- * \param[in] source Source data.
- * \param[in] size Size to copy.
+ * If none of the previous macros is defined,
+ * then the default network endianess is Big Endian.
+ *
+ * \param[out] dest Destination buffer.
+ * \param[in] source Source buffer.
+ * \param[in] size Bytes to copy.
  *
  * \see dataToNetworkEndian
  * \see dataFromNetworkEndian
@@ -50,24 +54,15 @@ void memcpyWithEndian(void *dest, const void *source, size_t size);
 
 
 /**
- * \brief Applies the correct endianess to a \c data, in order to send it over network.
+ * \brief Applies the correct endianess to \c data, in order to send it over network.
  *
  * \param[in] data Data to send over the network.
  * \param[out] dest Destination buffer.
  *
  * \see memcpyWithEndian
  */
-///@{
 template <typename T>
-void dataToNetworkEndian(const T &data, uint8_t *dest)
-{
-    memcpyWithEndian(dest, &data, sizeof(data));
-}
-
-
-template <>
-void dataToNetworkEndian(const ByteArray &data, uint8_t *dest);
-///@}
+void dataToNetworkEndian(const T &data, uint8_t *dest);
 
 
 /**
@@ -80,19 +75,9 @@ void dataToNetworkEndian(const ByteArray &data, uint8_t *dest);
  *
  * \see memcpyWithEndian
  */
-///@{
 template <typename T>
-T dataFromNetworkEndian(const uint8_t *source, size_t size)
-{
-    T ret;
-    memcpyWithEndian(&ret, source, size);
-    return ret;
-}
+T dataFromNetworkEndian(const uint8_t *source, size_t size);
 
-
-template <>
-ByteArray dataFromNetworkEndian(const uint8_t *source, size_t size);
-///@}
 
 }
 }

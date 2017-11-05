@@ -74,7 +74,12 @@ set_target_properties(fuurin_static PROPERTIES
 add_dependencies(fuurin_shared ${LIB_DEPS})
 add_dependencies(fuurin_static ${LIB_DEPS})
 
-include_directories(include ${3RDPARTY_DIR}/include)
+include_directories(
+    "include"
+    "vendor/boost"
+    "${3RDPARTY_DIR}/include"
+)
+
 link_directories(${3RDPARTY_DIR}/lib)
 
 if(DEFINED BUILD_TESTS AND BUILD_TESTS EQUAL 1)
