@@ -37,7 +37,7 @@ void memcpyWithEndian(void *dest, const void *source, size_t size)
 #if __BYTE_ORDER == ENDIANESS_STRAIGHT
     std::memcpy(dest, source, size);
 #elif __BYTE_ORDER == ENDIANESS_OPPOSITE
-    std::reverse_copy((char *) source, ((char *) source) + size, (char *) dest);
+    std::reverse_copy((uint8_t *) source, ((uint8_t *) source) + size, (uint8_t *) dest);
 #else
     #error "Unable to detect endianness"
 #endif
@@ -45,21 +45,21 @@ void memcpyWithEndian(void *dest, const void *source, size_t size)
 
 
 template <typename T>
-void dataToNetworkEndian(const T &data, uint8_t *dest)
+void dataToNetworkEndian(const T &data, void *dest)
 {
     memcpyWithEndian(dest, &data, sizeof(data));
 }
 
 
 template <>
-void dataToNetworkEndian(const ByteArray &data, uint8_t *dest)
+void dataToNetworkEndian(const ByteArray &data, void *dest)
 {
     std::memcpy(dest, data.data(), data.size());
 }
 
 
 template <typename T>
-T dataFromNetworkEndian(const uint8_t *source, size_t size)
+T dataFromNetworkEndian(const void *source, size_t size)
 {
     T ret;
     memcpyWithEndian(&ret, source, size);
@@ -68,17 +68,17 @@ T dataFromNetworkEndian(const uint8_t *source, size_t size)
 
 
 template <>
-ByteArray dataFromNetworkEndian(const uint8_t *source, size_t size)
+ByteArray dataFromNetworkEndian(const void *source, size_t size)
 {
-    return ByteArray(source, source+size);
+    return ByteArray((uint8_t *) source, ((uint8_t *) source) + size);
 }
 
 
 #define TEMPLATE_TO_NETWORK(r, data, T) \
-    template void dataToNetworkEndian(const T &, uint8_t *);
+    template void dataToNetworkEndian(const T &, void *);
 
 #define TEMPLATE_FROM_NETWORK(r, data, T) \
-    template T dataFromNetworkEndian(const uint8_t *, size_t);
+    template T dataFromNetworkEndian(const void *, size_t);
 
 #define MSG_PART_INT_TYPES \
     (uint8_t)              \

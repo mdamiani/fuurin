@@ -62,7 +62,7 @@ void memcpyWithEndian(void *dest, const void *source, size_t size);
  * \see memcpyWithEndian
  */
 template <typename T>
-void dataToNetworkEndian(const T &data, uint8_t *dest);
+void dataToNetworkEndian(const T &data, void *dest);
 
 
 /**
@@ -76,7 +76,7 @@ void dataToNetworkEndian(const T &data, uint8_t *dest);
  * \see memcpyWithEndian
  */
 template <typename T>
-T dataFromNetworkEndian(const uint8_t *source, size_t size);
+T dataFromNetworkEndian(const void *source, size_t size);
 
 
 }
