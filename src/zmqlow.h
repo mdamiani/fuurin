@@ -15,6 +15,10 @@
 #include "types.h"
 
 
+#include <zmq.h>
+#include <boost/config.hpp> // for BOOST_LIKELY
+
+
 #if defined(FUURIN_ENDIANESS_BIG) && defined(FUURIN_ENDIANESS_LITTLE)
 #error "Please #define either FUURIN_ENDIANESS_BIG or FUURIN_ENDIANESS_LITTLE, not both"
 #endif
@@ -77,6 +81,51 @@ void memcpyToMessage(const T &data, void *dest);
  */
 template <typename T>
 T memcpyFromMessage(const void *source, size_t size);
+
+
+/**
+ * \brief Sends a ZMQ multipart message.
+ *
+ * The behaviour of this function if the same of \c zmq_send.
+ *
+ * \param[in] socket A valid ZMQ socket.
+ * \param[in] flags Flags accepted by function \c zmq_send.
+ * \param[in] part A single message part to send.
+ *
+ * \return Number of bytes in the message if successful.
+ *         Otherwise -1 and set \c errno variable with the error code.
+ *         Error codes are the ones returned by functions
+ *         \c zmq_msg_init_size and \c zmq_msg_send.
+ *
+ * \see sendMultipartMessage(void*, int, const T &, Args...)
+ */
+template <typename T>
+int sendMultipartMessage(void *socket, int flags, const T &part);
+
+
+/**
+ * \brief Sends a ZMQ multipart message.
+ *
+ * \param[in] socket A valid ZMQ socket.
+ * \param[in] flags Flags accepted by function \c zmq_send.
+ * \param[in] part Current message part to send.
+ * \param[in] args Additional message parts to send.
+ *
+ * \return Number of bytes in the last message if successful.
+ *         Otherwise -1 in case the multipart message could not be sent.
+ *
+ * \see sendMultipartMessage(void*, int, const T &)
+ */
+template <typename T, typename... Args>
+int sendMultipartMessage(void *socket, int flags, const T &part, Args... args)
+{
+    const int rc = sendMultipartMessage(socket, flags | ZMQ_SNDMORE, part);
+
+    if (BOOST_LIKELY(rc != -1))
+        return sendMultipartMessage(socket, flags, args...);
+    else
+        return rc;
+}
 
 
 }

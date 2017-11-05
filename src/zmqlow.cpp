@@ -12,6 +12,7 @@
 
 #include <boost/preprocessor/seq/for_each.hpp>
 
+#include <iostream>
 #include <cerrno>
 #include <cstring>
 #include <algorithm>
@@ -88,6 +89,65 @@ ByteArray memcpyFromMessage(const void *source, size_t size)
 
 BOOST_PP_SEQ_FOR_EACH(TEMPLATE_TO_NETWORK, _, MSG_PART_INT_TYPES)
 BOOST_PP_SEQ_FOR_EACH(TEMPLATE_FROM_NETWORK, _, MSG_PART_INT_TYPES)
+
+
+namespace {
+template <typename T>
+inline size_t getPartSize(const T &part)
+{
+    return sizeof(part);
+}
+
+
+template <>
+inline size_t getPartSize(const ByteArray &part)
+{
+    return part.size();
+}
+}
+
+
+template <typename T>
+int sendMultipartMessage(void *socket, int flags, const T &part)
+{
+    zmq_msg_t msg;
+    if (zmq_msg_init_size(&msg, getPartSize<T>(part)) != 0) {
+        // TODO: use library logging functions
+        std::cerr << "zmq_msg_init_size: " << zmq_strerror(errno) << std::endl;
+        return -1;
+    }
+
+    memcpyToMessage<T>(part, zmq_msg_data(&msg));
+
+    int rc;
+    do {
+        rc = zmq_msg_send(&msg, socket, flags);
+    } while (rc == -1 && errno == EINTR);
+
+    if (BOOST_UNLIKELY(rc == -1)) {
+        if (errno != EAGAIN) {
+            // TODO: use library logging functions
+            std::cerr << "zmq_send: " << zmq_strerror(errno) << std::endl;
+        }
+
+        const int err = errno;
+        const int rc2 = zmq_msg_close(&msg);
+        if (rc2 != 0) {
+            // TODO: use library logging functions
+            std::cerr << "zmq_msg_close: " << zmq_strerror(errno) << std::endl;
+        }
+        errno = err;
+    }
+
+    return rc;
+}
+
+
+#define TEMPLATE_SEND_MULTIPART_MESSAGE(r, data, T) \
+    template int sendMultipartMessage(void *, int, const T &);
+
+BOOST_PP_SEQ_FOR_EACH(TEMPLATE_SEND_MULTIPART_MESSAGE, _, MSG_PART_INT_TYPES(ByteArray))
+
 
 }
 }
