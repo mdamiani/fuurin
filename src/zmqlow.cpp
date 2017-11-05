@@ -32,7 +32,7 @@ namespace fuurin {
 namespace zmq {
 
 
-void memcpyWithEndian(void *dest, const void *source, size_t size)
+inline void memcpyWithEndian(void *dest, const void *source, size_t size)
 {
 #if __BYTE_ORDER == ENDIANESS_STRAIGHT
     std::memcpy(dest, source, size);

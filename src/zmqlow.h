@@ -50,7 +50,7 @@ namespace zmq {
  * \see memcpyToMessage
  * \see memcpyFromMessage
  */
-void memcpyWithEndian(void *dest, const void *source, size_t size);
+inline void memcpyWithEndian(void *dest, const void *source, size_t size);
 
 
 /**
