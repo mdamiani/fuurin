@@ -757,6 +757,7 @@ if (MSVC)
       RELWITHDEBINFO_POSTFIX "${MSVC_TOOLSET}-mt-s-${ZMQ_VERSION_MAJOR}_${ZMQ_VERSION_MINOR}_${ZMQ_VERSION_PATCH}"
       DEBUG_POSTFIX "${MSVC_TOOLSET}-mt-sgd-${ZMQ_VERSION_MAJOR}_${ZMQ_VERSION_MINOR}_${ZMQ_VERSION_PATCH}"
       COMPILE_FLAGS "/DZMQ_STATIC"
+      POSITION_INDEPENDENT_CODE ON
       OUTPUT_NAME "libzmq")
   endif()
 else ()
@@ -791,6 +792,7 @@ else ()
     set_target_properties (libzmq-static PROPERTIES
       PUBLIC_HEADER "${public_headers}"
       COMPILE_DEFINITIONS "ZMQ_STATIC"
+      POSITION_INDEPENDENT_CODE ON
       OUTPUT_NAME "libzmq"
       PREFIX "")
   endif()
