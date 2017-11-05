@@ -47,8 +47,8 @@ namespace zmq {
  * \param[in] source Source buffer.
  * \param[in] size Bytes to copy.
  *
- * \see dataToNetworkEndian
- * \see dataFromNetworkEndian
+ * \see memcpyToMessage
+ * \see memcpyFromMessage
  */
 void memcpyWithEndian(void *dest, const void *source, size_t size);
 
@@ -62,7 +62,7 @@ void memcpyWithEndian(void *dest, const void *source, size_t size);
  * \see memcpyWithEndian
  */
 template <typename T>
-void dataToNetworkEndian(const T &data, void *dest);
+void memcpyToMessage(const T &data, void *dest);
 
 
 /**
@@ -76,7 +76,7 @@ void dataToNetworkEndian(const T &data, void *dest);
  * \see memcpyWithEndian
  */
 template <typename T>
-T dataFromNetworkEndian(const void *source, size_t size);
+T memcpyFromMessage(const void *source, size_t size);
 
 
 }
