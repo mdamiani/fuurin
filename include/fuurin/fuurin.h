@@ -9,7 +9,6 @@
  */
 
 #include <string>
-#include <functional>
 
 
 namespace fuurin {
@@ -23,28 +22,36 @@ constexpr const int VERSION_MINOR = 1;
 constexpr const int VERSION_PATCH = 1;
 ///@}
 
+
 /**
  * \return Library version, formatted as string.
  */
 char * version();
 
-/// Type for a callable log handler function.
-typedef std::function<void(const std::string &)> LogHandlerFn;
 
 /**
- * \brief Installs log handler for library log messages.
- * \param[in] fn A callable function of type \ref LogHandlerFn.
+ * \brief Levels for logging messages.
  */
-///{@
-void logInstallDebugHandler(const LogHandlerFn &fn);
-void logInstallInfoHandler(const LogHandlerFn &fn);
-void logInstallWarnHandler(const LogHandlerFn &fn);
-void logInstallFatalHandler(const LogHandlerFn &fn);
-///@}
+enum LogLevel {
+    DebugLevel,         ///< Debug level.
+    InfoLevel,          ///< Info level.
+    WarningLevel,       ///< Warning level.
+    ErrorLevel,         ///< Error level.
+    FatalLevel,         ///< Fatal level.
+};
+
+
+/// Type for a callable log message handler function.
+typedef void (*LogMessageHandler)(LogLevel, const std::string &);
+
 
 /**
- * \brief Installs default handlers for library log messages.
+ * \brief Installs a custom handler for library log messages.
+ *
+ * \param[in] handler A callable function of type \ref LogMessageHandler.
+ *                    Passing NULL causes the default message handler to be installed.
  */
-void logInstallDefaultHandlers();
+void logInstallMessageHandler(LogMessageHandler handler);
+
 
 }

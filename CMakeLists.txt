@@ -43,6 +43,7 @@ ExternalProject_Add(zeromq
 set(LIB_SOURCES
     src/fuurin.cpp
     src/zmqlow.cpp
+    src/log.cpp
 )
 
 set(LIB_PUBLIC_HEADERS

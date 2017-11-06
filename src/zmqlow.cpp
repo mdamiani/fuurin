@@ -9,10 +9,10 @@
  */
 
 #include "zmqlow.h"
+#include "log.h"
 
 #include <boost/preprocessor/seq/for_each.hpp>
 
-#include <iostream>
 #include <cerrno>
 #include <cstring>
 #include <algorithm>
@@ -112,8 +112,7 @@ int sendMultipartMessage(void *socket, int flags, const T &part)
 {
     zmq_msg_t msg;
     if (zmq_msg_init_size(&msg, getPartSize<T>(part)) != 0) {
-        // TODO: use library logging functions
-        std::cerr << "zmq_msg_init_size: " << zmq_strerror(errno) << std::endl;
+        LOG_ERROR(std::string("zmq_msg_init_size: ") + zmq_strerror(errno));
         return -1;
     }
 
@@ -126,15 +125,13 @@ int sendMultipartMessage(void *socket, int flags, const T &part)
 
     if (BOOST_UNLIKELY(rc == -1)) {
         if (errno != EAGAIN) {
-            // TODO: use library logging functions
-            std::cerr << "zmq_send: " << zmq_strerror(errno) << std::endl;
+            LOG_ERROR(std::string("zmq_send: ") + zmq_strerror(errno));
         }
 
         const int err = errno;
         const int rc2 = zmq_msg_close(&msg);
         if (rc2 != 0) {
-            // TODO: use library logging functions
-            std::cerr << "zmq_msg_close: " << zmq_strerror(errno) << std::endl;
+            LOG_ERROR(std::string("zmq_msg_close: ") + zmq_strerror(errno));
         }
         errno = err;
     }
