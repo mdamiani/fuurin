@@ -33,6 +33,8 @@ ExternalProject_Add(zeromq
         -D CMAKE_INSTALL_PREFIX=<INSTALL_DIR>
         -D ZMQ_BUILD_TESTS=OFF
         -D ENABLE_CPACK=OFF
+        -D BUILD_SHARED=OFF
+        -D BUILD_STATIC=ON
         -D CMAKE_BUILD_TYPE=Release
 )
 
