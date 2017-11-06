@@ -23,6 +23,8 @@ add_definitions(
 
 include(ExternalProject)
 
+find_package(Threads REQUIRED)
+
 set(3RDPARTY_DIR ${CMAKE_BINARY_DIR}/3rdparty)
 
 ExternalProject_Add(zeromq
@@ -60,6 +62,8 @@ set(LIB_VERSION_FULL ${LIB_VERSION_MAJOR}.${LIB_VERSION_MINOR}.${LIB_VERSION_PAT
 set(LIB_SOVERSION ${LIB_VERSION_MAJOR})
 set(LIB_NAME "lib${PROJECT_NAME}")
 
+link_directories(${3RDPARTY_DIR}/lib)
+
 add_library(fuurin_shared SHARED ${LIB_SOURCES})
 add_library(fuurin_static STATIC ${LIB_SOURCES})
 
@@ -82,7 +86,8 @@ include_directories(
     "${3RDPARTY_DIR}/include"
 )
 
-link_directories(${3RDPARTY_DIR}/lib)
+target_link_libraries(fuurin_static zmq ${CMAKE_THREAD_LIBS_INIT})
+target_link_libraries(fuurin_shared zmq ${CMAKE_THREAD_LIBS_INIT})
 
 if(DEFINED BUILD_TESTS AND BUILD_TESTS EQUAL 1)
     message("-- Tests enabled")
