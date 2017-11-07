@@ -112,7 +112,8 @@ int sendMultipartMessage(void *socket, int flags, const T &part)
 {
     zmq_msg_t msg;
     if (zmq_msg_init_size(&msg, getPartSize<T>(part)) != 0) {
-        LOG_ERROR(std::string("zmq_msg_init_size: ") + zmq_strerror(errno));
+        LOG_ERROR(format("zmq_msg_init_size: %s",
+            zmq_strerror(errno)));
         return -1;
     }
 
@@ -125,13 +126,15 @@ int sendMultipartMessage(void *socket, int flags, const T &part)
 
     if (BOOST_UNLIKELY(rc == -1)) {
         if (errno != EAGAIN) {
-            LOG_ERROR(std::string("zmq_send: ") + zmq_strerror(errno));
+            LOG_ERROR(format("zmq_send: %s",
+                zmq_strerror(errno)));
         }
 
         const int err = errno;
         const int rc2 = zmq_msg_close(&msg);
         if (rc2 != 0) {
-            LOG_ERROR(std::string("zmq_msg_close: ") + zmq_strerror(errno));
+            LOG_ERROR(format("zmq_msg_close: %s",
+                zmq_strerror(errno)));
         }
         errno = err;
     }

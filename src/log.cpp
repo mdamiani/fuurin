@@ -12,13 +12,15 @@
 
 #include <cstdlib>
 #include <cstdio>
+#include <stdarg.h>
 #include <iostream>
+#include <vector>
 
 
 namespace fuurin {
 
 
-void logMessage(LogLevel level, const std::string &message)
+void logHandler(LogLevel level, const std::string &message)
 {
     switch(level) {
     case DebugLevel:
@@ -45,7 +47,25 @@ void logMessage(LogLevel level, const std::string &message)
 }
 
 
-LogMessageHandler _logMessage = logMessage;
+LogMessageHandler logMessage = logHandler;
+
+
+std::string format(const char *format, ...)
+{
+    va_list args;
+
+    va_start(args, format);
+    const int sz = std::vsnprintf(nullptr, 0, format, args) + 1;
+    va_end(args);
+
+    std::vector<char> buf(sz, 0);
+
+    va_start(args, format);
+    std::vsnprintf(&buf[0], sz, format, args);
+    va_end(args);
+
+    return std::string(buf.begin(), buf.end() - 1);
+}
 
 
 }

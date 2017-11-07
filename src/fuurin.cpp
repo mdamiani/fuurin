@@ -15,8 +15,8 @@
 
 namespace fuurin {
 
-extern void logMessage(LogLevel, const std::string &);
-extern LogMessageHandler _logMessage;
+extern void logHandler(LogLevel, const std::string &);
+extern LogMessageHandler logMessage;
 
 static char _version_buf[16];
 
@@ -31,9 +31,9 @@ char * version() {
 void logInstallMessageHandler(LogMessageHandler handler)
 {
     if (handler)
-        _logMessage = handler;
+        logMessage = handler;
     else
-        _logMessage = logMessage;
+        logMessage = logHandler;
 }
 
 

@@ -22,19 +22,30 @@ namespace fuurin {
  *
  * This function is used to handle message logs.
  */
-extern LogMessageHandler _logMessage;
+extern LogMessageHandler logMessage;
+
+
+/**
+ * \brief Simple formatting function for logs.
+ *
+ * \param[in] format String format, in printf-style.
+ * \param[in] ... Variable number of arguments.
+ *
+ * \return A formatted string.
+ */
+std::string format(const char *format, ...);
 
 
 #ifndef NDEBUG
-#define LOG_DEBUG(msg) _logMessage(DebugLevel, msg)
+#define LOG_DEBUG(msg)  logMessage(DebugLevel, msg)
 #else
 #define LOG_DEBUG(msg)
 #endif
 
-#define LOG_INFO(msg) _logMessage(InfoLevel, msg)
-#define LOG_WARN(msg) _logMessage(WarningLevel, msg)
-#define LOG_ERROR(msg) _logMessage(ErrorLevel, msg)
-#define LOG_FATAL(msg) _logMessage(FatalLevel, msg)
+#define LOG_INFO(msg)   logMessage(InfoLevel, msg)
+#define LOG_WARN(msg)   logMessage(WarningLevel, msg)
+#define LOG_ERROR(msg)  logMessage(ErrorLevel, msg)
+#define LOG_FATAL(msg)  logMessage(FatalLevel, msg)
 
 
 }
