@@ -8,6 +8,9 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
+#ifndef FUURIN_H
+#define FUURIN_H
+
 #include <string>
 
 
@@ -55,3 +58,5 @@ void logInstallMessageHandler(LogMessageHandler handler);
 
 
 }
+
+#endif // FUURIN_H
