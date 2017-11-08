@@ -13,6 +13,7 @@
 #include <boost/test/data/test_case.hpp>
 
 #include "fuurin/fuurin.h"
+#include "types.h"
 #include "log.h"
 
 #include <cstdio>
@@ -43,8 +44,11 @@ static const char * _myLogPrefix[] = {
     "MY_FATAL: ",
 };
 
-void myLogHandler(fuurin::LogLevel level, const std::string &message)
+void myLogHandler(fuurin::LogLevel level, const char *file, unsigned int line, const std::string &message)
 {
+    UNUSED(file);
+    UNUSED(line);
+
     _myLogOutput = _myLogPrefix[level] + message;
 }
 
@@ -59,7 +63,7 @@ BOOST_DATA_TEST_CASE(customLogMessageHandler, bdata::make({
     const std::string msg = "message";
 
     fuurin::logInstallMessageHandler(myLogHandler);
-    fuurin::logMessage(level, msg);
+    fuurin::logMessage(level, __FILE__, __LINE__, msg);
 
     BOOST_TEST(_myLogOutput == _myLogPrefix[level] + msg);
 }

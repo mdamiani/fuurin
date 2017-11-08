@@ -44,8 +44,14 @@ enum LogLevel {
 };
 
 
-/// Type for a callable log message handler function.
-typedef void (*LogMessageHandler)(LogLevel, const std::string &);
+/**
+ * \brief Type for a callable log message handler function.
+ *
+ * \param[in] level Log level of the message.
+ * \param[in] file  File name where the log happens.
+ * \param[in] line  Code line where the log happens.
+ */
+typedef void (*LogMessageHandler)(LogLevel level, const char *file, unsigned int line, const std::string &message);
 
 
 /**

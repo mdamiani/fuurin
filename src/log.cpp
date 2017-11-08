@@ -20,27 +20,18 @@
 namespace fuurin {
 
 
-void logHandler(LogLevel level, const std::string &message)
+void logHandler(LogLevel level, const char *file, unsigned int line, const std::string &message)
 {
     switch(level) {
     case DebugLevel:
-        std::cout << "DEBUG: " << message << std::endl;
-        break;
-
     case InfoLevel:
-        std::cout << "INFO: " << message << std::endl;
-        break;
-
     case WarningLevel:
-        std::cerr << "WARN: " << message << std::endl;
-        break;
-
     case ErrorLevel:
-        std::cerr << "ERROR: " << message << std::endl;
+        std::cout << message << std::endl;
         break;
 
     case FatalLevel:
-        std::cerr << "FATAL: " << message << std::endl;
+        std::cerr << "FATAL at file " << file << " line " << line << ": " << message << std::endl;
         std::abort();
         break;
     }

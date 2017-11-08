@@ -15,6 +15,8 @@
 #include <cstdint>
 #include <vector>
 
+#define UNUSED(x) (void)(x)
+
 
 namespace fuurin {
 
