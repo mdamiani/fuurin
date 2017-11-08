@@ -8,7 +8,10 @@
  # file, You can obtain one at http://mozilla.org/MPL/2.0/.
  ##
 
-include_directories("../vendor/boost")
+include_directories(
+    "../src"
+    "../vendor/boost"
+)
 
 ExternalProject_Add(boost_utf
     SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../vendor/boost/libs/test/build"
