@@ -21,6 +21,7 @@ add_definitions(
     -Wextra
 )
 
+include(BuildType)
 include(ExternalProject)
 
 find_package(Threads REQUIRED)
@@ -91,16 +92,16 @@ target_link_libraries(fuurin_static zmq ${CMAKE_THREAD_LIBS_INIT})
 target_link_libraries(fuurin_shared zmq ${CMAKE_THREAD_LIBS_INIT})
 
 if(DEFINED BUILD_TESTS AND BUILD_TESTS EQUAL 1)
-    message("-- Tests enabled")
+    message(STATUS "Tests enabled")
     include(CTest)
     add_subdirectory(${PROJECT_SOURCE_DIR}/test)
 else()
-    message("-- Tests disabled")
+    message(STATUS "Tests disabled")
 endif()
 
 
 if(DEFINED BUILD_DEB_PACKAGE AND BUILD_DEB_PACKAGE EQUAL 1)
-    message("-- CPack Debian enabled")
+    message(STATUS "CPack Debian enabled")
 
     # CPack configuration
     set(CPACK_PACKAGE_DESCRIPTION_SUMMARY
@@ -125,7 +126,7 @@ if(DEFINED BUILD_DEB_PACKAGE AND BUILD_DEB_PACKAGE EQUAL 1)
         DEPENDS libfuurin
     )
 else()
-    message("-- CPack Debian disabled")
+    message(STATUS "CPack Debian disabled")
 endif()
 
 
