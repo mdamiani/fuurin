@@ -9,6 +9,7 @@
  */
 
 #include "zmqlow.h"
+#include "failure.h"
 #include "log.h"
 
 #include <boost/preprocessor/seq/for_each.hpp>
@@ -104,14 +105,22 @@ inline size_t getPartSize(const ByteArray &part)
 {
     return part.size();
 }
+
+inline void closeZmqMsg(zmq_msg_t *msg) {
+    const int rc = zmq_msg_close(msg);
+    ASSERT(rc == 0, "zmq_msg_close failed");
+}
 }
 
 
 template <typename T>
 int sendMultipartMessage(void *socket, int flags, const T &part)
 {
+    int rc;
+
     zmq_msg_t msg;
-    if (zmq_msg_init_size(&msg, getPartSize<T>(part)) != 0) {
+    rc = zmq_msg_init_size(&msg, getPartSize<T>(part));
+    if (BOOST_UNLIKELY(rc != 0)) {
         LOG_ERROR(format("zmq_msg_init_size: %s",
             zmq_strerror(errno)));
         return -1;
@@ -119,7 +128,6 @@ int sendMultipartMessage(void *socket, int flags, const T &part)
 
     memcpyToMessage<T>(part, zmq_msg_data(&msg));
 
-    int rc;
     do {
         rc = zmq_msg_send(&msg, socket, flags);
     } while (rc == -1 && errno == EINTR);
@@ -130,13 +138,7 @@ int sendMultipartMessage(void *socket, int flags, const T &part)
                 zmq_strerror(errno)));
         }
 
-        const int err = errno;
-        const int rc2 = zmq_msg_close(&msg);
-        if (rc2 != 0) {
-            LOG_ERROR(format("zmq_msg_close: %s",
-                zmq_strerror(errno)));
-        }
-        errno = err;
+        closeZmqMsg(&msg);
     }
 
     return rc;
@@ -147,6 +149,40 @@ int sendMultipartMessage(void *socket, int flags, const T &part)
     template int sendMultipartMessage(void *, int, const T &);
 
 BOOST_PP_SEQ_FOR_EACH(TEMPLATE_SEND_MULTIPART_MESSAGE, _, MSG_PART_INT_TYPES(ByteArray))
+
+
+template <typename T>
+int recvMultipartMessage(void *socket, int flags, T *part)
+{
+    int rc;
+
+    zmq_msg_t msg;
+    rc = zmq_msg_init(&msg);
+    ASSERT(rc == 0, "zmq_msg_init failed");
+
+    do {
+        rc = zmq_msg_recv(&msg, socket, flags);
+    } while (rc == -1 && errno == EINTR);
+
+    if (BOOST_UNLIKELY(rc == -1)) {
+        if (errno != EAGAIN) {
+            LOG_ERROR(format("zmq_msg_recv: %s",
+                zmq_strerror(errno)));
+        }
+    }
+    else {
+        *part = memcpyFromMessage<T>(zmq_msg_data(&msg), zmq_msg_size(&msg));
+    }
+
+    closeZmqMsg(&msg);
+    return rc;
+}
+
+
+#define TEMPLATE_RECV_MULTIPART_MESSAGE(r, data, T) \
+    template int recvMultipartMessage(void *, int, T *);
+
+BOOST_PP_SEQ_FOR_EACH(TEMPLATE_RECV_MULTIPART_MESSAGE, _, MSG_PART_INT_TYPES(ByteArray))
 
 
 }

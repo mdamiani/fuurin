@@ -86,10 +86,12 @@ T memcpyFromMessage(const void *source, size_t size);
 /**
  * \brief Sends a ZMQ multipart message.
  *
- * The behaviour of this function if the same of \c zmq_send.
+ * The behaviour of this function if the same of \c zmq_msg_send.
+ * The endianess of passed \c part is reversed when
+ * host endianess doesn't match the network's.
  *
  * \param[in] socket A valid ZMQ socket.
- * \param[in] flags Flags accepted by function \c zmq_send.
+ * \param[in] flags Flags accepted by function \c zmq_msg_send.
  * \param[in] part A single message part to send.
  *
  * \return Number of bytes in the message if successful.
@@ -97,6 +99,7 @@ T memcpyFromMessage(const void *source, size_t size);
  *         Error codes are the ones returned by functions
  *         \c zmq_msg_init_size and \c zmq_msg_send.
  *
+ * \see memcpyToMessage
  * \see sendMultipartMessage(void*, int, const T &, Args...)
  */
 template <typename T>
@@ -107,7 +110,7 @@ int sendMultipartMessage(void *socket, int flags, const T &part);
  * \brief Sends a ZMQ multipart message.
  *
  * \param[in] socket A valid ZMQ socket.
- * \param[in] flags Flags accepted by function \c zmq_send.
+ * \param[in] flags Flags accepted by function \c zmq_msg_send.
  * \param[in] part Current message part to send.
  * \param[in] args Additional message parts to send.
  *
@@ -123,6 +126,53 @@ int sendMultipartMessage(void *socket, int flags, const T &part, Args... args)
 
     if (BOOST_LIKELY(rc != -1))
         return sendMultipartMessage(socket, flags, args...);
+    else
+        return rc;
+}
+
+
+/**
+ * \brief Receives a ZMQ multipart message.
+ *
+ * The behaviour of this function if the same of \c zmq_recv_msg.
+ * The endianess of received data is reversed when
+ * host endianess doesn't match the network's.
+ *
+ * \param[in] socket A valid ZMQ socket.
+ * \param[in] flags Flags accepted by function \c zmq_msg_recv.
+ * \param[out] part A single message part to fill with the received data.
+ *
+ * \return Number of bytes in the message if successful.
+ *         Otherwise -1 and set \c errno variable with the error code.
+ *         Error codes are the ones returned by function \c zmq_msg_recv.
+ *
+ * \see memcpyFromMessage
+ * \see recvMultipartMessage(void*, int, const T &, Args...)
+ */
+template <typename T>
+int recvMultipartMessage(void *socket, int flags, T *part);
+
+
+/**
+ * \brief Receives a ZMQ multipart message.
+ *
+ * \param[in] socket A valid ZMQ socket.
+ * \param[in] flags Flags accepted by function \c zmq_msg_recv.
+ * \param[out] part A single message part to fill with the received data.
+ * \param[out] args Additional message parts to receive.
+ *
+ * \return Number of bytes in the last message if successful.
+ *         Otherwise -1 in case the multipart message could not be received.
+ *
+ * \see recvMultipartMessage(void*, int, T *)
+ */
+template <typename T, typename... Args>
+int recvMultipartMessage(void *socket, int flags, T *part, Args... args)
+{
+    const int rc = recvMultipartMessage(socket, flags, part);
+
+    if (BOOST_LIKELY(rc != -1))
+        return recvMultipartMessage(socket, flags, args...);
     else
         return rc;
 }
