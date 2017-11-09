@@ -70,7 +70,9 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(endianessSendArray, T, networkArrayTypes)
 
 BOOST_AUTO_TEST_CASE_TEMPLATE(endianessRecvInt, T, networkIntTypes)
 {
-    const T val = zmq::memcpyFromMessage<T>(&networkDataBuf[0], sizeof(T));
+    T val;
+    std::memset(&val, 'a', sizeof(T));
+    zmq::memcpyFromMessage<T>(&networkDataBuf[0], sizeof(T), &val);
 
     for (size_t i = 0; i < sizeof(T); ++i) {
         const uint8_t byte = (val >> (8*i)) & 0xFF;
@@ -87,7 +89,10 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(endianessRecvInt, T, networkIntTypes)
 
 BOOST_AUTO_TEST_CASE_TEMPLATE(endianessRecvArray, T, networkArrayTypes)
 {
-    const T val = zmq::memcpyFromMessage<T>(&networkDataBuf[0], sizeof(networkDataBuf));
+    const int sz = sizeof(networkDataBuf);
 
-    BOOST_TEST(std::memcmp(&val[0], &networkDataBuf[0], sizeof(networkDataBuf)) == 0);
+    T val = ByteArray(sz, 'a');
+    zmq::memcpyFromMessage<T>(&networkDataBuf[0], sz, &val);
+
+    BOOST_TEST(std::memcmp(&val[0], &networkDataBuf[0], sz) == 0);
 }

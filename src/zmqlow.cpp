@@ -61,18 +61,18 @@ void memcpyToMessage(const ByteArray &data, void *dest)
 
 
 template <typename T>
-T memcpyFromMessage(const void *source, size_t size)
+void memcpyFromMessage(const void *source, size_t size, T *part)
 {
-    T ret;
-    memcpyWithEndian(&ret, source, size);
-    return ret;
+    ASSERT(sizeof(T) == size, "memcpyFromMessage size mismatch!");
+    memcpyWithEndian(part, source, size);
 }
 
 
 template <>
-ByteArray memcpyFromMessage(const void *source, size_t size)
+void memcpyFromMessage(const void *source, size_t size, ByteArray *part)
 {
-    return ByteArray((uint8_t *) source, ((uint8_t *) source) + size);
+    part->resize(size);
+    std::memcpy(part->data(), source, size);
 }
 
 
@@ -80,7 +80,7 @@ ByteArray memcpyFromMessage(const void *source, size_t size)
     template void memcpyToMessage(const T &, void *);
 
 #define TEMPLATE_FROM_NETWORK(r, data, T) \
-    template T memcpyFromMessage(const void *, size_t);
+    template void memcpyFromMessage(const void *, size_t, T *);
 
 #define MSG_PART_INT_TYPES \
     (uint8_t)              \
@@ -171,7 +171,7 @@ int recvMultipartMessage(void *socket, int flags, T *part)
         }
     }
     else {
-        *part = memcpyFromMessage<T>(zmq_msg_data(&msg), zmq_msg_size(&msg));
+        memcpyFromMessage<T>(zmq_msg_data(&msg), zmq_msg_size(&msg), part);
     }
 
     closeZmqMsg(&msg);

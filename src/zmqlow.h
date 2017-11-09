@@ -74,13 +74,12 @@ void memcpyToMessage(const T &data, void *dest);
  *
  * \param[in] source Data received from the network, as an array of bytes.
  * \param[in] size Size of the \c source buffer.
- *
- * \return Data with correct host endianess.
+ * \param[out] part Returned part, with correct host endianess.
  *
  * \see memcpyWithEndian
  */
 template <typename T>
-T memcpyFromMessage(const void *source, size_t size);
+void memcpyFromMessage(const void *source, size_t size, T *part);
 
 
 /**
