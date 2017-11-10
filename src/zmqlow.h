@@ -177,6 +177,35 @@ int recvMultipartMessage(void *socket, int flags, T *part, Args... args)
 }
 
 
+/**
+ * \brief Sets a socket \c option of a ZMQ \c socket.
+ *
+ * Valid options are listed in the manual of ZMQ function \c zmq_setsockopt.
+ *
+ * \param[in] socket A valid ZMQ socket.
+ * \param[in] option Option to set.
+ * \param[in] value Value to set.
+ *
+ * \return \c true in case the specified \c option and \c value could be set.
+ */
+bool setSocketOption(void *socket, int option, int value);
+
+
+/**
+ * \brief Queries a socket \c option of a ZMQ \c socket.
+ *
+ * Valid options are listed in the manual of ZMQ function \c zmq_getsockopt.
+ *
+ * \param[in] socket A valid ZMQ socket.
+ * \param[in] option Option to query.
+ * \param[in] defaultValue Value to return in case \c option could not be queried.
+ * \param[out] Optional argument to store whether the \c option could queried or not.
+ *
+ * \return The value of the specified \c option, otherwise \c defaultValue.
+ */
+int socketOption(void *socket, int option, int defaultValue = 0, bool *ok = 0);
+
+
 }
 }
 

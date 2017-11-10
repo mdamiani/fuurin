@@ -185,5 +185,47 @@ int recvMultipartMessage(void *socket, int flags, T *part)
 BOOST_PP_SEQ_FOR_EACH(TEMPLATE_RECV_MULTIPART_MESSAGE, _, MSG_PART_INT_TYPES(ByteArray))
 
 
+bool setSocketOption(void *socket, int option, int value)
+{
+    int rc;
+
+    do {
+        rc = zmq_setsockopt(socket, option, &value, sizeof(value));
+    } while (rc == -1 && errno == EINTR);
+
+    if (rc == -1) {
+        LOG_ERROR(format("zmq_setsockopt: %s",
+            zmq_strerror(errno)));
+    }
+
+    return rc != -1;
+}
+
+
+int socketOption(void *socket, int option, int defaultValue, bool *ok)
+{
+    int rc;
+    int optval;
+    size_t optsize = sizeof(optval);
+    bool iok;
+
+    if (!ok)
+        ok = &iok;
+
+    do {
+        rc = zmq_getsockopt(socket, option, &optval, &optsize);
+    } while (rc == -1 && errno == EINTR);
+
+    *ok = rc != -1;
+
+    if (!*ok) {
+        LOG_ERROR(format("zmq_getsockopt: %s",
+            zmq_strerror(errno)));
+    }
+
+    return *ok ? optval : defaultValue;
+}
+
+
 }
 }
