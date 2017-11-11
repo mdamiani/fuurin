@@ -178,6 +178,28 @@ int recvMultipartMessage(void *socket, int flags, T *part, Args... args)
 
 
 /**
+ * \brief Initializes a ZMQ context.
+ *
+ * This function calls \c zmq_ctx_new.
+ *
+ * \return A new ZMQ context, otherwise \c null in case of errors.
+ */
+void * initContext();
+
+
+/**
+ * \brief Deletes a ZMQ context.
+ *
+ * This functions calls \c zmq_ctx_term.
+ *
+ * \param[in] context A valid ZMQ context.
+ *
+ * \return \c true in case of successful operation.
+ */
+bool deleteContext(void *context);
+
+
+/**
  * \brief Creates a ZMQ socket.
  *
  * This function calls \c zmq_socket.

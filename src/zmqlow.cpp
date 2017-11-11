@@ -187,6 +187,32 @@ int recvMultipartMessage(void *socket, int flags, T *part)
 BOOST_PP_SEQ_FOR_EACH(TEMPLATE_RECV_MULTIPART_MESSAGE, _, MSG_PART_INT_TYPES(ByteArray))
 
 
+void * initContext()
+{
+    void *context = zmq_ctx_new();
+
+    if (!context) {
+        LOG_ERROR(format("zmq_ctx_new: %s",
+            zmq_strerror(errno)));
+    }
+
+    return context;
+}
+
+
+bool deleteContext(void *context)
+{
+    const int rc = zmq_ctx_term(context);
+
+    if (rc == -1) {
+        LOG_ERROR(format("zmq_ctx_term: %s",
+            zmq_strerror(errno)));
+    }
+
+    return rc != -1;
+}
+
+
 void *createSocket(void *context, int type)
 {
     void *socket = zmq_socket(context, type);
