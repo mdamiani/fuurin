@@ -17,6 +17,8 @@
 #include <cerrno>
 #include <cstring>
 #include <algorithm>
+#include <chrono>
+#include <thread>
 
 
 #if defined(FUURIN_ENDIANESS_BIG)
@@ -206,6 +208,51 @@ bool closeSocket(void *socket)
 
     if (rc == -1) {
         LOG_ERROR(format("zmq_close: %s",
+            zmq_strerror(errno)));
+    }
+
+    return rc != -1;
+}
+
+
+bool connectSocket(void *socket, const char *endpoint)
+{
+    const int rc = zmq_connect(socket, endpoint);
+
+    if (rc == -1) {
+        LOG_ERROR(format("zmq_connect: %s",
+            zmq_strerror(errno)));
+    }
+
+    return rc != -1;
+}
+
+
+bool bindSocket(void *socket, const char *endpoint, int timeout)
+{
+    int rc;
+    const auto start = std::chrono::steady_clock::now();
+
+    do {
+        rc = zmq_bind(socket, endpoint);
+
+        if (rc != -1 || errno != EADDRINUSE || timeout < 0)
+            break;
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+
+        const auto now = std::chrono::steady_clock::now();
+        const auto msec = std::chrono::duration_cast<
+            std::chrono::milliseconds>(now - start)
+            .count();
+
+        if (timeout > 0 && msec >= timeout)
+            break;
+    }
+    while(1);
+
+    if (rc == -1) {
+        LOG_ERROR(format("zmq_bind: %s",
             zmq_strerror(errno)));
     }
 

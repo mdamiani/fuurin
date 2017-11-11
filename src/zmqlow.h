@@ -206,6 +206,41 @@ bool closeSocket(void *socket);
 
 
 /**
+ * \brief Connects a ZMQ socket.
+ *
+ * This functions calls \c zmq_connect.
+ *
+ * \param[in] socket A valid ZMQ socket.
+ * \param[in] endpoint A ZMQ endpoint to use.
+ *
+ * \return \c false in case \c socket could not be connected.
+ */
+bool connectSocket(void *socket, const char *endpoint);
+
+
+/**
+ * \brief Binds a ZMQ socket.
+ *
+ * This functions calls \c zmq_bind.
+ *
+ * Possibly the bind action is retried until the specified \c timeout,
+ * in case of EADDRINUSE error.
+ * This is done to avoid the 'address already in use' error,
+ * when fast respawing the same application.
+ *
+ * \param[in] socket A valid ZMQ socket.
+ * \param[in] endpoint A ZMQ endpoint to use.
+ * \param[in] timeout Timeout in milliseconds until retry is performed,
+ *                    before returning an error. When passing -1,
+ *                    retry is not performed at all. When passing 0,
+ *                    retring is done forever.
+ *
+ * \return \c false in case \c socket could not be bound to \c endpoint.
+ */
+bool bindSocket(void *socket, const char *endpoint, int timeout = -1);
+
+
+/**
  * \brief Sets a socket \c option of a ZMQ \c socket.
  *
  * Valid options are listed in the manual of ZMQ function \c zmq_setsockopt.
