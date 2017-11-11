@@ -10,14 +10,16 @@
 
 #define BOOST_TEST_MODULE zmqlow
 #include <boost/test/unit_test.hpp>
+#include <boost/test/data/test_case.hpp>
 #include <boost/mpl/list.hpp>
 
 #include "../src/zmqlow.h"
 
-#include <cstring>
+#include <string>
 
 
 using namespace fuurin;
+namespace bdata = boost::unit_test::data;
 
 typedef boost::mpl::list<
     uint8_t,
@@ -95,4 +97,65 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(endianessRecvArray, T, networkArrayTypes)
     zmq::memcpyFromMessage<T>(&networkDataBuf[0], sz, &val);
 
     BOOST_TEST(std::memcmp(&val[0], &networkDataBuf[0], sz) == 0);
+}
+
+
+struct TVal {
+    std::string type;
+    uint64_t val;
+    ByteArray arr;
+
+    TVal(const std::string &t, uint64_t v) : type(t), val(v) {}
+    TVal(const std::string &t, const ByteArray &v) : type(t), val(0), arr(v) {}
+};
+
+std::ostream& operator<<(std::ostream& os, const TVal& ts)
+{
+    os << ts.type << " " << ts.val;
+    if (!ts.arr.empty()) {
+        os << " ";
+        for (auto i = ts.arr.begin(); i != ts.arr.end(); ++i)
+            os << *i;
+    }
+    return os;
+}
+
+template <typename T>
+void testTransferSingle(const T &val) {
+    UNUSED(val);
+    BOOST_FAIL("not yet implemented");
+}
+
+BOOST_DATA_TEST_CASE(transferMultipart, bdata::make({
+    TVal("uint8_t",     0u),
+    TVal("uint8_t",     255u),
+    TVal("uint16_t",    0u),
+    TVal("uint16_t",    61689u),
+    TVal("uint16_t",    65535u),
+    TVal("uint32_t",    0ul),
+    TVal("uint32_t",    4278583165ul),
+    TVal("uint32_t",    4294967295ul),
+    TVal("uint64_t",    0ull),
+    TVal("uint64_t",    11460521682733600767ull),
+    TVal("uint64_t",    18446744073709551615ull),
+    TVal("ByteArray",   ByteArray()),
+    TVal("ByteArray",   ByteArray{'a','b','c'}),
+    TVal("ByteArray",   ByteArray(2048, 'z')),
+}))
+{
+#define TRANSF_SINGLE(T, field)             \
+    if (sample.type == #T) {                \
+        const T value = sample.field;       \
+        BOOST_TEST(value == sample.field);  \
+        testTransferSingle<T>(value);       \
+        return;                             \
+    }
+
+    TRANSF_SINGLE(uint8_t,   val);
+    TRANSF_SINGLE(uint16_t,  val);
+    TRANSF_SINGLE(uint32_t,  val);
+    TRANSF_SINGLE(uint64_t,  val);
+    TRANSF_SINGLE(ByteArray, arr);
+
+    BOOST_FAIL("unsupported type");
 }
