@@ -185,6 +185,34 @@ int recvMultipartMessage(void *socket, int flags, T *part)
 BOOST_PP_SEQ_FOR_EACH(TEMPLATE_RECV_MULTIPART_MESSAGE, _, MSG_PART_INT_TYPES(ByteArray))
 
 
+void *createSocket(void *context, int type)
+{
+    void *socket = zmq_socket(context, type);
+
+    if (!socket) {
+        LOG_ERROR(format("zmq_socket: %s",
+            zmq_strerror(errno)));
+    }
+
+    return socket;
+}
+
+
+bool closeSocket(void *socket)
+{
+    setSocketOption(socket, ZMQ_LINGER, 0);
+
+    const int rc = zmq_close(socket);
+
+    if (rc == -1) {
+        LOG_ERROR(format("zmq_close: %s",
+            zmq_strerror(errno)));
+    }
+
+    return rc != -1;
+}
+
+
 bool setSocketOption(void *socket, int option, int value)
 {
     int rc;

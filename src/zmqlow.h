@@ -178,6 +178,34 @@ int recvMultipartMessage(void *socket, int flags, T *part, Args... args)
 
 
 /**
+ * \brief Creates a ZMQ socket.
+ *
+ * This function calls \c zmq_socket.
+ *
+ * \param[in] context A valid ZMQ context.
+ * \param[in] type Type of ZMQ socket.
+ *
+ * \return A handle to a ZMQ socket or \c null in case of errors.
+ */
+void *createSocket(void *context, int type);
+
+
+/**
+ * \brief Closes a ZMQ socket.
+ *
+ * This function calls \c zmq_close.
+ * Before closing the \c socket, its \c ZMQ_LINGER property is set to 0.
+ *
+ * \param[in] socket A valid ZMQ socket.
+ *
+ * \return \c false in case \c socket is invalid or it could not be closed.
+ *
+ * \see setSocketOption
+ */
+bool closeSocket(void *socket);
+
+
+/**
  * \brief Sets a socket \c option of a ZMQ \c socket.
  *
  * Valid options are listed in the manual of ZMQ function \c zmq_setsockopt.
