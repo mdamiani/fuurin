@@ -121,9 +121,47 @@ std::ostream& operator<<(std::ostream& os, const TVal& ts)
 }
 
 template <typename T>
-void testTransferSingle(const T &val) {
-    UNUSED(val);
-    BOOST_FAIL("not yet implemented");
+inline size_t getPartSize(const T &part)
+{
+    return sizeof(part);
+}
+
+template <>
+inline size_t getPartSize(const ByteArray &part)
+{
+    return part.size();
+}
+
+template <typename T>
+void testTransferSingle(const T &part) {
+    void *ctx = zmq::initContext();
+    BOOST_TEST_REQUIRE(ctx, "failed to create ZMQ context");
+
+    void *s1 = zmq::createSocket(ctx, ZMQ_PAIR);
+    BOOST_TEST_REQUIRE(s1, "failed to create ZMQ send socket");
+
+    void *s2 = zmq::createSocket(ctx, ZMQ_PAIR);
+    BOOST_TEST_REQUIRE(s2, "failed to create ZMQ recv socket");
+
+    const bool ok1 = zmq::connectSocket(s1, "inproc://transfer");
+    BOOST_TEST_REQUIRE(ok1, "failed to connect ZMQ socket");
+
+    const bool ok2 = zmq::bindSocket(s2, "inproc://transfer", 10);
+    BOOST_TEST_REQUIRE(ok2, "failed to bind ZMQ socket");
+
+    const int sz = getPartSize<T>(part);
+
+    const int rc1 = zmq::sendMultipartMessage<T>(s1, 0, part);
+    BOOST_TEST(rc1 == sz);
+
+    T value;
+    const int rc2 = zmq::recvMultipartMessage<T>(s2, 0, &value);
+    BOOST_TEST(rc2 == sz);
+    BOOST_TEST(value == part);
+
+    BOOST_TEST(zmq::closeSocket(s1));
+    BOOST_TEST(zmq::closeSocket(s2));
+    BOOST_TEST(zmq::deleteContext(ctx));
 }
 
 BOOST_DATA_TEST_CASE(transferMultipart, bdata::make({
