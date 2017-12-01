@@ -113,7 +113,7 @@ int sendMultipartMessage(void *socket, int flags, const T &part);
  * \param[in] part Current message part to send.
  * \param[in] args Additional message parts to send.
  *
- * \return Number of bytes in the last message if successful.
+ * \return Total number of bytes of every part if successful.
  *         Otherwise -1 in case the multipart message could not be sent.
  *
  * \see sendMultipartMessage(void*, int, const T &)
@@ -121,12 +121,15 @@ int sendMultipartMessage(void *socket, int flags, const T &part);
 template <typename T, typename... Args>
 int sendMultipartMessage(void *socket, int flags, const T &part, Args... args)
 {
-    const int rc = sendMultipartMessage(socket, flags | ZMQ_SNDMORE, part);
+    const int rc1 = sendMultipartMessage(socket, flags | ZMQ_SNDMORE, part);
+    if (BOOST_UNLIKELY(rc1 == -1))
+        return -1;
 
-    if (BOOST_LIKELY(rc != -1))
-        return sendMultipartMessage(socket, flags, args...);
-    else
-        return rc;
+    const int rc2 = sendMultipartMessage(socket, flags, args...);
+    if (BOOST_UNLIKELY(rc2 == -1))
+        return -1;
+
+    return rc1 + rc2;
 }
 
 
@@ -160,7 +163,7 @@ int recvMultipartMessage(void *socket, int flags, T *part);
  * \param[out] part A single message part to fill with the received data.
  * \param[out] args Additional message parts to receive.
  *
- * \return Number of bytes in the last message if successful.
+ * \return Total number of bytes of every part if successful.
  *         Otherwise -1 in case the multipart message could not be received.
  *
  * \see recvMultipartMessage(void*, int, T *)
@@ -168,12 +171,15 @@ int recvMultipartMessage(void *socket, int flags, T *part);
 template <typename T, typename... Args>
 int recvMultipartMessage(void *socket, int flags, T *part, Args... args)
 {
-    const int rc = recvMultipartMessage(socket, flags, part);
+    const int rc1 = recvMultipartMessage(socket, flags, part);
+    if (BOOST_UNLIKELY(rc1 == -1))
+        return -1;
 
-    if (BOOST_LIKELY(rc != -1))
-        return recvMultipartMessage(socket, flags, args...);
-    else
-        return rc;
+    const int rc2 = recvMultipartMessage(socket, flags, args...);
+    if (BOOST_UNLIKELY(rc2 == -1))
+        return -1;
+
+    return rc1 + rc2;
 }
 
 

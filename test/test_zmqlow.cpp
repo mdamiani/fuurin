@@ -16,6 +16,7 @@
 #include "../src/zmqlow.h"
 
 #include <string>
+#include <tuple>
 
 
 using namespace fuurin;
@@ -120,6 +121,7 @@ std::ostream& operator<<(std::ostream& os, const TVal& ts)
     return os;
 }
 
+
 template <typename T>
 inline size_t getPartSize(const T &part)
 {
@@ -132,8 +134,9 @@ inline size_t getPartSize(const ByteArray &part)
     return part.size();
 }
 
-template <typename T>
-void testTransferSingle(const T &part) {
+
+std::tuple<void *, void *, void *> transferSetup()
+{
     void *ctx = zmq::initContext();
     BOOST_TEST_REQUIRE(ctx, "failed to create ZMQ context");
 
@@ -146,8 +149,25 @@ void testTransferSingle(const T &part) {
     const bool ok1 = zmq::connectSocket(s1, "inproc://transfer");
     BOOST_TEST_REQUIRE(ok1, "failed to connect ZMQ socket");
 
-    const bool ok2 = zmq::bindSocket(s2, "inproc://transfer", 10);
+    const bool ok2 = zmq::bindSocket(s2, "inproc://transfer", 10000);
     BOOST_TEST_REQUIRE(ok2, "failed to bind ZMQ socket");
+
+    return std::make_tuple(ctx, s1, s2);
+}
+
+void transferTeardown(void *ctx, void *s1, void *s2)
+{
+    BOOST_TEST(zmq::closeSocket(s1));
+    BOOST_TEST(zmq::closeSocket(s2));
+    BOOST_TEST(zmq::deleteContext(ctx));
+}
+
+
+template <typename T>
+void testTransferSingle(const T &part)
+{
+    void *ctx, *s1, *s2;
+    std::tie(ctx, s1, s2) = transferSetup();
 
     const int sz = getPartSize<T>(part);
 
@@ -159,12 +179,10 @@ void testTransferSingle(const T &part) {
     BOOST_TEST(rc2 == sz);
     BOOST_TEST(value == part);
 
-    BOOST_TEST(zmq::closeSocket(s1));
-    BOOST_TEST(zmq::closeSocket(s2));
-    BOOST_TEST(zmq::deleteContext(ctx));
+    transferTeardown(ctx, s1, s2);
 }
 
-BOOST_DATA_TEST_CASE(transferMultipart, bdata::make({
+BOOST_DATA_TEST_CASE(transferSinglePart, bdata::make({
     TVal("uint8_t",     0u),
     TVal("uint8_t",     255u),
     TVal("uint16_t",    0u),
@@ -197,3 +215,47 @@ BOOST_DATA_TEST_CASE(transferMultipart, bdata::make({
 
     BOOST_FAIL("unsupported type");
 }
+
+
+BOOST_AUTO_TEST_CASE(transferMultiPart)
+{
+    void *ctx, *s1, *s2;
+    std::tie(ctx, s1, s2) = transferSetup();
+
+    uint8_t   send_p1 = 255u;
+    uint16_t  send_p2 = 65535u;
+    uint32_t  send_p3 = 4294967295ul;
+    uint64_t  send_p4 = 18446744073709551615ull;
+    ByteArray send_p5 = ByteArray{'a','b','c'};
+    ByteArray send_p6 = ByteArray{};
+
+    const int sz = sizeof(send_p1) + sizeof(send_p2) + sizeof(send_p3) + sizeof(send_p4)
+        + send_p5.size() + send_p6.size();
+
+    const int rc1 = zmq::sendMultipartMessage(s1, 0,
+        send_p1, send_p2, send_p3, send_p4, send_p5, send_p6);
+
+    BOOST_TEST(rc1 == sz);
+
+    uint8_t   recv_p1;
+    uint16_t  recv_p2;
+    uint32_t  recv_p3;
+    uint64_t  recv_p4;
+    ByteArray recv_p5;
+    ByteArray recv_p6;
+
+    const int rc2 = zmq::recvMultipartMessage(s2, 0,
+        &recv_p1, &recv_p2, &recv_p3, &recv_p4, &recv_p5, &recv_p6);
+
+    BOOST_TEST(rc2 == sz);
+
+    BOOST_TEST(send_p1 == recv_p1);
+    BOOST_TEST(send_p2 == recv_p2);
+    BOOST_TEST(send_p3 == recv_p3);
+    BOOST_TEST(send_p4 == recv_p4);
+    BOOST_TEST(send_p5 == recv_p5);
+    BOOST_TEST(send_p6 == recv_p6);
+
+    transferTeardown(ctx, s1, s2);
+}
+
