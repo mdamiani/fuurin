@@ -286,6 +286,23 @@ bool bindSocket(void *socket, const char *endpoint, int timeout)
 }
 
 
+bool pollSocket(zmq_pollitem_t *items, int nitems, long msecs)
+{
+    int rc;
+
+    do {
+        rc = zmq_poll(items, nitems, msecs);
+    } while (rc == -1 && errno == EINTR);
+
+    if (rc == -1) {
+        LOG_ERROR(format("zmq_poll: %s",
+            zmq_strerror(errno)));
+    }
+
+    return rc != -1;
+}
+
+
 bool setSocketOption(void *socket, int option, int value)
 {
     int rc;

@@ -259,3 +259,40 @@ BOOST_AUTO_TEST_CASE(transferMultiPart)
     transferTeardown(ctx, s1, s2);
 }
 
+
+void testWaitForEvents(void *socket, short event, int timeout, bool expected)
+{
+    zmq_pollitem_t items[] = {
+        {socket, 0, event, 0},
+    };
+
+    BOOST_TEST(zmq::pollSocket(items, 1, timeout) == true);
+    BOOST_TEST(!!(items[0].revents & event) == !!expected);
+}
+
+
+BOOST_DATA_TEST_CASE(waitForEvents, bdata::make({
+    std::make_tuple('w', ZMQ_POLLOUT, 250,  true),
+    std::make_tuple('w', ZMQ_POLLIN,  250,  false),
+    std::make_tuple('r', ZMQ_POLLOUT, 250,  true),
+    std::make_tuple('r', ZMQ_POLLIN,  2500, true),
+}), type, event, timeout, expected)
+{
+    void *ctx, *s1, *s2;
+    std::tie(ctx, s1, s2) = transferSetup();
+    uint32_t data = 0;
+
+    if (type == 'w')
+        testWaitForEvents(s1, event, timeout, expected);
+
+    const int rc1 = zmq::sendMultipartMessage(s1, 0, data);
+    BOOST_TEST(rc1 != -1);
+
+    if (type == 'r')
+        testWaitForEvents(s2, event, timeout, expected);
+
+    const int rc2 = zmq::recvMultipartMessage(s2, 0, &data);
+    BOOST_TEST(rc2 != -1);
+
+    transferTeardown(ctx, s1, s2);
+}

@@ -269,6 +269,22 @@ bool bindSocket(void *socket, const char *endpoint, int timeout = -1);
 
 
 /**
+ * \brief Polls ZMQ sockets.
+ *
+ * In case of errors, the \c errno variable is set accoring to \c zmq_poll function.
+ *
+ * \param items List of sockets to poll.
+ * \param nitems Numer of sockets.
+ * \param msecs Timeout in milliseconds to wait for socket events.
+ *              If -1 is passed, then the function blocks forever
+ *              until an event is received.
+ *
+ * \return \c false when \c zmq_poll fails.
+ */
+bool pollSocket(zmq_pollitem_t *items, int nitems, long msecs);
+
+
+/**
  * \brief Sets a socket \c option of a ZMQ \c socket.
  *
  * Valid options are listed in the manual of ZMQ function \c zmq_setsockopt.
