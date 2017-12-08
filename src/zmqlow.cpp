@@ -62,6 +62,13 @@ void memcpyToMessage(const ByteArray &data, void *dest)
 }
 
 
+template <>
+void memcpyToMessage(const String &data, void *dest)
+{
+    std::memcpy(dest, data.c_str(), data.size());
+}
+
+
 template <typename T>
 void memcpyFromMessage(const void *source, size_t size, T *part)
 {
@@ -78,6 +85,14 @@ void memcpyFromMessage(const void *source, size_t size, ByteArray *part)
 }
 
 
+template <>
+void memcpyFromMessage(const void *source, size_t size, String *part)
+{
+    part->resize(size);
+    std::memcpy(&((*part)[0]), source, size);
+}
+
+
 #define TEMPLATE_TO_NETWORK(r, data, T) \
     template void memcpyToMessage(const T &, void *);
 
@@ -89,6 +104,10 @@ void memcpyFromMessage(const void *source, size_t size, ByteArray *part)
     (uint16_t)             \
     (uint32_t)             \
     (uint64_t)
+
+#define MSG_PART_ARR_TYPES \
+    (ByteArray)            \
+    (String)
 
 BOOST_PP_SEQ_FOR_EACH(TEMPLATE_TO_NETWORK, _, MSG_PART_INT_TYPES)
 BOOST_PP_SEQ_FOR_EACH(TEMPLATE_FROM_NETWORK, _, MSG_PART_INT_TYPES)
@@ -108,7 +127,16 @@ inline size_t getPartSize(const ByteArray &part)
     return part.size();
 }
 
-inline void closeZmqMsg(zmq_msg_t *msg) {
+
+template <>
+inline size_t getPartSize(const String &part)
+{
+    return part.size();
+}
+
+
+inline void closeZmqMsg(zmq_msg_t *msg)
+{
     const int rc = zmq_msg_close(msg);
     ASSERT(rc == 0, "zmq_msg_close failed");
 }
@@ -150,7 +178,8 @@ int sendMultipartMessage(void *socket, int flags, const T &part)
 #define TEMPLATE_SEND_MULTIPART_MESSAGE(r, data, T) \
     template int sendMultipartMessage(void *, int, const T &);
 
-BOOST_PP_SEQ_FOR_EACH(TEMPLATE_SEND_MULTIPART_MESSAGE, _, MSG_PART_INT_TYPES(ByteArray))
+BOOST_PP_SEQ_FOR_EACH(TEMPLATE_SEND_MULTIPART_MESSAGE, _,
+    MSG_PART_INT_TYPES MSG_PART_ARR_TYPES)
 
 
 template <typename T>
@@ -184,7 +213,8 @@ int recvMultipartMessage(void *socket, int flags, T *part)
 #define TEMPLATE_RECV_MULTIPART_MESSAGE(r, data, T) \
     template int recvMultipartMessage(void *, int, T *);
 
-BOOST_PP_SEQ_FOR_EACH(TEMPLATE_RECV_MULTIPART_MESSAGE, _, MSG_PART_INT_TYPES(ByteArray))
+BOOST_PP_SEQ_FOR_EACH(TEMPLATE_RECV_MULTIPART_MESSAGE, _,
+    MSG_PART_INT_TYPES MSG_PART_ARR_TYPES)
 
 
 void * initContext()

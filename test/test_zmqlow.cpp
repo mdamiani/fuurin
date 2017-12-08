@@ -30,7 +30,8 @@ typedef boost::mpl::list<
 > networkIntTypes;
 
 typedef boost::mpl::list<
-    ByteArray
+    ByteArray,
+    String
 > networkArrayTypes;
 
 static const uint8_t networkDataBuf[] = {
@@ -94,7 +95,7 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(endianessRecvArray, T, networkArrayTypes)
 {
     const int sz = sizeof(networkDataBuf);
 
-    T val = ByteArray(sz, 'a');
+    T val(sz, 'a');
     zmq::memcpyFromMessage<T>(&networkDataBuf[0], sz, &val);
 
     BOOST_TEST(std::memcmp(&val[0], &networkDataBuf[0], sz) == 0);
@@ -105,9 +106,11 @@ struct TVal {
     std::string type;
     uint64_t val;
     ByteArray arr;
+    String str;
 
     TVal(const std::string &t, uint64_t v) : type(t), val(v) {}
     TVal(const std::string &t, const ByteArray &v) : type(t), val(0), arr(v) {}
+    TVal(const std::string &t, const String &v) : type(t), val(0), str(v) {}
 };
 
 std::ostream& operator<<(std::ostream& os, const TVal& ts)
@@ -134,6 +137,11 @@ inline size_t getPartSize(const ByteArray &part)
     return part.size();
 }
 
+template <>
+inline size_t getPartSize(const String &part)
+{
+    return part.size();
+}
 
 std::tuple<void *, void *, void *> transferSetup()
 {
@@ -197,6 +205,9 @@ BOOST_DATA_TEST_CASE(transferSinglePart, bdata::make({
     TVal("ByteArray",   ByteArray()),
     TVal("ByteArray",   ByteArray{'a','b','c'}),
     TVal("ByteArray",   ByteArray(2048, 'z')),
+    TVal("String",      String()),
+    TVal("String",      String{"汉字漢字唐字"}),
+    TVal("String",      String(2048, 'y')),
 }))
 {
 #define TRANSF_SINGLE(T, field)             \
@@ -212,6 +223,7 @@ BOOST_DATA_TEST_CASE(transferSinglePart, bdata::make({
     TRANSF_SINGLE(uint32_t,  val);
     TRANSF_SINGLE(uint64_t,  val);
     TRANSF_SINGLE(ByteArray, arr);
+    TRANSF_SINGLE(String,    str);
 
     BOOST_FAIL("unsupported type");
 }
