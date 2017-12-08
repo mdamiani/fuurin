@@ -14,9 +14,10 @@
 
 #include "types.h"
 
-
 #include <zmq.h>
 #include <boost/config.hpp> // for BOOST_LIKELY
+
+#include <string>
 
 
 #if defined(FUURIN_ENDIANESS_BIG) && defined(FUURIN_ENDIANESS_LITTLE)
@@ -285,7 +286,7 @@ bool pollSocket(zmq_pollitem_t *items, int nitems, long msecs);
 
 
 /**
- * \brief Sets a socket \c option of a ZMQ \c socket.
+ * \brief Sets an \c option to a ZMQ \c socket.
  *
  * Valid options are listed in the manual of ZMQ function \c zmq_setsockopt.
  *
@@ -296,6 +297,17 @@ bool pollSocket(zmq_pollitem_t *items, int nitems, long msecs);
  * \return \c true in case the specified \c option and \c value could be set.
  */
 bool setSocketOption(void *socket, int option, int value);
+
+
+/**
+ * \brief Sets a \c filter to a ZMQ \c socket.
+ *
+ * \param[in] socket A valid and connected ZMQ socket.
+ * \param[in] filter Message filter.
+ *
+ * \return \c true in case the \c filter is correctly applied.
+ */
+bool setSocketSubscription(void *socket, const std::string &filter);
 
 
 /**

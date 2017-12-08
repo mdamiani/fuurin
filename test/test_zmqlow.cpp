@@ -20,6 +20,7 @@
 
 
 using namespace fuurin;
+using namespace std::string_literals;
 namespace bdata = boost::unit_test::data;
 
 typedef boost::mpl::list<
@@ -143,15 +144,16 @@ inline size_t getPartSize(const String &part)
     return part.size();
 }
 
-std::tuple<void *, void *, void *> transferSetup()
+
+std::tuple<void *, void *, void *> transferSetup(int type1, int type2)
 {
     void *ctx = zmq::initContext();
     BOOST_TEST_REQUIRE(ctx, "failed to create ZMQ context");
 
-    void *s1 = zmq::createSocket(ctx, ZMQ_PAIR);
+    void *s1 = zmq::createSocket(ctx, type1);
     BOOST_TEST_REQUIRE(s1, "failed to create ZMQ send socket");
 
-    void *s2 = zmq::createSocket(ctx, ZMQ_PAIR);
+    void *s2 = zmq::createSocket(ctx, type2);
     BOOST_TEST_REQUIRE(s2, "failed to create ZMQ recv socket");
 
     const bool ok1 = zmq::connectSocket(s1, "inproc://transfer");
@@ -175,7 +177,7 @@ template <typename T>
 void testTransferSingle(const T &part)
 {
     void *ctx, *s1, *s2;
-    std::tie(ctx, s1, s2) = transferSetup();
+    std::tie(ctx, s1, s2) = transferSetup(ZMQ_PAIR, ZMQ_PAIR);
 
     const int sz = getPartSize<T>(part);
 
@@ -232,7 +234,7 @@ BOOST_DATA_TEST_CASE(transferSinglePart, bdata::make({
 BOOST_AUTO_TEST_CASE(transferMultiPart)
 {
     void *ctx, *s1, *s2;
-    std::tie(ctx, s1, s2) = transferSetup();
+    std::tie(ctx, s1, s2) = transferSetup(ZMQ_PAIR, ZMQ_PAIR);
 
     uint8_t   send_p1 = 255u;
     uint16_t  send_p2 = 65535u;
@@ -291,7 +293,7 @@ BOOST_DATA_TEST_CASE(waitForEvents, bdata::make({
 }), type, event, timeout, expected)
 {
     void *ctx, *s1, *s2;
-    std::tie(ctx, s1, s2) = transferSetup();
+    std::tie(ctx, s1, s2) = transferSetup(ZMQ_PAIR, ZMQ_PAIR);
     uint32_t data = 0;
 
     if (type == 'w')
@@ -305,6 +307,54 @@ BOOST_DATA_TEST_CASE(waitForEvents, bdata::make({
 
     const int rc2 = zmq::recvMultipartMessage(s2, 0, &data);
     BOOST_TEST(rc2 != -1);
+
+    transferTeardown(ctx, s1, s2);
+}
+
+
+BOOST_DATA_TEST_CASE(publishMessage, bdata::make({
+    std::make_tuple("filt1"s, "filt1"s, 100, 50, true),
+    std::make_tuple("filt1"s, ""s,      100, 50, true),
+    std::make_tuple(""s,      ""s,      100, 50, true),
+    std::make_tuple(""s,      "filt2"s, 100, 10, false),
+    std::make_tuple("filt1"s, "filt2"s, 100, 10, false),
+}), pubFilt, subFilt, timeout, count, expected)
+{
+    void *ctx, *s1, *s2;
+    std::tie(ctx, s1, s2) = transferSetup(ZMQ_PUB, ZMQ_SUB);
+
+    BOOST_TEST(zmq::setSocketSubscription(s2, subFilt) == true);
+
+    int retry = 0, rc1;
+    bool ready, p2;
+
+    do {
+        rc1 = zmq::sendMultipartMessage(s1, 0, pubFilt);
+        BOOST_TEST(rc1 != -1);
+
+        zmq_pollitem_t items[] = {
+            {s2, 0, ZMQ_POLLIN, 0},
+        };
+
+        p2 = zmq::pollSocket(items, 1, timeout);
+        BOOST_TEST(p2 == true);
+
+        ready = items[0].revents & ZMQ_POLLIN;
+        ++retry;
+    }
+    while (!ready && retry < count && rc1 != -1 && p2 == true);
+
+    BOOST_TEST(ready == expected);
+
+    if (ready) {
+        std::string recvFilt;
+
+        const int rc2 = zmq::recvMultipartMessage(s2, 0, &recvFilt);
+        BOOST_TEST(rc2 != -1);
+
+        if (!subFilt.empty())
+            BOOST_TEST(recvFilt == subFilt);
+    }
 
     transferTeardown(ctx, s1, s2);
 }

@@ -350,6 +350,23 @@ bool setSocketOption(void *socket, int option, int value)
 }
 
 
+bool setSocketSubscription(void *socket, const std::string &filter)
+{
+    int rc;
+
+    do {
+        rc = zmq_setsockopt(socket, ZMQ_SUBSCRIBE, filter.c_str(), filter.size());
+    } while (rc == -1 && errno == EINTR);
+
+    if (rc == -1) {
+        LOG_ERROR(format("zmq_setsockopt: %s",
+            zmq_strerror(errno)));
+    }
+
+    return rc != -1;
+}
+
+
 int socketOption(void *socket, int option, int defaultValue, bool *ok)
 {
     int rc;
