@@ -15,14 +15,15 @@
 
 namespace fuurin {
 
-extern void logHandler(LogLevel, const char *, unsigned int, const std::string &);
+extern void logHandler(LogLevel, const char*, unsigned int, const std::string&);
 extern LogMessageHandler logMessage;
 
 static char _version_buf[16];
 
-char * version() {
-    std::snprintf(_version_buf, sizeof(_version_buf), "%d.%d.%d",
-        VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH);
+char* version()
+{
+    std::snprintf(_version_buf, sizeof(_version_buf), "%d.%d.%d", VERSION_MAJOR, VERSION_MINOR,
+        VERSION_PATCH);
 
     return _version_buf;
 }
@@ -35,6 +36,4 @@ void logInstallMessageHandler(LogMessageHandler handler)
     else
         logMessage = logHandler;
 }
-
-
 }

@@ -55,7 +55,7 @@ namespace zmq {
  * \see memcpyToMessage
  * \see memcpyFromMessage
  */
-inline void memcpyWithEndian(void *dest, const void *source, size_t size);
+inline void memcpyWithEndian(void* dest, const void* source, size_t size);
 
 
 /**
@@ -66,8 +66,8 @@ inline void memcpyWithEndian(void *dest, const void *source, size_t size);
  *
  * \see memcpyWithEndian
  */
-template <typename T>
-void memcpyToMessage(const T &data, void *dest);
+template<typename T>
+void memcpyToMessage(const T& data, void* dest);
 
 
 /**
@@ -79,8 +79,8 @@ void memcpyToMessage(const T &data, void *dest);
  *
  * \see memcpyWithEndian
  */
-template <typename T>
-void memcpyFromMessage(const void *source, size_t size, T *part);
+template<typename T>
+void memcpyFromMessage(const void* source, size_t size, T* part);
 
 
 /**
@@ -102,8 +102,8 @@ void memcpyFromMessage(const void *source, size_t size, T *part);
  * \see memcpyToMessage
  * \see sendMultipartMessage(void*, int, const T &, Args...)
  */
-template <typename T>
-int sendMultipartMessage(void *socket, int flags, const T &part);
+template<typename T>
+int sendMultipartMessage(void* socket, int flags, const T& part);
 
 
 /**
@@ -119,8 +119,8 @@ int sendMultipartMessage(void *socket, int flags, const T &part);
  *
  * \see sendMultipartMessage(void*, int, const T &)
  */
-template <typename T, typename... Args>
-int sendMultipartMessage(void *socket, int flags, const T &part, Args... args)
+template<typename T, typename... Args>
+int sendMultipartMessage(void* socket, int flags, const T& part, Args... args)
 {
     const int rc1 = sendMultipartMessage(socket, flags | ZMQ_SNDMORE, part);
     if (BOOST_UNLIKELY(rc1 == -1))
@@ -152,8 +152,8 @@ int sendMultipartMessage(void *socket, int flags, const T &part, Args... args)
  * \see memcpyFromMessage
  * \see recvMultipartMessage(void*, int, const T &, Args...)
  */
-template <typename T>
-int recvMultipartMessage(void *socket, int flags, T *part);
+template<typename T>
+int recvMultipartMessage(void* socket, int flags, T* part);
 
 
 /**
@@ -169,8 +169,8 @@ int recvMultipartMessage(void *socket, int flags, T *part);
  *
  * \see recvMultipartMessage(void*, int, T *)
  */
-template <typename T, typename... Args>
-int recvMultipartMessage(void *socket, int flags, T *part, Args... args)
+template<typename T, typename... Args>
+int recvMultipartMessage(void* socket, int flags, T* part, Args... args)
 {
     const int rc1 = recvMultipartMessage(socket, flags, part);
     if (BOOST_UNLIKELY(rc1 == -1))
@@ -191,7 +191,7 @@ int recvMultipartMessage(void *socket, int flags, T *part, Args... args)
  *
  * \return A new ZMQ context, otherwise \c null in case of errors.
  */
-void * initContext();
+void* initContext();
 
 
 /**
@@ -203,7 +203,7 @@ void * initContext();
  *
  * \return \c true in case of successful operation.
  */
-bool deleteContext(void *context);
+bool deleteContext(void* context);
 
 
 /**
@@ -216,7 +216,7 @@ bool deleteContext(void *context);
  *
  * \return A handle to a ZMQ socket or \c null in case of errors.
  */
-void *createSocket(void *context, int type);
+void* createSocket(void* context, int type);
 
 
 /**
@@ -231,7 +231,7 @@ void *createSocket(void *context, int type);
  *
  * \see setSocketOption
  */
-bool closeSocket(void *socket);
+bool closeSocket(void* socket);
 
 
 /**
@@ -244,7 +244,7 @@ bool closeSocket(void *socket);
  *
  * \return \c false in case \c socket could not be connected.
  */
-bool connectSocket(void *socket, const char *endpoint);
+bool connectSocket(void* socket, const char* endpoint);
 
 
 /**
@@ -266,7 +266,7 @@ bool connectSocket(void *socket, const char *endpoint);
  *
  * \return \c false in case \c socket could not be bound to \c endpoint.
  */
-bool bindSocket(void *socket, const char *endpoint, int timeout = -1);
+bool bindSocket(void* socket, const char* endpoint, int timeout = -1);
 
 
 /**
@@ -282,7 +282,7 @@ bool bindSocket(void *socket, const char *endpoint, int timeout = -1);
  *
  * \return \c false when \c zmq_poll fails.
  */
-bool pollSocket(zmq_pollitem_t *items, int nitems, long msecs);
+bool pollSocket(zmq_pollitem_t* items, int nitems, long msecs);
 
 
 /**
@@ -296,7 +296,7 @@ bool pollSocket(zmq_pollitem_t *items, int nitems, long msecs);
  *
  * \return \c true in case the specified \c option and \c value could be set.
  */
-bool setSocketOption(void *socket, int option, int value);
+bool setSocketOption(void* socket, int option, int value);
 
 
 /**
@@ -307,7 +307,7 @@ bool setSocketOption(void *socket, int option, int value);
  *
  * \return \c true in case the \c filter is correctly applied.
  */
-bool setSocketSubscription(void *socket, const std::string &filter);
+bool setSocketSubscription(void* socket, const std::string& filter);
 
 
 /**
@@ -322,9 +322,7 @@ bool setSocketSubscription(void *socket, const std::string &filter);
  *
  * \return The value of the specified \c option, otherwise \c defaultValue.
  */
-int socketOption(void *socket, int option, int defaultValue = 0, bool *ok = 0);
-
-
+int socketOption(void* socket, int option, int defaultValue = 0, bool* ok = 0);
 }
 }
 
