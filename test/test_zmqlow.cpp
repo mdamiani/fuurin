@@ -181,8 +181,7 @@ void transferTeardown(void* ctx, void* s1, void* s2)
 template<typename T>
 void testTransferSingle(const T& part)
 {
-    void *ctx, *s1, *s2;
-    std::tie(ctx, s1, s2) = transferSetup(ZMQ_PAIR, ZMQ_PAIR);
+    const auto [ctx, s1, s2] = transferSetup(ZMQ_PAIR, ZMQ_PAIR);
 
     const int sz = getPartSize<T>(part);
 
@@ -239,8 +238,7 @@ BOOST_DATA_TEST_CASE(transferSinglePart,
 
 BOOST_AUTO_TEST_CASE(transferMultiPart)
 {
-    void *ctx, *s1, *s2;
-    std::tie(ctx, s1, s2) = transferSetup(ZMQ_PAIR, ZMQ_PAIR);
+    const auto [ctx, s1, s2] = transferSetup(ZMQ_PAIR, ZMQ_PAIR);
 
     uint8_t send_p1 = 255u;
     uint16_t send_p2 = 65535u;
@@ -300,8 +298,7 @@ BOOST_DATA_TEST_CASE(waitForEvents,
     }),
     type, event, timeout, expected)
 {
-    void *ctx, *s1, *s2;
-    std::tie(ctx, s1, s2) = transferSetup(ZMQ_PAIR, ZMQ_PAIR);
+    const auto [ctx, s1, s2] = transferSetup(ZMQ_PAIR, ZMQ_PAIR);
     uint32_t data = 0;
 
     if (type == 'w')
@@ -330,8 +327,7 @@ BOOST_DATA_TEST_CASE(publishMessage,
     }),
     pubFilt, subFilt, timeout, count, expected)
 {
-    void *ctx, *s1, *s2;
-    std::tie(ctx, s1, s2) = transferSetup(ZMQ_PUB, ZMQ_SUB);
+    const auto [ctx, s1, s2] = transferSetup(ZMQ_PUB, ZMQ_SUB);
 
     BOOST_TEST(zmq::setSocketSubscription(s2, subFilt) == true);
 
