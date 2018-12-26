@@ -19,10 +19,9 @@
 
 namespace fuurin {
 
-
-void logHandler(LogLevel level, const char *file, unsigned int line, const std::string &message)
+void logHandler(LogLevel level, const char* file, unsigned int line, const std::string& message)
 {
-    switch(level) {
+    switch (level) {
     case DebugLevel:
     case InfoLevel:
     case WarningLevel:
@@ -41,7 +40,7 @@ void logHandler(LogLevel level, const char *file, unsigned int line, const std::
 LogMessageHandler logMessage = logHandler;
 
 
-std::string format(const char *format, ...)
+std::string format(const char* format, ...)
 {
     va_list args;
 
@@ -57,6 +56,4 @@ std::string format(const char *format, ...)
 
     return std::string(buf.begin(), buf.end() - 1);
 }
-
-
 }

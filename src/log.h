@@ -16,7 +16,6 @@
 
 namespace fuurin {
 
-
 /**
  * \brief Log message handler.
  *
@@ -33,21 +32,19 @@ extern LogMessageHandler logMessage;
  *
  * \return A formatted string.
  */
-std::string format(const char *format, ...);
+std::string format(const char* format, ...);
 
 
 #ifndef NDEBUG
-#define LOG_DEBUG(msg)  logMessage(DebugLevel, __FILE__, __LINE__, msg)
+#define LOG_DEBUG(msg) logMessage(DebugLevel, __FILE__, __LINE__, msg)
 #else
 #define LOG_DEBUG(msg)
 #endif
 
-#define LOG_INFO(msg)   logMessage(InfoLevel, __FILE__, __LINE__, msg)
-#define LOG_WARN(msg)   logMessage(WarningLevel, __FILE__, __LINE__, msg)
-#define LOG_ERROR(msg)  logMessage(ErrorLevel, __FILE__, __LINE__, msg)
-#define LOG_FATAL(msg)  logMessage(FatalLevel, __FILE__, __LINE__, msg)
-
-
+#define LOG_INFO(msg) logMessage(InfoLevel, __FILE__, __LINE__, msg)
+#define LOG_WARN(msg) logMessage(WarningLevel, __FILE__, __LINE__, msg)
+#define LOG_ERROR(msg) logMessage(ErrorLevel, __FILE__, __LINE__, msg)
+#define LOG_FATAL(msg) logMessage(FatalLevel, __FILE__, __LINE__, msg)
 }
 
 #endif // LOG_H

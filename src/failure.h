@@ -18,7 +18,6 @@
 
 namespace fuurin {
 
-
 /**
  * \brief Causes a program abort because of an assertion failure.
  *
@@ -27,7 +26,7 @@ namespace fuurin {
  * \param[in] line Code line.
  * \param[in] expr Expression which evaluated to \c false and caused the failure.
  */
-void failure(const char *file, unsigned int line, const char *expr, const std::string &message);
+void failure(const char* file, unsigned int line, const char* expr, const std::string& message);
 
 
 /**
@@ -40,8 +39,6 @@ void failure(const char *file, unsigned int line, const char *expr, const std::s
     if (BOOST_UNLIKELY(!(expr))) { \
         failure(__FILE__, __LINE__, #expr, msg); \
     }
-
-
 }
 
 

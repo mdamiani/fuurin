@@ -16,14 +16,10 @@
 
 namespace fuurin {
 
-
-void failure(const char *file, unsigned int line, const char *expr, const std::string &message)
+void failure(const char* file, unsigned int line, const char* expr, const std::string& message)
 {
-    logMessage(FatalLevel, file, line,
-        format("ASSERT failure '%s', %s", expr, message.c_str()));
+    logMessage(FatalLevel, file, line, format("ASSERT failure '%s', %s", expr, message.c_str()));
 
     std::abort();
 }
-
-
 }

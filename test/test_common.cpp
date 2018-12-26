@@ -26,9 +26,7 @@ BOOST_AUTO_TEST_CASE(version)
 {
     char buf[16];
 
-    std::snprintf(buf, sizeof(buf), "%d.%d.%d",
-        fuurin::VERSION_MAJOR,
-        fuurin::VERSION_MINOR,
+    std::snprintf(buf, sizeof(buf), "%d.%d.%d", fuurin::VERSION_MAJOR, fuurin::VERSION_MINOR,
         fuurin::VERSION_PATCH);
 
     BOOST_TEST(std::string(fuurin::version()) == std::string(buf));
@@ -36,7 +34,7 @@ BOOST_AUTO_TEST_CASE(version)
 
 
 static std::string _myLogOutput;
-static const char * _myLogPrefix[] = {
+static const char* _myLogPrefix[] = {
     "MY_DEBUG: ",
     "MY_INFO: ",
     "MY_WARN: ",
@@ -44,7 +42,8 @@ static const char * _myLogPrefix[] = {
     "MY_FATAL: ",
 };
 
-void myLogHandler(fuurin::LogLevel level, const char *file, unsigned int line, const std::string &message)
+void myLogHandler(
+    fuurin::LogLevel level, const char* file, unsigned int line, const std::string& message)
 {
     UNUSED(file);
     UNUSED(line);
@@ -52,13 +51,15 @@ void myLogHandler(fuurin::LogLevel level, const char *file, unsigned int line, c
     _myLogOutput = _myLogPrefix[level] + message;
 }
 
-BOOST_DATA_TEST_CASE(customLogMessageHandler, bdata::make({
-    fuurin::DebugLevel,
-    fuurin::InfoLevel,
-    fuurin::WarningLevel,
-    fuurin::ErrorLevel,
-    fuurin::FatalLevel,
-}), level)
+BOOST_DATA_TEST_CASE(customLogMessageHandler,
+    bdata::make({
+        fuurin::DebugLevel,
+        fuurin::InfoLevel,
+        fuurin::WarningLevel,
+        fuurin::ErrorLevel,
+        fuurin::FatalLevel,
+    }),
+    level)
 {
     const std::string msg = "message";
 
