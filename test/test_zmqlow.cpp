@@ -101,21 +101,23 @@ struct TVal
     ByteArray arr;
     String str;
 
-    TVal(const std::string& t, uint64_t v)
+    TVal(const std::string& t, uint64_t v, const ByteArray& a, const String& s)
         : type(t)
         , val(v)
+        , arr(a)
+        , str(s)
+    {}
+
+    TVal(const std::string& t, uint64_t v)
+        : TVal(t, v, {}, {})
     {}
 
     TVal(const std::string& t, const ByteArray& v)
-        : type(t)
-        , val(0)
-        , arr(v)
+        : TVal(t, 0, v, {})
     {}
 
     TVal(const std::string& t, const String& v)
-        : type(t)
-        , val(0)
-        , str(v)
+        : TVal(t, 0, {}, v)
     {}
 };
 
@@ -181,8 +183,7 @@ void transferTeardown(void* ctx, void* s1, void* s2)
 template<typename T>
 void testTransferSingle(const T& part)
 {
-    void *ctx, *s1, *s2;
-    std::tie(ctx, s1, s2) = transferSetup(ZMQ_PAIR, ZMQ_PAIR);
+    const auto [ctx, s1, s2] = transferSetup(ZMQ_PAIR, ZMQ_PAIR);
 
     const int sz = getPartSize<T>(part);
 
@@ -199,23 +200,23 @@ void testTransferSingle(const T& part)
 
 BOOST_DATA_TEST_CASE(transferSinglePart,
     bdata::make({
-        TVal("uint8_t", 0u),
-        TVal("uint8_t", 255u),
-        TVal("uint16_t", 0u),
-        TVal("uint16_t", 61689u),
-        TVal("uint16_t", 65535u),
-        TVal("uint32_t", 0ul),
-        TVal("uint32_t", 4278583165ul),
-        TVal("uint32_t", 4294967295ul),
-        TVal("uint64_t", 0ull),
-        TVal("uint64_t", 11460521682733600767ull),
-        TVal("uint64_t", 18446744073709551615ull),
-        TVal("ByteArray", ByteArray()),
-        TVal("ByteArray", ByteArray{'a', 'b', 'c'}),
-        TVal("ByteArray", ByteArray(2048, 'z')),
-        TVal("String", String()),
-        TVal("String", String{"汉字漢字唐字"}),
-        TVal("String", String(2048, 'y')),
+        TVal{"uint8_t", 0u},
+        TVal{"uint8_t", 255u},
+        TVal{"uint16_t", 0u},
+        TVal{"uint16_t", 61689u},
+        TVal{"uint16_t", 65535u},
+        TVal{"uint32_t", 0ul},
+        TVal{"uint32_t", 4278583165ul},
+        TVal{"uint32_t", 4294967295ul},
+        TVal{"uint64_t", 0ull},
+        TVal{"uint64_t", 11460521682733600767ull},
+        TVal{"uint64_t", 18446744073709551615ull},
+        TVal{"ByteArray", ByteArray()},
+        TVal{"ByteArray", ByteArray{'a', 'b', 'c'}},
+        TVal{"ByteArray", ByteArray(2048, 'z')},
+        TVal{"String", String()},
+        TVal{"String", String{"汉字漢字唐字"}},
+        TVal{"String", String(2048, 'y')},
     }))
 {
 #define TRANSF_SINGLE(T, field) \
@@ -239,15 +240,14 @@ BOOST_DATA_TEST_CASE(transferSinglePart,
 
 BOOST_AUTO_TEST_CASE(transferMultiPart)
 {
-    void *ctx, *s1, *s2;
-    std::tie(ctx, s1, s2) = transferSetup(ZMQ_PAIR, ZMQ_PAIR);
+    const auto [ctx, s1, s2] = transferSetup(ZMQ_PAIR, ZMQ_PAIR);
 
-    uint8_t send_p1 = 255u;
-    uint16_t send_p2 = 65535u;
-    uint32_t send_p3 = 4294967295ul;
-    uint64_t send_p4 = 18446744073709551615ull;
-    ByteArray send_p5 = ByteArray{'a', 'b', 'c'};
-    ByteArray send_p6 = ByteArray{};
+    uint8_t send_p1{255u};
+    uint16_t send_p2{65535u};
+    uint32_t send_p3{4294967295ul};
+    uint64_t send_p4{18446744073709551615ull};
+    ByteArray send_p5{'a', 'b', 'c'};
+    ByteArray send_p6;
 
     const int sz = sizeof(send_p1) + sizeof(send_p2) + sizeof(send_p3) + sizeof(send_p4) +
         send_p5.size() + send_p6.size();
@@ -300,8 +300,7 @@ BOOST_DATA_TEST_CASE(waitForEvents,
     }),
     type, event, timeout, expected)
 {
-    void *ctx, *s1, *s2;
-    std::tie(ctx, s1, s2) = transferSetup(ZMQ_PAIR, ZMQ_PAIR);
+    const auto [ctx, s1, s2] = transferSetup(ZMQ_PAIR, ZMQ_PAIR);
     uint32_t data = 0;
 
     if (type == 'w')
@@ -330,8 +329,7 @@ BOOST_DATA_TEST_CASE(publishMessage,
     }),
     pubFilt, subFilt, timeout, count, expected)
 {
-    void *ctx, *s1, *s2;
-    std::tie(ctx, s1, s2) = transferSetup(ZMQ_PUB, ZMQ_SUB);
+    const auto [ctx, s1, s2] = transferSetup(ZMQ_PUB, ZMQ_SUB);
 
     BOOST_TEST(zmq::setSocketSubscription(s2, subFilt) == true);
 
