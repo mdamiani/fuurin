@@ -50,6 +50,7 @@ set(LIB_SOURCES
 
 set(LIB_PUBLIC_HEADERS
     include/fuurin/fuurin.h
+    include/fuurin/logger.h
     include/fuurin/broker.h
     include/fuurin/worker.h
 )

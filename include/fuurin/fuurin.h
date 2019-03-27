@@ -11,8 +11,7 @@
 #ifndef FUURIN_H
 #define FUURIN_H
 
-#include <string>
-
+#include <fuurin/logger.h>
 
 namespace fuurin {
 
@@ -30,39 +29,6 @@ constexpr const int VERSION_PATCH = 1;
  * \return Library version, formatted as string.
  */
 char* version();
-
-
-/**
- * \brief Levels for logging messages.
- */
-enum LogLevel
-{
-    DebugLevel,   ///< Debug level.
-    InfoLevel,    ///< Info level.
-    WarningLevel, ///< Warning level.
-    ErrorLevel,   ///< Error level.
-    FatalLevel,   ///< Fatal level.
-};
-
-
-/**
- * \brief Type for a callable log message handler function.
- *
- * \param[in] level Log level of the message.
- * \param[in] file  File name where the log happens.
- * \param[in] line  Code line where the log happens.
- */
-typedef void (*LogMessageHandler)(
-    LogLevel level, const char* file, unsigned int line, const std::string& message);
-
-
-/**
- * \brief Installs a custom handler for library log messages.
- *
- * \param[in] handler A callable function of type \ref LogMessageHandler.
- *                    Passing NULL causes the default message handler to be installed.
- */
-void logInstallMessageHandler(LogMessageHandler handler);
 }
 
 #endif // FUURIN_H

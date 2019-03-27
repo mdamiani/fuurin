@@ -34,7 +34,7 @@ BOOST_AUTO_TEST_CASE(version)
 
 
 static std::string _myLogOutput;
-static const char* _myLogPrefix[] = {
+static std::string _myLogPrefix[] = {
     "MY_DEBUG: ",
     "MY_INFO: ",
     "MY_WARN: ",
@@ -42,29 +42,48 @@ static const char* _myLogPrefix[] = {
     "MY_FATAL: ",
 };
 
-void myLogHandler(
-    fuurin::LogLevel level, const char* file, unsigned int line, const std::string& message)
+class MyLogHandler : public fuurin::log::Handler
 {
-    UNUSED(file);
-    UNUSED(line);
+public:
+    void debug(const fuurin::log::Message& m)
+    {
+        _myLogOutput = _myLogPrefix[0] + m.what;
+    }
 
-    _myLogOutput = _myLogPrefix[level] + message;
-}
+    void info(const fuurin::log::Message& m)
+    {
+        _myLogOutput = _myLogPrefix[1] + m.what;
+    }
+
+    void warn(const fuurin::log::Message& m)
+    {
+        _myLogOutput = _myLogPrefix[2] + m.what;
+    }
+
+    void error(const fuurin::log::Message& m)
+    {
+        _myLogOutput = _myLogPrefix[3] + m.what;
+    }
+
+    void fatal(const fuurin::log::Message& m)
+    {
+        _myLogOutput = _myLogPrefix[4] + m.what;
+    }
+};
 
 BOOST_DATA_TEST_CASE(customLogMessageHandler,
     bdata::make({
-        fuurin::DebugLevel,
-        fuurin::InfoLevel,
-        fuurin::WarningLevel,
-        fuurin::ErrorLevel,
-        fuurin::FatalLevel,
+        std::make_tuple(fuurin::log::Logger::debug, 0),
+        std::make_tuple(fuurin::log::Logger::info, 1),
+        std::make_tuple(fuurin::log::Logger::warn, 2),
+        std::make_tuple(fuurin::log::Logger::error, 3),
+        std::make_tuple(fuurin::log::Logger::fatal, 4),
     }),
-    level)
+    logfn, level)
 {
-    const std::string msg = "message";
-
-    fuurin::logInstallMessageHandler(myLogHandler);
-    fuurin::logMessage(level, __FILE__, __LINE__, msg);
+    const char* msg = "message";
+    fuurin::log::Logger::installMessageHandler(new MyLogHandler);
+    logfn({__LINE__, __FILE__, "customLogMessageHandler", msg});
 
     BOOST_TEST(_myLogOutput == _myLogPrefix[level] + msg);
 }

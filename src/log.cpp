@@ -18,27 +18,76 @@
 
 
 namespace fuurin {
+namespace log {
 
-void logHandler(LogLevel level, const char* file, unsigned int line, const std::string& message)
+class DefaultHandler : public Handler
 {
-    switch (level) {
-    case DebugLevel:
-    case InfoLevel:
-    case WarningLevel:
-    case ErrorLevel:
-        std::cout << message << std::endl;
-        break;
-
-    case FatalLevel:
-        std::cerr << "FATAL at file " << file << " line " << line << ": " << message << std::endl;
-        std::abort();
-        break;
+public:
+    void debug(const Message& m)
+    {
+        std::cout << m.where << ": " << m.what << std::endl;
     }
+
+    void info(const Message& m)
+    {
+        std::cout << m.where << ": " << m.what << std::endl;
+    }
+
+    void warn(const Message& m)
+    {
+        std::cerr << m.where << ": " << m.what << std::endl;
+    }
+
+    void error(const Message& m)
+    {
+        std::cerr << m.where << ": " << m.what << std::endl;
+    }
+
+    void fatal(const Message& m)
+    {
+        std::cerr << "FATAL at file " << m.file << " line " << m.line << ": " << m.where << ": "
+                  << m.what << std::endl;
+        std::abort();
+    }
+};
+
+Handler::~Handler()
+{}
+
+std::unique_ptr<Handler> Logger::_handler(new DefaultHandler);
+
+void Logger::installMessageHandler(Handler* handler)
+{
+    if (handler)
+        _handler.reset(handler);
+    else
+        _handler.reset(new DefaultHandler);
 }
 
+void Logger::debug(const Message& message)
+{
+    _handler->debug(message);
+}
 
-LogMessageHandler logMessage = logHandler;
+void Logger::info(const Message& message)
+{
+    _handler->info(message);
+}
 
+void Logger::warn(const Message& message)
+{
+    _handler->warn(message);
+}
+
+void Logger::error(const Message& message)
+{
+    _handler->error(message);
+}
+
+void Logger::fatal(const Message& message)
+{
+    _handler->fatal(message);
+}
 
 std::string format(const char* format, ...)
 {
@@ -55,5 +104,6 @@ std::string format(const char* format, ...)
     va_end(args);
 
     return std::string(buf.begin(), buf.end() - 1);
+}
 }
 }
