@@ -24,6 +24,15 @@ namespace log {
 Handler::~Handler()
 {}
 
+namespace {
+void abortWithMessage(const Message& m)
+{
+    std::cerr << "FATAL at file " << m.file << " line " << m.line << ": " << m.where << ": "
+              << m.what << std::endl;
+    std::abort();
+}
+}
+
 void StandardHandler::debug(const Message& m)
 {
     std::cout << m.where << ": " << m.what << std::endl;
@@ -46,9 +55,7 @@ void StandardHandler::error(const Message& m)
 
 void StandardHandler::fatal(const Message& m)
 {
-    std::cerr << "FATAL at file " << m.file << " line " << m.line << ": " << m.where << ": "
-              << m.what << std::endl;
-    std::abort();
+    abortWithMessage(m);
 }
 
 void SilentHandler::debug(const Message&)
@@ -63,9 +70,9 @@ void SilentHandler::warn(const Message&)
 void SilentHandler::error(const Message&)
 {}
 
-void SilentHandler::fatal(const Message&)
+void SilentHandler::fatal(const Message& m)
 {
-    std::abort();
+    abortWithMessage(m);
 }
 
 std::unique_ptr<Handler> Logger::_handler(new StandardHandler);

@@ -63,8 +63,8 @@ BOOST_DATA_TEST_CASE(standardLogMessageHandler,
     logfn)
 {
     std::stringstream buf;
-    const auto ro = redirect(std::cout, buf.rdbuf());
-    const auto re = redirect(std::cerr, buf.rdbuf());
+    const auto& ro = redirect(std::cout, buf.rdbuf());
+    const auto& re = redirect(std::cerr, buf.rdbuf());
 
     fuurin::log::Logger::installMessageHandler(new fuurin::log::StandardHandler);
 
