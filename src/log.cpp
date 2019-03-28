@@ -9,6 +9,7 @@
  */
 
 #include "log.h"
+#include "failure.h"
 
 #include <cstdlib>
 #include <cstdio>
@@ -18,27 +19,88 @@
 
 
 namespace fuurin {
+namespace log {
 
-void logHandler(LogLevel level, const char* file, unsigned int line, const std::string& message)
+Handler::~Handler()
+{}
+
+void StandardHandler::debug(const Message& m)
 {
-    switch (level) {
-    case DebugLevel:
-    case InfoLevel:
-    case WarningLevel:
-    case ErrorLevel:
-        std::cout << message << std::endl;
-        break;
-
-    case FatalLevel:
-        std::cerr << "FATAL at file " << file << " line " << line << ": " << message << std::endl;
-        std::abort();
-        break;
-    }
+    std::cout << m.where << ": " << m.what << std::endl;
 }
 
+void StandardHandler::info(const Message& m)
+{
+    std::cout << m.where << ": " << m.what << std::endl;
+}
 
-LogMessageHandler logMessage = logHandler;
+void StandardHandler::warn(const Message& m)
+{
+    std::cerr << m.where << ": " << m.what << std::endl;
+}
 
+void StandardHandler::error(const Message& m)
+{
+    std::cerr << m.where << ": " << m.what << std::endl;
+}
+
+void StandardHandler::fatal(const Message& m)
+{
+    std::cerr << "FATAL at file " << m.file << " line " << m.line << ": " << m.where << ": "
+              << m.what << std::endl;
+    std::abort();
+}
+
+void SilentHandler::debug(const Message&)
+{}
+
+void SilentHandler::info(const Message&)
+{}
+
+void SilentHandler::warn(const Message&)
+{}
+
+void SilentHandler::error(const Message&)
+{}
+
+void SilentHandler::fatal(const Message&)
+{
+    std::abort();
+}
+
+std::unique_ptr<Handler> Logger::_handler(new StandardHandler);
+
+void Logger::installMessageHandler(Handler* handler)
+{
+    ASSERT(handler != nullptr, "log message handler is null");
+
+    _handler.reset(handler);
+}
+
+void Logger::debug(const Message& message)
+{
+    _handler->debug(message);
+}
+
+void Logger::info(const Message& message)
+{
+    _handler->info(message);
+}
+
+void Logger::warn(const Message& message)
+{
+    _handler->warn(message);
+}
+
+void Logger::error(const Message& message)
+{
+    _handler->error(message);
+}
+
+void Logger::fatal(const Message& message)
+{
+    _handler->fatal(message);
+}
 
 std::string format(const char* format, ...)
 {
@@ -55,5 +117,6 @@ std::string format(const char* format, ...)
     va_end(args);
 
     return std::string(buf.begin(), buf.end() - 1);
+}
 }
 }

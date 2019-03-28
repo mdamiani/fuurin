@@ -11,18 +11,11 @@
 #ifndef LOG_H
 #define LOG_H
 
-#include "fuurin/fuurin.h"
+#include "fuurin/logger.h"
 
 
 namespace fuurin {
-
-/**
- * \brief Log message handler.
- *
- * This function is used to handle message logs.
- */
-extern LogMessageHandler logMessage;
-
+namespace log {
 
 /**
  * \brief Simple formatting function for logs.
@@ -36,15 +29,16 @@ std::string format(const char* format, ...);
 
 
 #ifndef NDEBUG
-#define LOG_DEBUG(msg) logMessage(DebugLevel, __FILE__, __LINE__, msg)
+#define LOG_DEBUG(wh, wa) log::Logger::debug({__LINE__, __FILE__, wh, wa})
 #else
-#define LOG_DEBUG(msg)
+#define LOG_DEBUG(wh, wa)
 #endif
 
-#define LOG_INFO(msg) logMessage(InfoLevel, __FILE__, __LINE__, msg)
-#define LOG_WARN(msg) logMessage(WarningLevel, __FILE__, __LINE__, msg)
-#define LOG_ERROR(msg) logMessage(ErrorLevel, __FILE__, __LINE__, msg)
-#define LOG_FATAL(msg) logMessage(FatalLevel, __FILE__, __LINE__, msg)
+#define LOG_INFO(wh, wa) log::Logger::info({__LINE__, __FILE__, wh, wa})
+#define LOG_WARN(wh, wa) log::Logger::warn({__LINE__, __FILE__, wh, wa})
+#define LOG_ERROR(wh, wa) log::Logger::error({__LINE__, __FILE__, wh, wa})
+#define LOG_FATAL(wh, wa) log::Logger::fatal({__LINE__, __FILE__, wh, wa})
+}
 }
 
 #endif // LOG_H
