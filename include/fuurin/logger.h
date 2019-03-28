@@ -53,6 +53,46 @@ public:
 };
 
 /**
+ * \brief Logging handler which prints every message to stdout/stderr.
+ * This is the default installed handler.
+ *
+ * \see Handler
+ */
+class StandardHandler : public Handler
+{
+    /**
+     * \brief Logging function which prints the \c message to stdout/stderr.
+     */
+    ///{@
+    void debug(const Message&);
+    void info(const Message&);
+    void warn(const Message&);
+    void error(const Message&);
+    void fatal(const Message&);
+    ///@}
+};
+
+/**
+ * \brief Logging handler which discards every message.
+ * No logging message will be ever shown.
+ *
+ * \see Handler
+ */
+class SilentHandler : public Handler
+{
+    /**
+     * \brief Logging function which discards the message.
+     */
+    ///{@
+    void debug(const Message&);
+    void info(const Message&);
+    void warn(const Message&);
+    void error(const Message&);
+    void fatal(const Message&);
+    ///@}
+};
+
+/**
  * \brief Library-level generic logger.
  *
  * This logger shall use the installed \ref Handler to log any \ref Message.
@@ -66,9 +106,8 @@ public:
     /**
      * \brief Installs a custom \ref Handler for any library log \ref Message.
      *
-     * \param[in] handler A pointer to the message \ref Handler. The ownership of the
-     *                    object is taken. Passing \c nullptr causes the default
-     *                    message handler to be installed.
+     * \param[in] handler A valid pointer to the message \ref Handler.
+     *      The ownership of the object is taken.
      */
     static void installMessageHandler(Handler* handler);
 

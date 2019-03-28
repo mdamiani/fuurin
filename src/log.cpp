@@ -9,6 +9,7 @@
  */
 
 #include "log.h"
+#include "failure.h"
 
 #include <cstdlib>
 #include <cstdio>
@@ -20,48 +21,60 @@
 namespace fuurin {
 namespace log {
 
-class DefaultHandler : public Handler
-{
-public:
-    void debug(const Message& m)
-    {
-        std::cout << m.where << ": " << m.what << std::endl;
-    }
-
-    void info(const Message& m)
-    {
-        std::cout << m.where << ": " << m.what << std::endl;
-    }
-
-    void warn(const Message& m)
-    {
-        std::cerr << m.where << ": " << m.what << std::endl;
-    }
-
-    void error(const Message& m)
-    {
-        std::cerr << m.where << ": " << m.what << std::endl;
-    }
-
-    void fatal(const Message& m)
-    {
-        std::cerr << "FATAL at file " << m.file << " line " << m.line << ": " << m.where << ": "
-                  << m.what << std::endl;
-        std::abort();
-    }
-};
-
 Handler::~Handler()
 {}
 
-std::unique_ptr<Handler> Logger::_handler(new DefaultHandler);
+void StandardHandler::debug(const Message& m)
+{
+    std::cout << m.where << ": " << m.what << std::endl;
+}
+
+void StandardHandler::info(const Message& m)
+{
+    std::cout << m.where << ": " << m.what << std::endl;
+}
+
+void StandardHandler::warn(const Message& m)
+{
+    std::cerr << m.where << ": " << m.what << std::endl;
+}
+
+void StandardHandler::error(const Message& m)
+{
+    std::cerr << m.where << ": " << m.what << std::endl;
+}
+
+void StandardHandler::fatal(const Message& m)
+{
+    std::cerr << "FATAL at file " << m.file << " line " << m.line << ": " << m.where << ": "
+              << m.what << std::endl;
+    std::abort();
+}
+
+void SilentHandler::debug(const Message&)
+{}
+
+void SilentHandler::info(const Message&)
+{}
+
+void SilentHandler::warn(const Message&)
+{}
+
+void SilentHandler::error(const Message&)
+{}
+
+void SilentHandler::fatal(const Message&)
+{
+    std::abort();
+}
+
+std::unique_ptr<Handler> Logger::_handler(new StandardHandler);
 
 void Logger::installMessageHandler(Handler* handler)
 {
-    if (handler)
-        _handler.reset(handler);
-    else
-        _handler.reset(new DefaultHandler);
+    ASSERT(handler != nullptr, "log message handler is null");
+
+    _handler.reset(handler);
 }
 
 void Logger::debug(const Message& message)

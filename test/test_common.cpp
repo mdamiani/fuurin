@@ -18,6 +18,8 @@
 
 #include <cstdio>
 #include <string>
+#include <iostream>
+#include <sstream>
 
 namespace bdata = boost::unit_test::data;
 
@@ -33,57 +35,66 @@ BOOST_AUTO_TEST_CASE(version)
 }
 
 
-static std::string _myLogOutput;
-static std::string _myLogPrefix[] = {
-    "MY_DEBUG: ",
-    "MY_INFO: ",
-    "MY_WARN: ",
-    "MY_ERROR: ",
-    "MY_FATAL: ",
-};
-
-class MyLogHandler : public fuurin::log::Handler
+struct redirect
 {
-public:
-    void debug(const fuurin::log::Message& m)
+    redirect(std::ostream& oss, std::streambuf* buf)
+        : _oss(oss)
+        , _old(oss.rdbuf(buf))
+    {}
+
+    ~redirect()
     {
-        _myLogOutput = _myLogPrefix[0] + m.what;
+        _oss.rdbuf(_old);
     }
 
-    void info(const fuurin::log::Message& m)
-    {
-        _myLogOutput = _myLogPrefix[1] + m.what;
-    }
-
-    void warn(const fuurin::log::Message& m)
-    {
-        _myLogOutput = _myLogPrefix[2] + m.what;
-    }
-
-    void error(const fuurin::log::Message& m)
-    {
-        _myLogOutput = _myLogPrefix[3] + m.what;
-    }
-
-    void fatal(const fuurin::log::Message& m)
-    {
-        _myLogOutput = _myLogPrefix[4] + m.what;
-    }
+private:
+    std::ostream& _oss;
+    std::streambuf* _old;
 };
 
-BOOST_DATA_TEST_CASE(customLogMessageHandler,
+BOOST_DATA_TEST_CASE(standardLogMessageHandler,
     bdata::make({
-        std::make_tuple(fuurin::log::Logger::debug, 0),
-        std::make_tuple(fuurin::log::Logger::info, 1),
-        std::make_tuple(fuurin::log::Logger::warn, 2),
-        std::make_tuple(fuurin::log::Logger::error, 3),
-        std::make_tuple(fuurin::log::Logger::fatal, 4),
+        fuurin::log::Logger::debug,
+        fuurin::log::Logger::info,
+        fuurin::log::Logger::warn,
+        fuurin::log::Logger::error,
     }),
-    logfn, level)
+    logfn)
 {
-    const char* msg = "message";
-    fuurin::log::Logger::installMessageHandler(new MyLogHandler);
-    logfn({__LINE__, __FILE__, "customLogMessageHandler", msg});
+    std::stringstream buf;
+    const auto ro = redirect(std::cout, buf.rdbuf());
+    const auto re = redirect(std::cerr, buf.rdbuf());
 
-    BOOST_TEST(_myLogOutput == _myLogPrefix[level] + msg);
+    fuurin::log::Logger::installMessageHandler(new fuurin::log::StandardHandler);
+
+    const fuurin::log::Message msg{1, "test_file", "test_fun", "test_msg"};
+    const auto expected = std::string(msg.where) + ": " + msg.what;
+
+    logfn(msg);
+
+    auto out = buf.str();
+    for (const char& c : {'\r', '\n'})
+        out.erase(std::remove(out.begin(), out.end(), c), out.end());
+
+    BOOST_TEST(out == expected);
+}
+
+BOOST_DATA_TEST_CASE(silentLogMessageHandler,
+    bdata::make({
+        fuurin::log::Logger::debug,
+        fuurin::log::Logger::info,
+        fuurin::log::Logger::warn,
+        fuurin::log::Logger::error,
+    }),
+    logfn)
+{
+    std::stringstream buf;
+    const auto ro = redirect(std::cout, buf.rdbuf());
+    const auto re = redirect(std::cerr, buf.rdbuf());
+
+    fuurin::log::Logger::installMessageHandler(new fuurin::log::SilentHandler);
+
+    logfn({1, "test_file", "test_fun", "test_msg"});
+
+    BOOST_TEST(buf.str().empty());
 }
