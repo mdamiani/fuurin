@@ -52,6 +52,7 @@ private:
     std::streambuf* _old;
 };
 
+
 BOOST_DATA_TEST_CASE(standardLogMessageHandler,
     bdata::make({
         fuurin::log::Logger::debug,
@@ -79,6 +80,7 @@ BOOST_DATA_TEST_CASE(standardLogMessageHandler,
     BOOST_TEST(out == expected);
 }
 
+
 BOOST_DATA_TEST_CASE(silentLogMessageHandler,
     bdata::make({
         fuurin::log::Logger::debug,
@@ -97,4 +99,10 @@ BOOST_DATA_TEST_CASE(silentLogMessageHandler,
     logfn({1, "test_file", "test_fun", "test_msg"});
 
     BOOST_TEST(buf.str().empty());
+}
+
+
+BOOST_AUTO_TEST_CASE(formatLog)
+{
+    BOOST_TEST("test_fun: test_msg1" == fuurin::log::format("test_fun: %s%d", "test_msg", 1));
 }
