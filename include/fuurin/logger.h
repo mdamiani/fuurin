@@ -127,7 +127,7 @@ public:
     ///@}
 
 private:
-    static std::unique_ptr<Handler> _handler; ///< The user defined log handler.
+    static std::unique_ptr<Handler> handler_; ///< The user defined log handler.
 };
 }
 }

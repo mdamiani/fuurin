@@ -75,38 +75,38 @@ void SilentHandler::fatal(const Content& c)
     abortWithContent(c);
 }
 
-std::unique_ptr<Handler> Logger::_handler(new StandardHandler);
+std::unique_ptr<Handler> Logger::handler_(new StandardHandler);
 
 void Logger::installContentHandler(Handler* handler)
 {
     ASSERT(handler != nullptr, "log message handler is null");
 
-    _handler.reset(handler);
+    handler_.reset(handler);
 }
 
 void Logger::debug(const Content& c)
 {
-    _handler->debug(c);
+    handler_->debug(c);
 }
 
 void Logger::info(const Content& c)
 {
-    _handler->info(c);
+    handler_->info(c);
 }
 
 void Logger::warn(const Content& c)
 {
-    _handler->warn(c);
+    handler_->warn(c);
 }
 
 void Logger::error(const Content& c)
 {
-    _handler->error(c);
+    handler_->error(c);
 }
 
 void Logger::fatal(const Content& c)
 {
-    _handler->fatal(c);
+    handler_->fatal(c);
 }
 
 std::string format(const char* format, ...)
