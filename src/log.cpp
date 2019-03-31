@@ -25,88 +25,88 @@ Handler::~Handler()
 {}
 
 namespace {
-void abortWithMessage(const Message& m)
+void abortWithContent(const Content& c)
 {
-    std::cerr << "FATAL at file " << m.file << " line " << m.line << ": " << m.where << ": "
-              << m.what << std::endl;
+    std::cerr << "FATAL at file " << c.file << " line " << c.line << ": " << c.where << ": "
+              << c.what << std::endl;
     std::abort();
 }
 }
 
-void StandardHandler::debug(const Message& m)
+void StandardHandler::debug(const Content& c)
 {
-    std::cout << m.where << ": " << m.what << std::endl;
+    std::cout << c.where << ": " << c.what << std::endl;
 }
 
-void StandardHandler::info(const Message& m)
+void StandardHandler::info(const Content& c)
 {
-    std::cout << m.where << ": " << m.what << std::endl;
+    std::cout << c.where << ": " << c.what << std::endl;
 }
 
-void StandardHandler::warn(const Message& m)
+void StandardHandler::warn(const Content& c)
 {
-    std::cerr << m.where << ": " << m.what << std::endl;
+    std::cerr << c.where << ": " << c.what << std::endl;
 }
 
-void StandardHandler::error(const Message& m)
+void StandardHandler::error(const Content& c)
 {
-    std::cerr << m.where << ": " << m.what << std::endl;
+    std::cerr << c.where << ": " << c.what << std::endl;
 }
 
-void StandardHandler::fatal(const Message& m)
+void StandardHandler::fatal(const Content& c)
 {
-    abortWithMessage(m);
+    abortWithContent(c);
 }
 
-void SilentHandler::debug(const Message&)
+void SilentHandler::debug(const Content&)
 {}
 
-void SilentHandler::info(const Message&)
+void SilentHandler::info(const Content&)
 {}
 
-void SilentHandler::warn(const Message&)
+void SilentHandler::warn(const Content&)
 {}
 
-void SilentHandler::error(const Message&)
+void SilentHandler::error(const Content&)
 {}
 
-void SilentHandler::fatal(const Message& m)
+void SilentHandler::fatal(const Content& c)
 {
-    abortWithMessage(m);
+    abortWithContent(c);
 }
 
 std::unique_ptr<Handler> Logger::_handler(new StandardHandler);
 
-void Logger::installMessageHandler(Handler* handler)
+void Logger::installContentHandler(Handler* handler)
 {
     ASSERT(handler != nullptr, "log message handler is null");
 
     _handler.reset(handler);
 }
 
-void Logger::debug(const Message& message)
+void Logger::debug(const Content& c)
 {
-    _handler->debug(message);
+    _handler->debug(c);
 }
 
-void Logger::info(const Message& message)
+void Logger::info(const Content& c)
 {
-    _handler->info(message);
+    _handler->info(c);
 }
 
-void Logger::warn(const Message& message)
+void Logger::warn(const Content& c)
 {
-    _handler->warn(message);
+    _handler->warn(c);
 }
 
-void Logger::error(const Message& message)
+void Logger::error(const Content& c)
 {
-    _handler->error(message);
+    _handler->error(c);
 }
 
-void Logger::fatal(const Message& message)
+void Logger::fatal(const Content& c)
 {
-    _handler->fatal(message);
+    _handler->fatal(c);
 }
 
 std::string format(const char* format, ...)

@@ -18,18 +18,18 @@ namespace fuurin {
 namespace log {
 
 /**
- * \brief Message that holds the log details.
+ * \brief Content that holds the log details.
  */
-struct Message
+struct Content
 {
     const unsigned int line; ///< Code line where the log happened.
     const char* const file;  ///< File name where the log happened.
     const char* const where; ///< Function that caused the log.
-    const char* const what;  ///< Main log message.
+    const char* const what;  ///< Main log content.
 };
 
 /**
- * \brief Interface for a generic message handler.
+ * \brief Interface for a generic content handler.
  * User code shall derive this class to implement custom logging.
  */
 class Handler
@@ -38,14 +38,14 @@ public:
     /**
      * \brief Logging function.
      *
-     * \param[in] message Message to be logged.
+     * \param[in] c Content to be logged.
      */
     ///{@
-    virtual void debug(const Message& message) = 0;
-    virtual void info(const Message& message) = 0;
-    virtual void warn(const Message& message) = 0;
-    virtual void error(const Message& message) = 0;
-    virtual void fatal(const Message& message) = 0;
+    virtual void debug(const Content& c) = 0;
+    virtual void info(const Content& c) = 0;
+    virtual void warn(const Content& c) = 0;
+    virtual void error(const Content& c) = 0;
+    virtual void fatal(const Content& c) = 0;
     ///@}
 
     /// Destructor.
@@ -53,7 +53,7 @@ public:
 };
 
 /**
- * \brief Logging handler which prints every message to stdout/stderr.
+ * \brief Logging handler which prints every content to stdout/stderr.
  * This is the default installed handler.
  *
  * \see Handler
@@ -61,69 +61,69 @@ public:
 class StandardHandler : public Handler
 {
     /**
-     * \brief Logging function which prints the \c message to stdout/stderr.
+     * \brief Logging function which prints the \c content to stdout/stderr.
      */
     ///{@
-    void debug(const Message&);
-    void info(const Message&);
-    void warn(const Message&);
-    void error(const Message&);
-    void fatal(const Message&);
+    void debug(const Content&);
+    void info(const Content&);
+    void warn(const Content&);
+    void error(const Content&);
+    void fatal(const Content&);
     ///@}
 };
 
 /**
- * \brief Logging handler which discards every message.
- * No logging message will be ever shown.
+ * \brief Logging handler which discards every content.
+ * No logging content will be ever shown.
  *
  * \see Handler
  */
 class SilentHandler : public Handler
 {
     /**
-     * \brief Logging function which discards the message.
+     * \brief Logging function which discards the content.
      */
     ///{@
-    void debug(const Message&);
-    void info(const Message&);
-    void warn(const Message&);
-    void error(const Message&);
-    void fatal(const Message&);
+    void debug(const Content&);
+    void info(const Content&);
+    void warn(const Content&);
+    void error(const Content&);
+    void fatal(const Content&);
     ///@}
 };
 
 /**
  * \brief Library-level generic logger.
  *
- * This logger shall use the installed \ref Handler to log any \ref Message.
+ * This logger shall use the installed \ref Handler to log any \ref Content.
  *
  * \see Handler
- * \see Message
+ * \see Content
  */
 class Logger
 {
 public:
     /**
-     * \brief Installs a custom \ref Handler for any library log \ref Message.
+     * \brief Installs a custom \ref Handler for any library log \ref Content.
      *
-     * \param[in] handler A valid pointer to the message \ref Handler.
+     * \param[in] handler A valid pointer to the content \ref Handler.
      *      The ownership of the object is taken.
      */
-    static void installMessageHandler(Handler* handler);
+    static void installContentHandler(Handler* handler);
 
     /**
-     * \brief Logs a \ref Message for level, using the installed \ref Handler.
+     * \brief Logs a \ref Content for level, using the installed \ref Handler.
      * In case no handler was installed, then the default one is used.
-     * The default handler causes the application to be aborted on a \c fatal message.
+     * The default handler causes the application to be aborted on a \c fatal log.
      *
-     * \param[in] message Message to be logged.
+     * \param[in] c Content to be logged.
      */
     ///{@
-    static void debug(const Message& message);
-    static void info(const Message& message);
-    static void warn(const Message& message);
-    static void error(const Message& message);
-    static void fatal(const Message& message);
+    static void debug(const Content& c);
+    static void info(const Content& c);
+    static void warn(const Content& c);
+    static void error(const Content& c);
+    static void fatal(const Content& c);
     ///@}
 
 private:

@@ -53,7 +53,7 @@ private:
 };
 
 
-BOOST_DATA_TEST_CASE(standardLogMessageHandler,
+BOOST_DATA_TEST_CASE(standardLogContentHandler,
     bdata::make({
         fuurin::log::Logger::debug,
         fuurin::log::Logger::info,
@@ -66,9 +66,9 @@ BOOST_DATA_TEST_CASE(standardLogMessageHandler,
     const auto& ro = redirect(std::cout, buf.rdbuf());
     const auto& re = redirect(std::cerr, buf.rdbuf());
 
-    fuurin::log::Logger::installMessageHandler(new fuurin::log::StandardHandler);
+    fuurin::log::Logger::installContentHandler(new fuurin::log::StandardHandler);
 
-    const fuurin::log::Message msg{1, "test_file", "test_fun", "test_msg"};
+    const fuurin::log::Content msg{1, "test_file", "test_fun", "test_msg"};
     const auto expected = std::string(msg.where) + ": " + msg.what;
 
     logfn(msg);
@@ -81,7 +81,7 @@ BOOST_DATA_TEST_CASE(standardLogMessageHandler,
 }
 
 
-BOOST_DATA_TEST_CASE(silentLogMessageHandler,
+BOOST_DATA_TEST_CASE(silentLogContentHandler,
     bdata::make({
         fuurin::log::Logger::debug,
         fuurin::log::Logger::info,
@@ -94,7 +94,7 @@ BOOST_DATA_TEST_CASE(silentLogMessageHandler,
     const auto ro = redirect(std::cout, buf.rdbuf());
     const auto re = redirect(std::cerr, buf.rdbuf());
 
-    fuurin::log::Logger::installMessageHandler(new fuurin::log::SilentHandler);
+    fuurin::log::Logger::installContentHandler(new fuurin::log::SilentHandler);
 
     logfn({1, "test_file", "test_fun", "test_msg"});
 
