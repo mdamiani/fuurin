@@ -25,7 +25,7 @@
 #endif
 
 #if !defined(FUURIN_ENDIANESS_BIG) && !defined(FUURIN_ENDIANESS_LITTLE)
-#define FUURIN_ENDIANESS_BIG
+#define FUURIN_ENDIANESS_LITTLE
 #endif
 
 
