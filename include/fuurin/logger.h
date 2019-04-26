@@ -41,11 +41,11 @@ public:
      * \param[in] c Content to be logged.
      */
     ///{@
-    virtual void debug(const Content& c) = 0;
-    virtual void info(const Content& c) = 0;
-    virtual void warn(const Content& c) = 0;
-    virtual void error(const Content& c) = 0;
-    virtual void fatal(const Content& c) = 0;
+    virtual void debug(const Content& c) const = 0;
+    virtual void info(const Content& c) const = 0;
+    virtual void warn(const Content& c) const = 0;
+    virtual void error(const Content& c) const = 0;
+    virtual void fatal(const Content& c) const = 0;
     ///@}
 
     /// Destructor.
@@ -64,11 +64,11 @@ class StandardHandler : public Handler
      * \brief Logging function which prints the \c content to stdout/stderr.
      */
     ///{@
-    void debug(const Content&);
-    void info(const Content&);
-    void warn(const Content&);
-    void error(const Content&);
-    void fatal(const Content&);
+    void debug(const Content&) const override;
+    void info(const Content&) const override;
+    void warn(const Content&) const override;
+    void error(const Content&) const override;
+    void fatal(const Content&) const override;
     ///@}
 };
 
@@ -84,11 +84,11 @@ class SilentHandler : public Handler
      * \brief Logging function which discards the content.
      */
     ///{@
-    void debug(const Content&);
-    void info(const Content&);
-    void warn(const Content&);
-    void error(const Content&);
-    void fatal(const Content&);
+    void debug(const Content&) const override;
+    void info(const Content&) const override;
+    void warn(const Content&) const override;
+    void error(const Content&) const override;
+    void fatal(const Content&) const override;
     ///@}
 };
 
@@ -119,11 +119,11 @@ public:
      * \param[in] c Content to be logged.
      */
     ///{@
-    static void debug(const Content& c);
-    static void info(const Content& c);
-    static void warn(const Content& c);
-    static void error(const Content& c);
-    static void fatal(const Content& c);
+    static void debug(const Content& c) noexcept;
+    static void info(const Content& c) noexcept;
+    static void warn(const Content& c) noexcept;
+    static void error(const Content& c) noexcept;
+    static void fatal(const Content& c) noexcept;
     ///@}
 
 private:

@@ -11,6 +11,8 @@
 #include "log.h"
 #include "failure.h"
 
+#include <boost/preprocessor/seq/for_each.hpp>
+
 #include <cstdlib>
 #include <cstdio>
 #include <stdarg.h>
@@ -33,47 +35,48 @@ void abortWithContent(const Content& c)
 }
 }
 
-void StandardHandler::debug(const Content& c)
+void StandardHandler::debug(const Content& c) const
 {
     std::cout << c.where << ": " << c.what << std::endl;
 }
 
-void StandardHandler::info(const Content& c)
+void StandardHandler::info(const Content& c) const
 {
     std::cout << c.where << ": " << c.what << std::endl;
 }
 
-void StandardHandler::warn(const Content& c)
+void StandardHandler::warn(const Content& c) const
 {
     std::cerr << c.where << ": " << c.what << std::endl;
 }
 
-void StandardHandler::error(const Content& c)
+void StandardHandler::error(const Content& c) const
 {
     std::cerr << c.where << ": " << c.what << std::endl;
 }
 
-void StandardHandler::fatal(const Content& c)
+void StandardHandler::fatal(const Content& c) const
 {
     abortWithContent(c);
 }
 
-void SilentHandler::debug(const Content&)
+void SilentHandler::debug(const Content&) const
 {}
 
-void SilentHandler::info(const Content&)
+void SilentHandler::info(const Content&) const
 {}
 
-void SilentHandler::warn(const Content&)
+void SilentHandler::warn(const Content&) const
 {}
 
-void SilentHandler::error(const Content&)
+void SilentHandler::error(const Content&) const
 {}
 
-void SilentHandler::fatal(const Content& c)
+void SilentHandler::fatal(const Content& c) const
 {
     abortWithContent(c);
 }
+
 
 std::unique_ptr<Handler> Logger::handler_(new StandardHandler);
 
@@ -84,30 +87,19 @@ void Logger::installContentHandler(Handler* handler)
     handler_.reset(handler);
 }
 
-void Logger::debug(const Content& c)
-{
-    handler_->debug(c);
-}
+#define LOGGER_LEVEL(r, data, level) \
+    void Logger::level(const Content& c) noexcept \
+    { \
+        try { \
+            handler_->level(c); \
+        } catch (...) { \
+            abortWithContent( \
+                {__LINE__, __FILE__, "Logger::" #level, "unexpected exception caught!"}); \
+        } \
+    }
+BOOST_PP_SEQ_FOR_EACH(LOGGER_LEVEL, _, (debug)(info)(warn)(error)(fatal))
+#undef LOGGER_LEVEL
 
-void Logger::info(const Content& c)
-{
-    handler_->info(c);
-}
-
-void Logger::warn(const Content& c)
-{
-    handler_->warn(c);
-}
-
-void Logger::error(const Content& c)
-{
-    handler_->error(c);
-}
-
-void Logger::fatal(const Content& c)
-{
-    handler_->fatal(c);
-}
 
 std::string format(const char* format, ...)
 {
