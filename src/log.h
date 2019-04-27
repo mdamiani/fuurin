@@ -13,6 +13,8 @@
 
 #include "fuurin/logger.h"
 
+#include <boost/preprocessor/seq/for_each.hpp>
+
 
 namespace fuurin {
 namespace log {
@@ -28,16 +30,26 @@ namespace log {
 std::string format(const char* format, ...);
 
 
+#define LOG_LEVEL(r, data, level) \
+    template<typename... Args> \
+    void level(Loc&& c, Args&&... args) \
+    { \
+        Arg arr[] = {args...}; \
+        Logger::level(std::forward<Loc>(c), arr, sizeof...(Args)); \
+    }
+BOOST_PP_SEQ_FOR_EACH(LOG_LEVEL, _, (debug)(info)(warn)(error)(fatal))
+#undef LOG
+
 #ifndef NDEBUG
-#define LOG_DEBUG(wh, wa) log::Logger::debug({__LINE__, __FILE__, wh, wa})
+#define LOG_DEBUG(wh, wa) debug({__FILE__, __LINE__}, log::Arg(wh, wa))
 #else
 #define LOG_DEBUG(wh, wa)
 #endif
 
-#define LOG_INFO(wh, wa) log::Logger::info({__LINE__, __FILE__, wh, wa})
-#define LOG_WARN(wh, wa) log::Logger::warn({__LINE__, __FILE__, wh, wa})
-#define LOG_ERROR(wh, wa) log::Logger::error({__LINE__, __FILE__, wh, wa})
-#define LOG_FATAL(wh, wa) log::Logger::fatal({__LINE__, __FILE__, wh, wa})
+#define LOG_INFO(wh, wa) info({__FILE__, __LINE__}, log::Arg(wh, wa))
+#define LOG_WARN(wh, wa) warn({__FILE__, __LINE__}, log::Arg(wh, wa))
+#define LOG_ERROR(wh, wa) error({__FILE__, __LINE__}, log::Arg(wh, wa))
+#define LOG_FATAL(wh, wa) fatal({__FILE__, __LINE__}, log::Arg(wh, wa))
 }
 }
 

@@ -19,6 +19,7 @@ set(CMAKE_CXX_STANDARD 17)
 add_definitions(
     -Wall
     -Wextra
+    -DBOOST_SCOPE_EXIT_CONFIG_USE_LAMBDAS
 )
 
 include(BuildType)
@@ -43,13 +44,18 @@ ExternalProject_Add(zeromq
 
 set(LIB_SOURCES
     src/fuurin.cpp
+    src/errors.cpp
+    src/logger.cpp
     src/zmqlow.cpp
+    src/zmqcontext.cpp
+    src/zmqsocket.cpp
     src/failure.cpp
     src/log.cpp
 )
 
 set(LIB_PUBLIC_HEADERS
     include/fuurin/fuurin.h
+    include/fuurin/errors.h
     include/fuurin/logger.h
     include/fuurin/broker.h
     include/fuurin/worker.h

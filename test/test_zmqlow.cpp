@@ -106,19 +106,23 @@ struct TVal
         , val(v)
         , arr(a)
         , str(s)
-    {}
+    {
+    }
 
     TVal(const std::string& t, uint64_t v)
         : TVal(t, v, {}, {})
-    {}
+    {
+    }
 
     TVal(const std::string& t, const ByteArray& v)
         : TVal(t, 0, v, {})
-    {}
+    {
+    }
 
     TVal(const std::string& t, const String& v)
         : TVal(t, 0, {}, v)
-    {}
+    {
+    }
 };
 
 std::ostream& operator<<(std::ostream& os, const TVal& ts)

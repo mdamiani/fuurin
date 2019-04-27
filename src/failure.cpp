@@ -16,10 +16,9 @@
 
 namespace fuurin {
 
-void failure(const char* file, unsigned int line, const char* expr, const std::string& what)
+void failure(const char* file, unsigned int line, const char* expr, const char* what)
 {
-    const auto where = log::format("ASSERT failure '%s'", expr);
-    log::Logger::fatal({line, file, where.c_str(), what.c_str()});
+    log::fatal({file, line}, log::Arg("ASSERT", expr), log::Arg("FAILURE", what));
     std::abort();
 }
 }

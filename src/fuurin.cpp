@@ -19,8 +19,8 @@ static char _version_buf[16];
 
 char* version()
 {
-    std::snprintf(_version_buf, sizeof(_version_buf), "%d.%d.%d", VERSION_MAJOR, VERSION_MINOR,
-        VERSION_PATCH);
+    std::snprintf(_version_buf, sizeof(_version_buf), "%d.%d.%d",
+        VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH);
 
     return _version_buf;
 }

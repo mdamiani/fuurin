@@ -18,7 +18,6 @@
 
 #define UNUSED(x) (void)(x)
 
-
 namespace fuurin {
 using ByteArray = std::vector<uint8_t>;
 using String = std::string;
