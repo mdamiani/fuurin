@@ -1,5 +1,5 @@
 /*
-    Copyright (c) 2016 Contributors as noted in the AUTHORS file
+    Copyright (c) 2016-2017 Contributors as noted in the AUTHORS file
 
     This file is part of libzmq, the ZeroMQ core engine in C++.
 
@@ -32,17 +32,21 @@
 */
 #include "platform.hpp"
 
-#if defined (ZMQ_USE_TWEETNACL)
+#if defined(ZMQ_USE_TWEETNACL)
 
 /*
     Disable warnings for this source only, rather than for the whole
     codebase when building with C99 (gcc >= 4.2) or with Microsoft's compiler
 */
-#if defined __GNUC__ && (__GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 2)) && __STDC_VERSION__ < 201112L
-#   pragma GCC diagnostic ignored "-Wsign-compare"
+#if defined __GNUC__                                                           \
+  && (__GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 2))                  \
+  && __STDC_VERSION__ < 201112L
+#pragma GCC diagnostic ignored "-Wsign-compare"
 #elif defined _MSC_VER
-#   pragma warning (disable:4018 4244 4146)
+#pragma warning(disable : 4018 4244 4146)
 #endif
+
+/* clang-format off */
 
 #include "tweetnacl.h"
 
@@ -898,32 +902,45 @@ int randombytes_close(void)
     return rc;
 }
 
+int sodium_init (void)
+{
+    return 0;
+}
+
 #else
 
+#include <unistd.h>
+#include <assert.h>
+
+#ifdef ZMQ_HAVE_GETRANDOM
+#include <sys/random.h>
+#else
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-#include <unistd.h>
 
 static int fd = -1;
+#endif
 
 void randombytes (unsigned char *x,unsigned long long xlen)
 {
     int i;
-    if (fd == -1) {
-        for (;;) {
-            fd = open("/dev/urandom",O_RDONLY);
-            if (fd != -1) break;
-                sleep (1);
-        }
-    }
+#ifndef ZMQ_HAVE_GETRANDOM
+    /*  Require that random_open has already been called, to avoid
+        race conditions. */
+    assert (fd != -1);
+#endif
     while (xlen > 0) {
         if (xlen < 1048576)
             i = xlen;
         else
             i = 1048576;
 
+#ifdef ZMQ_HAVE_GETRANDOM
+        i = getrandom (x, i, 0);
+#else
         i = read(fd,x,i);
+#endif
         if (i < 1) {
             sleep (1);
             continue;
@@ -933,16 +950,44 @@ void randombytes (unsigned char *x,unsigned long long xlen)
     }
 }
 
+/*  Do not call manually! Use random_close from random.hpp */
 int randombytes_close (void)
 {
     int rc = -1;
+#ifndef ZMQ_HAVE_GETRANDOM
     if (fd != -1 && close(fd) == 0) {
         fd = -1;
         rc = 0;
     }
+#endif /* ZMQ_HAVE_GETRANDOM */
     return rc;
+}
+
+/*  Do not call manually! Use random_open from random.hpp */
+int sodium_init (void)
+{
+#ifndef ZMQ_HAVE_GETRANDOM
+    if (fd == -1) {
+        for (;;) {
+            int flags = O_RDONLY;
+#ifdef ZMQ_HAVE_O_CLOEXEC
+            flags |= O_CLOEXEC;
+#endif
+            fd = open ("/dev/urandom", flags);
+            if (fd != -1)
+                break;
+            sleep (1);
+        }
+#if !defined ZMQ_HAVE_O_CLOEXEC && defined FD_CLOEXEC
+        int rc = fcntl (fd, F_SETFD, FD_CLOEXEC);
+        assert (rc != -1);
+#endif
+    }
+#endif /* ZMQ_HAVE_GETRANDOM */
+    return 0;
 }
 
 #endif
 
 #endif
+/* clang-format on */

@@ -34,21 +34,24 @@
 #define _CRT_SECURE_NO_WARNINGS
 #endif
 #ifndef NOMINMAX
-#define NOMINMAX          // Macros min(a,b) and max(a,b)
+#define NOMINMAX // Macros min(a,b) and max(a,b)
 #endif
 
 //  Set target version to Windows Server 2008, Windows Vista or higher.
 //  Windows XP (0x0501) is supported but without client & server socket types.
-#ifndef _WIN32_WINNT
+#if !defined _WIN32_WINNT && !defined ZMQ_HAVE_WINDOWS_UWP
 #define _WIN32_WINNT 0x0600
+#endif
+
+#if defined ZMQ_HAVE_WINDOWS_UWP
+#define _WIN32_WINNT _WIN32_WINNT_WIN10
 #endif
 
 #ifdef __MINGW32__
 //  Require Windows XP or higher with MinGW for getaddrinfo().
-#if(_WIN32_WINNT >= 0x0600)
+#if (_WIN32_WINNT >= 0x0501)
 #else
-#undef _WIN32_WINNT
-#define _WIN32_WINNT 0x0600
+#error You need at least Windows XP target
 #endif
 #endif
 
@@ -63,14 +66,15 @@
 
 //  Workaround missing mstcpip.h in mingw32 (MinGW64 provides this)
 //  __MINGW64_VERSION_MAJOR is only defined when using in mingw-w64
-#if defined __MINGW32__ && !defined SIO_KEEPALIVE_VALS && \
-    !defined __MINGW64_VERSION_MAJOR
-struct tcp_keepalive {
+#if defined __MINGW32__ && !defined SIO_KEEPALIVE_VALS                         \
+  && !defined __MINGW64_VERSION_MAJOR
+struct tcp_keepalive
+{
     u_long onoff;
     u_long keepalivetime;
     u_long keepaliveinterval;
 };
-#define SIO_KEEPALIVE_VALS _WSAIOW(IOC_VENDOR,4)
+#define SIO_KEEPALIVE_VALS _WSAIOW (IOC_VENDOR, 4)
 #endif
 
 #include <ws2tcpip.h>
@@ -79,8 +83,11 @@ struct tcp_keepalive {
 #include <process.h>
 #endif
 
-#if ZMQ_USE_POLL
-static inline int poll(struct pollfd *pfd, unsigned long nfds, int timeout) { return WSAPoll(pfd, nfds, timeout); }
+#if defined ZMQ_IOTHREAD_POLLER_USE_POLL || defined ZMQ_POLL_BASED_ON_POLL
+static inline int poll (struct pollfd *pfd, unsigned long nfds, int timeout)
+{
+    return WSAPoll (pfd, nfds, timeout);
+}
 #endif
 
 //  In MinGW environment AI_NUMERICSERV is not defined.

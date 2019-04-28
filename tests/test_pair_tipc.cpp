@@ -29,34 +29,42 @@
 
 #include <stdio.h>
 #include "testutil.hpp"
+#include "testutil_unity.hpp"
 
-int main (void)
+#include <unity.h>
+
+void setUp ()
 {
-    fprintf (stderr, "test_pair_tipc running...\n");
+    setup_test_context ();
+}
 
-    void *ctx = zmq_init (1);
-    assert (ctx);
+void tearDown ()
+{
+    teardown_test_context ();
+}
 
-    void *sb = zmq_socket (ctx, ZMQ_PAIR);
-    assert (sb);
-    int rc = zmq_bind (sb, "tipc://{5560,0,0}");
-    assert (rc == 0);
+void test_roundtrip ()
+{
+    void *sb = test_context_socket (ZMQ_PAIR);
+    TEST_ASSERT_SUCCESS_ERRNO (zmq_bind (sb, "tipc://{5560,0,0}"));
 
-    void *sc = zmq_socket (ctx, ZMQ_PAIR);
-    assert (sc);
-    rc = zmq_connect (sc, "tipc://{5560,0}@0.0.0");
-    assert (rc == 0);
+    void *sc = test_context_socket (ZMQ_PAIR);
+    TEST_ASSERT_SUCCESS_ERRNO (zmq_connect (sc, "tipc://{5560,0}@0.0.0"));
 
     bounce (sb, sc);
 
-    rc = zmq_close (sc);
-    assert (rc == 0);
+    test_context_socket_close (sc);
+    test_context_socket_close (sb);
+}
 
-    rc = zmq_close (sb);
-    assert (rc == 0);
+int main ()
+{
+    if (!is_tipc_available ()) {
+        printf ("TIPC environment unavailable, skipping test\n");
+        return 77;
+    }
 
-    rc = zmq_ctx_term (ctx);
-    assert (rc == 0);
-
-    return 0 ;
+    UNITY_BEGIN ();
+    RUN_TEST (test_roundtrip);
+    return UNITY_END ();
 }

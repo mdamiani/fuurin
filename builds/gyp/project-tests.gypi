@@ -375,6 +375,17 @@
       ],
     },
     {
+      'target_name': 'test_security_zap',
+      'type': 'executable',
+      'sources': [
+        '../../tests/test_security_zap.cpp',
+        '../../tests/testutil.hpp'
+      ],
+      'dependencies': [
+        'libzmq'
+      ],
+    },
+    {
       'target_name': 'test_iov',
       'type': 'executable',
       'sources': [
@@ -786,6 +797,17 @@
       'type': 'executable',
       'sources': [
         '../../tests/test_pair_ipc.cpp',
+        '../../tests/testutil.hpp'
+      ],
+      'dependencies': [
+        'libzmq'
+      ],
+    },
+    {
+      'target_name': 'test_rebind_ipc',
+      'type': 'executable',
+      'sources': [
+        '../../tests/test_rebind_ipc.cpp',
         '../../tests/testutil.hpp'
       ],
       'dependencies': [

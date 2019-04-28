@@ -70,24 +70,48 @@ Default value:: 100
 Applicable socket types:: all, only for connection-oriented transports.
 
 
+ZMQ_BINDTODEVICE: Set name of device to bind the socket to
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The 'ZMQ_BINDTODEVICE' option binds this socket to a particular device, eg.
+an interface or VRF. If a socket is bound to an interface, only packets
+received from that particular interface are processed by the socket. If device
+is a VRF device, then subsequent binds/connects to that socket use addresses
+in the VRF routing table.
+
+NOTE: requires setting CAP_NET_RAW on the compiled program.
+
+[horizontal]
+Option value type:: character string
+Option value unit:: N/A
+Default value:: not set
+Applicable socket types:: all, when using TCP or UDP transports.
+
+
 ZMQ_CONNECT_RID: Assign the next outbound connection id 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The 'ZMQ_CONNECT_RID' option sets the peer id of the next host connected 
-via the zmq_connect() call, and immediately readies that connection for 
-data transfer with the named id.  This option applies only to the first
-subsequent call to zmq_connect(), calls thereafter use default connection 
-behaviour. 
+This option name is now deprecated. Use ZMQ_CONNECT_ROUTING_ID instead. 
+ZMQ_CONNECT_RID remains as an alias for now. 
 
-Typical use is to set this socket option ahead of each zmq_connect() attempt 
-to a new host. Each connection MUST be assigned a unique name. Assigning a 
-name that is already in use is not allowed. 
+
+ZMQ_CONNECT_ROUTING_ID: Assign the next outbound routing id 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The 'ZMQ_CONNECT_ROUTING_ID' option sets the peer id of the peer connected 
+via the next zmq_connect() call, such that that connection is immediately ready for 
+data transfer with the given routing id.  This option applies only to the first
+subsequent call to zmq_connect(), zmq_connect() calls thereafter use the default 
+connection behaviour. 
+
+Typical use is to set this socket option ahead of each zmq_connect() call. 
+Each connection MUST be assigned a unique routing id. Assigning a 
+routing id that is already in use is not allowed. 
 
 Useful when connecting ROUTER to ROUTER, or STREAM to STREAM, as it 
-allows for immediate sending to peers. Outbound id framing requirements 
+allows for immediate sending to peers. Outbound routing id framing requirements 
 for ROUTER and STREAM sockets apply.
 
-The peer id should be from 1 to 255 bytes long and MAY NOT start with 
-binary zero.
+The routing id must be from 1 to 255 bytes long and MAY NOT start with 
+a zero byte (such routing ids are reserved for internal use by the 0MQ 
+infrastructure).
 
 [horizontal]
 Option value type:: binary data
@@ -103,6 +127,10 @@ queue, this message being the last message received/the last message
 to be sent. Ignores 'ZMQ_RCVHWM' and 'ZMQ_SNDHWM' options. Does not
 support multi-part messages, in particular, only one part of it is kept
 in the socket internal queue.
+
+NOTE: If recv is not called on the inbound socket, the queue and memory will
+grow with each message received. Use linkzmq:zmq_getsockopt[3] with ZMQ_EVENTS
+to trigger the conflation of the messages.
 
 [horizontal]
 Option value type:: int
@@ -249,12 +277,41 @@ Option value unit:: N/A
 Default value:: not set
 Applicable socket types:: all, when using TCP transport
 
+ZMQ_GSSAPI_SERVICE_PRINCIPAL_NAMETYPE: Set name type of service principal
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Sets the name type of the GSSAPI service principal.  A value of
+'ZMQ_GSSAPI_NT_HOSTBASED' (0) means the name specified with
+'ZMQ_GSSAPI_SERVICE_PRINCIPAL' is interpreted as a host based name.  A value
+of 'ZMQ_GSSAPI_NT_USER_NAME' (1) means it is interpreted as a local user name.
+A value of 'ZMQ_GSSAPI_NT_KRB5_PRINCIPAL' (2) means it is interpreted as an
+unparsed principal name string (valid only with the krb5 GSSAPI mechanism).
+
+[horizontal]
+Option value type:: int
+Option value unit:: 0, 1, 2
+Default value:: 0 (ZMQ_GSSAPI_NT_HOSTBASED)
+Applicable socket types:: all, when using TCP or IPC transport
+
+ZMQ_GSSAPI_PRINCIPAL_NAMETYPE: Set name type of principal
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Sets the name type of the GSSAPI principal.  A value of
+'ZMQ_GSSAPI_NT_HOSTBASED' (0) means the name specified with
+'ZMQ_GSSAPI_PRINCIPAL' is interpreted as a host based name.  A value of
+'ZMQ_GSSAPI_NT_USER_NAME' (1) means it is interpreted as a local user name.
+A value of 'ZMQ_GSSAPI_NT_KRB5_PRINCIPAL' (2) means it is interpreted as an
+unparsed principal name string (valid only with the krb5 GSSAPI mechanism).
+
+[horizontal]
+Option value type:: int
+Option value unit:: 0, 1, 2
+Default value:: 0 (ZMQ_GSSAPI_NT_HOSTBASED)
+Applicable socket types:: all, when using TCP or IPC transport
 
 ZMQ_HANDSHAKE_IVL: Set maximum handshake interval
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The 'ZMQ_HANDSHAKE_IVL' option shall set the maximum handshake interval for
 the specified 'socket'. Handshaking is the exchange of socket configuration
-information (socket type, identity, security) that occurs when a connection
+information (socket type, routing id, security) that occurs when a connection
 is first opened, only for connection-oriented transports. If handshaking does
 not complete within the configured time, the connection shall be closed.
 The value 0 means no handshake time limit.
@@ -291,7 +348,7 @@ traffic will cancel the timeout.
 [horizontal]
 Option value type:: int
 Option value unit:: milliseconds
-Default value:: 0
+Default value:: 0 normally, ZMQ_HEARTBEAT_IVL if it is set
 Applicable socket types:: all, when using connection-oriented transports
 
 
@@ -308,27 +365,14 @@ no effect.
 Option value type:: int
 Option value unit:: milliseconds
 Default value:: 0
+Maximum value:: 6553599 (which is 2^16-1 deciseconds)
 Applicable socket types:: all, when using connection-oriented transports
 
 
 ZMQ_IDENTITY: Set socket identity
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The 'ZMQ_IDENTITY' option shall set the identity of the specified 'socket'
-when connecting to a ROUTER socket. The identity should be from 1 to 255
-bytes long and may contain any values.
-
-If two clients use the same identity when connecting to a ROUTER, the
-results shall depend on the ZMQ_ROUTER_HANDOVER option setting. If that
-is not set (or set to the default of zero), the ROUTER socket shall reject
-clients trying to connect with an already-used identity. If that option
-is set to 1, the ROUTER socket shall hand-over the connection to the new
-client and disconnect the existing one.
-
-[horizontal]
-Option value type:: binary data
-Option value unit:: N/A
-Default value:: NULL
-Applicable socket types:: ZMQ_REQ, ZMQ_REP, ZMQ_ROUTER, ZMQ_DEALER.
+This option name is now deprecated. Use ZMQ_ROUTING_ID instead. 
+ZMQ_IDENTITY remains as an alias for now. 
 
 
 ZMQ_IMMEDIATE: Queue messages only to completed connections
@@ -409,7 +453,7 @@ The following outlines the different behaviours:
 [horizontal]
 Option value type:: int
 Option value unit:: milliseconds
-Default value:: 30000 (thirty seconds)
+Default value:: -1 (infinite)
 Applicable socket types:: all
 
 
@@ -422,6 +466,26 @@ ZMQ_MAXMSGSIZE it is disconnected. Value of -1 means 'no limit'.
 Option value type:: int64_t
 Option value unit:: bytes
 Default value:: -1
+Applicable socket types:: all
+
+
+ZMQ_METADATA: Add application metadata properties to a socket
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The _ZMQ_METADATA_ option shall add application metadata to the specified _socket_,
+the metadata is exchanged with peers during connection setup. A metadata property is
+specfied as a string, delimited by a colon, starting with the metadata _property_
+followed by the metadata value, for example "X-key:value".
+_Property_ names are restrited to maximum 255 characters and must be prefixed by "X-".
+Multiple application metadata properties can be added to a socket by executing zmq_setsockopt()
+multiple times. As the argument is a null-terminated string, binary data must be encoded
+before it is added e.g. using Z85 (linkzmq:zmq_z85_encode[3]).
+
+NOTE: in DRAFT state, not yet available in stable releases.
+
+[horizontal]
+Option value type:: character string
+Option value unit:: N/A
+Default value:: not set
 Applicable socket types:: all
 
 
@@ -576,6 +640,10 @@ blocking or dropping sent messages. Refer to the individual socket descriptions
 in linkzmq:zmq_socket[3] for details on the exact action taken for each socket
 type.
 
+NOTE: 0MQ does not guarantee that the socket will be able to queue as many as ZMQ_RCVHWM
+messages, and the actual limit may be lower or higher, depending on socket transport.
+A notable example is for sockets using TCP transport; see linkzmq:zmq_tcp[7].
+
 [horizontal]
 Option value type:: int
 Option value unit:: messages
@@ -686,12 +754,12 @@ Default value:: 0
 Applicable socket types:: ZMQ_REQ
 
 
-ZMQ_ROUTER_HANDOVER: handle duplicate client identities on ROUTER sockets
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-If two clients use the same identity when connecting to a ROUTER, the
+ZMQ_ROUTER_HANDOVER: handle duplicate client routing ids on ROUTER sockets
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If two clients use the same routing id when connecting to a ROUTER, the
 results shall depend on the ZMQ_ROUTER_HANDOVER option setting. If that
 is not set (or set to the default of zero), the ROUTER socket shall reject
-clients trying to connect with an already-used identity. If that option
+clients trying to connect with an already-used routing id. If that option
 is set to 1, the ROUTER socket shall hand-over the connection to the new
 client and disconnect the existing one.
 
@@ -712,6 +780,11 @@ code if the SNDHWM is reached and ZMQ_DONTWAIT was used. Without ZMQ_DONTWAIT
 it will block until the SNDTIMEO is reached or a spot in the send queue opens
 up.
 
+When ZMQ_ROUTER_MANDATORY is set to `1`, 'ZMQ_POLLOUT' events will be generated
+if one or more messages can be sent to at least one of the peers. If
+ZMQ_ROUTER_MANDATORY is set to `0`, the socket will generate a 'ZMQ_POLLOUT'
+event on every call to 'zmq_poll' resp. 'zmq_poller_wait_all'.
+
 [horizontal]
 Option value type:: int
 Option value unit:: 0, 1
@@ -726,7 +799,7 @@ raw mode, and when using the tcp:// transport, it will read and write TCP data
 without 0MQ framing. This lets 0MQ applications talk to non-0MQ applications.
 When using raw mode, you cannot set explicit identities, and the ZMQ_SNDMORE
 flag is ignored when sending data messages. In raw mode you can close a specific
-connection by sending it a zero-length message (following the identity frame).
+connection by sending it a zero-length message (following the routing id frame).
 
 NOTE: This option is deprecated, please use ZMQ_STREAM sockets instead.
 
@@ -735,6 +808,28 @@ Option value type:: int
 Option value unit:: 0, 1
 Default value:: 0
 Applicable socket types:: ZMQ_ROUTER
+
+
+ZMQ_ROUTING_ID: Set socket routing id
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The 'ZMQ_ROUTING_ID' option shall set the routing id of the specified 'socket'
+when connecting to a ROUTER socket. 
+
+A routing id must be at least one byte and at most 255 bytes long. Identities
+starting with a zero byte are reserved for use by the 0MQ infrastructure.
+
+If two clients use the same routing id when connecting to a ROUTER, the
+results shall depend on the ZMQ_ROUTER_HANDOVER option setting. If that
+is not set (or set to the default of zero), the ROUTER socket shall reject
+clients trying to connect with an already-used routing id. If that option
+is set to 1, the ROUTER socket shall hand-over the connection to the new
+client and disconnect the existing one.
+
+[horizontal]
+Option value type:: binary data
+Option value unit:: N/A
+Default value:: NULL
+Applicable socket types:: ZMQ_REQ, ZMQ_REP, ZMQ_ROUTER, ZMQ_DEALER.
 
 
 ZMQ_SNDBUF: Set kernel transmit buffer size
@@ -766,8 +861,10 @@ in linkzmq:zmq_socket[3] for details on the exact action taken for each socket
 type.
 
 NOTE: 0MQ does not guarantee that the socket will accept as many as ZMQ_SNDHWM
-messages, and the actual limit may be as much as 60-70% lower depending on the
-flow of messages on the socket.
+messages, and the actual limit may be as much as 90% lower depending on the
+flow of messages on the socket. The socket may even be able to accept more messages
+than the ZMQ_SNDHWM threshold; a notable example is for sockets using TCP transport;
+see linkzmq:zmq_tcp[7].
 
 [horizontal]
 Option value type:: int
@@ -932,11 +1029,12 @@ Default value:: N/A
 Applicable socket types:: ZMQ_SUB
 
 
-ZMQ_XPUB_VERBOSE: pass subscribe messages on XPUB socket
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Sets the 'XPUB' socket behaviour on new subscriptions. If enabled,
+ZMQ_XPUB_VERBOSE: pass duplicate subscribe messages on XPUB socket
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Sets the 'XPUB' socket behaviour on new duplicated subscriptions. If enabled,
 the socket passes all subscribe messages to the caller. If disabled,
-these are not visible to the caller. The default is 0 (disabled).
+only the first subscription to each filter will be passed. The default is 0
+(disabled).
 
 [horizontal]
 Option value type:: int
@@ -945,11 +1043,12 @@ Default value:: 0
 Applicable socket types:: ZMQ_XPUB
 
 
-ZMQ_XPUB_VERBOSER: pass subscribe and unsubscribe messages on XPUB socket
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Sets the 'XPUB' socket behaviour on new subscriptions and ubsubscriptions.
-If enabled, the socket passes all subscribe and unsubscribe messages to the
-caller. If disabled, these are not visible to the caller. The default is 0
+ZMQ_XPUB_VERBOSER: pass duplicate subscribe and unsubscribe messages on XPUB socket
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Sets the 'XPUB' socket behaviour on new duplicated subscriptions and
+unsubscriptions. If enabled, the socket passes all subscribe and unsubscribe
+messages to the caller. If disabled, only the first subscription to each filter and
+the last unsubscription from each filter will be passed. The default is 0
 (disabled).
 
 [horizontal]
@@ -997,7 +1096,7 @@ Subscriber must subscribe to the Welcome message before connecting.
 Welcome message will also be sent on reconnecting.
 For welcome message to work well user must poll on incoming subscription messages on the XPUB socket and handle them.
 
-Use NULL and lenght of zero to disable welcome message.
+Use NULL and length of zero to disable welcome message.
 
 [horizontal]
 Option value type:: binary data
@@ -1008,17 +1107,34 @@ Applicable socket types:: ZMQ_XPUB
 
 ZMQ_ZAP_DOMAIN: Set RFC 27 authentication domain
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Sets the domain for ZAP (ZMQ RFC 27) authentication. For NULL security (the
-default on all tcp:// connections), ZAP authentication only happens if you
-set a non-empty domain. For PLAIN and CURVE security, ZAP requests are always
-made, if there is a ZAP handler present. See http://rfc.zeromq.org/spec:27
-for more details.
+Sets the domain for ZAP (ZMQ RFC 27) authentication. A ZAP domain must be 
+specified to enable authentication. When the ZAP domain is empty, which is 
+the default, ZAP authentication is disabled. This is not compatible with
+previous versions of libzmq, so it can be controlled by ZMQ_ZAP_ENFORCE_DOMAIN
+which for now is disabled by default.
+See http://rfc.zeromq.org/spec:27 for more details.
 
 [horizontal]
 Option value type:: character string
 Option value unit:: N/A
-Default value:: not set
+Default value:: empty
 Applicable socket types:: all, when using TCP transport
+
+
+ZMQ_ZAP_ENFORCE_DOMAIN: Set ZAP domain handling to strictly adhere the RFC
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The ZAP (ZMQ RFC 27) authentication protocol specifies that a domain must
+always be set. Older versions of libzmq did not follow the spec and allowed
+an empty domain to be set.
+This option can be used to enabled or disable the stricter, backward
+incompatible behaviour. For now it is disabled by default, but in a future
+version it will be enabled by default.
+
+[horizontal]
+Option value type:: int
+Option value unit:: 0, 1
+Default value:: 0
+Applicable socket types:: all, when using ZAP
 
 
 ZMQ_TCP_ACCEPT_FILTER: Assign filters to allow new TCP connections
@@ -1166,6 +1282,35 @@ Option value type:: int
 Option value unit:: milliseconds
 Default value:: -1
 Applicable socket types:: all, when using VMCI transport
+
+
+ZMQ_MULTICAST_LOOP: Control multicast local loopback
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For multicast UDP sender sockets this option sets whether the data
+sent should be looped back on local listening sockets.
+
+[horizontal]
+Option value type:: int
+Option value unit:: 0, 1
+Default value:: 1
+Applicable socket types:: ZMQ_RADIO, when using UDP multicast transport
+
+
+ZMQ_ROUTER_NOTIFY: Send connect and disconnect notifications
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Enable connect and disconnect notifications on a ROUTER socket.
+When enabled, the socket delivers a zero-length message (with routing-id
+as first frame) when a peer connects or disconnects. It's possible
+to notify both events for a peer by OR-ing the flag values. This option
+only applies to stream oriented (tcp, ipc) transports.
+
+NOTE: in DRAFT state, not yet available in stable releases.
+
+[horizontal]
+Option value type:: int
+Option value unit:: 0, ZMQ_NOTIFY_CONNECT, ZMQ_NOTIFY_DISCONNECT, ZMQ_NOTIFY_CONNECT|ZMQ_NOTIFY_DISCONNECT
+Default value:: 0
+Applicable socket types:: ZMQ_ROUTER
 
 
 RETURN VALUE

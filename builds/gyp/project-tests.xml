@@ -33,6 +33,7 @@
     <test name = "test_security_null" />
     <test name = "test_security_plain" />
     <test name = "test_security_curve" />
+    <test name = "test_security_zap" />
     <test name = "test_iov" />
     <test name = "test_spec_req" />
     <test name = "test_spec_rep" />
@@ -71,6 +72,7 @@
     <test name = "test_udp" />
     <test name = "test_shutdown_stress" />
     <test name = "test_pair_ipc" />
+    <test name = "test_rebind_ipc" />
     <test name = "test_reqrep_ipc" />
     <test name = "test_use_fd_ipc" />
     <test name = "test_use_fd_tcp" />

@@ -38,9 +38,9 @@
 
 zmq::dgram_t::dgram_t (class ctx_t *parent_, uint32_t tid_, int sid_) :
     socket_base_t (parent_, tid_, sid_),
-    pipe (NULL),
-    last_in (NULL),
-    more_out (false)
+    _pipe (NULL),
+    _last_in (NULL),
+    _more_out (false)
 {
     options.type = ZMQ_DGRAM;
     options.raw_socket = true;
@@ -48,31 +48,33 @@ zmq::dgram_t::dgram_t (class ctx_t *parent_, uint32_t tid_, int sid_) :
 
 zmq::dgram_t::~dgram_t ()
 {
-    zmq_assert (!pipe);
+    zmq_assert (!_pipe);
 }
 
-void zmq::dgram_t::xattach_pipe (pipe_t *pipe_, bool subscribe_to_all_)
+void zmq::dgram_t::xattach_pipe (pipe_t *pipe_,
+                                 bool subscribe_to_all_,
+                                 bool locally_initiated_)
 {
-    LIBZMQ_UNUSED(subscribe_to_all_);
+    LIBZMQ_UNUSED (subscribe_to_all_);
+    LIBZMQ_UNUSED (locally_initiated_);
 
     zmq_assert (pipe_);
 
     //  ZMQ_DGRAM socket can only be connected to a single peer.
     //  The socket rejects any further connection requests.
-    if (pipe == NULL)
-        pipe = pipe_;
+    if (_pipe == NULL)
+        _pipe = pipe_;
     else
         pipe_->terminate (false);
 }
 
 void zmq::dgram_t::xpipe_terminated (pipe_t *pipe_)
 {
-    if (pipe_ == pipe) {
-        if (last_in == pipe) {
-            saved_credential = last_in->get_credential ();
-            last_in = NULL;
+    if (pipe_ == _pipe) {
+        if (_last_in == _pipe) {
+            _last_in = NULL;
         }
-        pipe = NULL;
+        _pipe = NULL;
     }
 }
 
@@ -91,7 +93,7 @@ void zmq::dgram_t::xwrite_activated (pipe_t *)
 int zmq::dgram_t::xsend (msg_t *msg_)
 {
     // If there's no out pipe, just drop it.
-    if (!pipe) {
+    if (!_pipe) {
         int rc = msg_->close ();
         errno_assert (rc == 0);
         return -1;
@@ -99,35 +101,30 @@ int zmq::dgram_t::xsend (msg_t *msg_)
 
     //  If this is the first part of the message it's the ID of the
     //  peer to send the message to.
-    if (!more_out) {
+    if (!_more_out) {
         if (!(msg_->flags () & msg_t::more)) {
             errno = EINVAL;
             return -1;
         }
-
-        //  Expect one more message frame.
-        more_out = true;
-    }
-    else {
-
+    } else {
         //  dgram messages are two part only, reject part if more is set
         if (msg_->flags () & msg_t::more) {
             errno = EINVAL;
             return -1;
         }
-
-        //  This is the last part of the message.
-        more_out = false;
     }
 
     // Push the message into the pipe.
-    if (!pipe->write (msg_)) {
+    if (!_pipe->write (msg_)) {
         errno = EAGAIN;
         return -1;
     }
 
     if (!(msg_->flags () & msg_t::more))
-        pipe->flush ();
+        _pipe->flush ();
+
+    // flip the more flag
+    _more_out = !_more_out;
 
     //  Detach the message from the data buffer.
     int rc = msg_->init ();
@@ -142,7 +139,7 @@ int zmq::dgram_t::xrecv (msg_t *msg_)
     int rc = msg_->close ();
     errno_assert (rc == 0);
 
-    if (!pipe || !pipe->read (msg_)) {
+    if (!_pipe || !_pipe->read (msg_)) {
         //  Initialise the output parameter to be a 0-byte message.
         rc = msg_->init ();
         errno_assert (rc == 0);
@@ -150,28 +147,23 @@ int zmq::dgram_t::xrecv (msg_t *msg_)
         errno = EAGAIN;
         return -1;
     }
-    last_in = pipe;
+    _last_in = _pipe;
 
     return 0;
 }
 
 bool zmq::dgram_t::xhas_in ()
 {
-    if (!pipe)
+    if (!_pipe)
         return false;
 
-    return pipe->check_read ();
+    return _pipe->check_read ();
 }
 
 bool zmq::dgram_t::xhas_out ()
 {
-    if (!pipe)
+    if (!_pipe)
         return false;
 
-    return pipe->check_write ();
-}
-
-zmq::blob_t zmq::dgram_t::get_credential () const
-{
-    return last_in? last_in->get_credential (): saved_credential;
+    return _pipe->check_write ();
 }
