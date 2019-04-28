@@ -116,7 +116,7 @@ function android_build_env {
     ##
     # Set up some local variables and check them
     
-    ANDROID_BUILD_SYSROOT="${ANDROID_NDK_ROOT}/platforms/android-9/arch-${TOOLCHAIN_ARCH}"
+    ANDROID_BUILD_SYSROOT="${ANDROID_NDK_ROOT}/platforms/android-14/arch-${TOOLCHAIN_ARCH}"
     
     if [ ! -d "$ANDROID_BUILD_SYSROOT" ]; then
         ANDROID_BUILD_FAIL+=("The ANDROID_BUILD_SYSROOT directory does not exist")
@@ -260,7 +260,11 @@ function android_build_opts {
     ANDROID_BUILD_OPTS+=("LDFLAGS=${LDFLAGS} ${ANDROID_BUILD_EXTRA_LDFLAGS}")
     ANDROID_BUILD_OPTS+=("LIBS=${LIBS} ${ANDROID_BUILD_EXTRA_LIBS}")
     
+    ANDROID_BUILD_OPTS+=("PKG_CONFIG_LIBDIR=${ANDROID_NDK_ROOT}/prebuilt/linux-x86_64/lib/pkgconfig")
     ANDROID_BUILD_OPTS+=("PKG_CONFIG_PATH=${ANDROID_BUILD_PREFIX}/lib/pkgconfig")
+    ANDROID_BUILD_OPTS+=("PKG_CONFIG_SYSROOT_DIR=${ANDROID_BUILD_SYSROOT}")
+    ANDROID_BUILD_OPTS+=("PKG_CONFIG_DIR=")
+    ANDROID_BUILD_OPTS+=("--with-sysroot=${ANDROID_BUILD_SYSROOT}")
     ANDROID_BUILD_OPTS+=("--host=${TOOLCHAIN_HOST}")
     ANDROID_BUILD_OPTS+=("--prefix=${ANDROID_BUILD_PREFIX}")
     

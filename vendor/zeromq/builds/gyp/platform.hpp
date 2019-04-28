@@ -62,6 +62,7 @@
 #   define ZMQ_HAVE_EVENTFD 1
 #   define ZMQ_HAVE_IFADDRS 1
 #   define ZMQ_HAVE_SOCK_CLOEXEC 1
+#   define ZMQ_HAVE_SO_BINDTODEVICE 1
 #   define ZMQ_HAVE_SO_KEEPALIVE 1
 #   define ZMQ_HAVE_SO_PEERCRED 1
 #   define ZMQ_HAVE_TCP_KEEPCNT 1
@@ -70,6 +71,7 @@
 #   define ZMQ_HAVE_UIO 1
 #   define HAVE_CLOCK_GETTIME 1
 #   define HAVE_FORK 1
+#   define HAVE_ACCEPT4 1
 
 #else
 #   error "No platform defined, abandoning"

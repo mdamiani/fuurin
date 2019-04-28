@@ -10,7 +10,7 @@
 %endif
 %define lib_name libzmq5
 Name:          zeromq
-Version:       4.2.2
+Version:       4.3.0
 Release:       1%{?dist}
 Summary:       The ZeroMQ messaging library
 Group:         Applications/Internet
@@ -24,9 +24,26 @@ BuildRequires:  autoconf automake libtool libsodium-devel glib2-devel
 BuildRequires:  e2fsprogs-devel
 BuildRoot:      %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 %endif
+%bcond_with pgm
 %if %{with pgm}
 BuildRequires:  openpgm-devel
+%define PGM yes
+%else
+%define PGM no
+%endif
+%bcond_with libgssapi_krb5
+%if %{with libgssapi_krb5}
 BuildRequires:  krb5-devel
+%define GSSAPI yes
+%else
+%define GSSAPI no
+%endif
+%bcond_with libsodium
+%if %{with libsodium}
+BuildRequires:  libsodium-devel
+%define SODIUM yes
+%else
+%define SODIUM no
 %endif
 BuildRequires: gcc, make, gcc-c++, libstdc++-devel, asciidoc, xmlto
 Requires:      libstdc++
@@ -63,6 +80,9 @@ Requires:      libstdc++
 %{!?_with_gnu_ld: %{!?_without_gnu_ld: %define _with_gnu_ld --with-gnu_ld}}
 %endif
 
+# We do not want to ship libzmq.la
+%define _unpackaged_files_terminate_build 0
+
 %description
 The 0MQ lightweight messaging kernel is a library which extends the
 standard socket interfaces with features traditionally provided by
@@ -90,6 +110,19 @@ This package contains the ZeroMQ shared library.
 Summary:  Development files and static library for the ZeroMQ library
 Group:    Development/Libraries
 Requires: %{lib_name} = %{version}-%{release}, pkgconfig
+Requires: libsodium-devel
+%bcond_with pgm
+%if %{with pgm}
+Requires:  openpgm-devel
+%endif
+%bcond_with libgssapi_krb5
+%if %{with libgssapi_krb5}
+Requires:  krb5-devel
+%endif
+%bcond_with libsodium
+%if %{with libsodium}
+Requires:  libsodium-devel
+%endif
 
 %description devel
 The 0MQ lightweight messaging kernel is a library which extends the
@@ -124,14 +157,13 @@ sed -i "s/openpgm-[0-9].[0-9]/%{openpgm_pc}/g" \
     configure*
 
 %build
+# Workaround for automake < 1.14 bug
+mkdir -p config
 autoreconf -fi
 %configure --enable-drafts=%{DRAFTS} \
-    %{?_with_libsodium} \
-    %{?_without_libsodium} \
-    %{?_with_pgm} \
-    %{?_without_pgm} \
-    %{?_with_libgssapi_krb5} \
-    %{?_without_libgssapi_krb5} \
+    --with-pgm=%{PGM} \
+    --with-libsodium=%{SODIUM} \
+    --with-libgssapi_krb5=%{GSSAPI} \
     %{?_with_pic} \
     %{?_without_pic} \
     %{?_with_gnu_ld} \
@@ -171,28 +203,24 @@ autoreconf -fi
 %{_includedir}/zmq.h
 %{_includedir}/zmq_utils.h
 
-%{_libdir}/libzmq.la
 %{_libdir}/libzmq.a
 %{_libdir}/pkgconfig/libzmq.pc
 %{_libdir}/libzmq.so
 
 %{_mandir}/man3/zmq*
-%{_mandir}/man7/zmq_curve.7.gz
-%{_mandir}/man7/zmq_inproc.7.gz
-%{_mandir}/man7/zmq_ipc.7.gz
-%{_mandir}/man7/zmq_null.7.gz
-%{_mandir}/man7/zmq_pgm.7.gz
-%{_mandir}/man7/zmq_plain.7.gz
-%{_mandir}/man7/zmq_tcp.7.gz
-%{_mandir}/man7/zmq_tipc.7.gz
-%{_mandir}/man7/zmq_udp.7.gz
-%{_mandir}/man7/zmq_vmci.7.gz
+# skip man7/zmq.7.gz
+%{_mandir}/man7/zmq_*
 
 %files -n libzmq-tools
 %defattr(-,root,root,-)
 %{_bindir}/curve_keygen
 
 %changelog
+* Sat Aug 19 2017 Luca Boccassi <luca.boccassi@gmail.com>
+- Fix parsing and usage of conditionals for sodium/pgm/krb5 so that they work
+  in OBS
+- Do not ship libzmq.la anymore, it's not needed and causes overlinking
+
 * Sun Nov 06 2016 Luca Boccassi <luca.boccassi@gmail.com>
 - Add libzmq-tool to package curve_keygen in /usr/bin
 
