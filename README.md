@@ -121,7 +121,7 @@ $> git ci -m"boost: import test framework version 1.65.1"
 
 ```
 $> git checkout master
-$> git merge -s ours --no-commit vendor/boost
+$> git merge --allow-unrelated-histories -s ours --no-commit vendor/boost
 $> git read-tree -u --prefix=vendor/boost vendor/boost
 $> git commit
 ```
@@ -129,8 +129,12 @@ $> git commit
  - Update the Boost library and merge back into the master branch
 
 ```
-$> git checkout vendor/boost
-$> ... update library ...
+$> ## folder must be free of untracked files
+$> git checkout vendor/boost --
+$> ## optional clear all tracked files
+$> git ls-files | xargs git rm
+$> ## update library by adding new untracked files
+$> git ls-files -o | xargs git add
 $> git ci -m"boost: library updated"
 $> git checkout master
 $> git merge -s subtree -X subtree=vendor/boost vendor/boost
