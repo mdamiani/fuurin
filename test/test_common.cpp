@@ -105,4 +105,5 @@ BOOST_DATA_TEST_CASE(silentLogContentHandler,
 BOOST_AUTO_TEST_CASE(formatLog)
 {
     BOOST_TEST("test_fun: test_msg1" == fuurin::log::format("test_fun: %s%d", "test_msg", 1));
+    BOOST_TEST("" == fuurin::log::format("", "aaa", 1));
 }

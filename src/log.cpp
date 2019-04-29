@@ -106,16 +106,21 @@ std::string format(const char* format, ...)
     va_list args;
 
     va_start(args, format);
-    const int sz = std::vsnprintf(nullptr, 0, format, args) + 1;
+    const int sz = std::vsnprintf(nullptr, 0, format, args);
     va_end(args);
 
-    std::vector<char> buf(sz, 0);
+    if (sz < 0) {
+        // return a null string in case of errors
+        return std::string();
+    }
+
+    std::string str(sz, 0);
 
     va_start(args, format);
-    std::vsnprintf(&buf[0], sz, format, args);
+    std::vsnprintf(&str[0], sz + 1, format, args);
     va_end(args);
 
-    return std::string(buf.begin(), buf.end() - 1);
+    return str;
 }
 }
 }
