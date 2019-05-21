@@ -21,13 +21,24 @@ ExternalProject_Add(boost_utf
         -D CMAKE_BUILD_TYPE=Release
 )
 
+ExternalProject_Add(google_benchmark
+    SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../vendor/google/benchmark"
+    INSTALL_DIR "${3RDPARTY_DIR}"
+
+    CMAKE_ARGS
+        -D CMAKE_INSTALL_PREFIX=<INSTALL_DIR>
+        -D CMAKE_BUILD_TYPE=Release
+        -D BENCHMARK_ENABLE_GTEST_TESTS=OFF
+        -D BENCHMARK_ENABLE_LTO=false
+)
+
 function (AddTest TEST)
     message("-- Adding test ${TEST}")
 
     add_executable(${TEST} ${TEST}.cpp)
-    add_dependencies(${TEST} boost_utf)
+    add_dependencies(${TEST} boost_utf google_benchmark)
 
-    target_link_libraries(${TEST} fuurin_static boost_test_framework)
+    target_link_libraries(${TEST} fuurin_static boost_test_framework benchmark)
     target_include_directories(${TEST} PRIVATE ../)
 
     add_test(NAME ${TEST}
