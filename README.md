@@ -106,7 +106,17 @@ $> tar xf boost_1_65_1.tar.bz2
 $> cd boost_1_65_1
 $> ./bootstrap.sh
 $> ./b2 tools/bcp
-$> ./bin.v2/tools/bcp/.../bcp boost/test/unit_test.hpp boost/test/included/unit_test.hpp /path/to/fuurin/folder
+$> ./bin.v2/tools/bcp/.../bcp \
+    LICENSE_1_0.txt \
+    boost/test/unit_test.hpp \
+    boost/test/included/unit_test.hpp \
+    boost/test/data/test_case.hpp \
+    libs/test/test/test-organization-ts/datasets-test/* \
+    libs/test/example/* \
+    boost/mpl/list.hpp \
+    boost/scope_exit.hpp \
+    boost/typeof/incr_registration_group.hpp \
+    /path/to/fuurin/folder
 ```
 
  - Add Boost files to the orphan branch
