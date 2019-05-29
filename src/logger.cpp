@@ -37,7 +37,7 @@ Arg::Val::Val(double v) noexcept
 }
 
 
-Arg::Val::Val(const char* v) noexcept
+Arg::Val::Val(std::string_view v) noexcept
     : chr_(v)
 {
 }
@@ -65,36 +65,36 @@ Arg::Arg() noexcept
 
 
 Arg::Arg(int val) noexcept
-    : Arg(nullptr, val)
+    : Arg(std::string_view(), val)
 {
 }
 
 
 Arg::Arg(double val) noexcept
-    : Arg(nullptr, val)
+    : Arg(std::string_view(), val)
 {
 }
 
 
-Arg::Arg(const char* val) noexcept
-    : Arg(nullptr, val)
+Arg::Arg(std::string_view val) noexcept
+    : Arg(std::string_view(), val)
 {
 }
 
 
 Arg::Arg(const std::string& val)
-    : Arg(nullptr, val)
+    : Arg(std::string_view(), val)
 {
 }
 
 
 Arg::Arg(std::initializer_list<Arg> l)
-    : Arg(nullptr, l)
+    : Arg(std::string_view(), l)
 {
 }
 
 
-Arg::Arg(const char* key, int val) noexcept
+Arg::Arg(std::string_view key, int val) noexcept
     : type_(Type::Int)
     , alloc_(Alloc::None)
     , key_(key)
@@ -103,7 +103,7 @@ Arg::Arg(const char* key, int val) noexcept
 }
 
 
-Arg::Arg(const char* key, double val) noexcept
+Arg::Arg(std::string_view key, double val) noexcept
     : type_(Type::Double)
     , alloc_(Alloc::None)
     , key_(key)
@@ -112,8 +112,8 @@ Arg::Arg(const char* key, double val) noexcept
 }
 
 
-Arg::Arg(const char* key, const char* val) noexcept
-    : type_(Type::CString)
+Arg::Arg(std::string_view key, std::string_view val) noexcept
+    : type_(Type::String)
     , alloc_(Alloc::None)
     , key_(key)
     , val_(val)
@@ -121,17 +121,18 @@ Arg::Arg(const char* key, const char* val) noexcept
 }
 
 
-Arg::Arg(const char* key, const std::string& val)
-    : type_(Type::CString)
+Arg::Arg(std::string_view key, const std::string& val)
+    : type_(Type::String)
     , alloc_(Alloc::None)
     , key_(key)
     , val_(0)
 {
-    const size_t sz = val.size() + 1;
+    const size_t sz = val.size();
 
-    if (sz <= sizeof(Val)) {
+    if (sz <= MaxStringStackSize) {
         alloc_ = Alloc::Stack;
-        std::memcpy(val_.buf_, val.data(), sz);
+        std::memcpy(val_.buf_.dat_, val.data(), sz);
+        val_.buf_.siz_ = sz;
     } else {
         alloc_ = Alloc::Heap;
         val_.str_ = new Ref<char>(sz);
@@ -141,7 +142,7 @@ Arg::Arg(const char* key, const std::string& val)
 }
 
 
-Arg::Arg(const char* key, const Arg val[], size_t size)
+Arg::Arg(std::string_view key, const Arg val[], size_t size)
     : type_(Type::Array)
     , alloc_(Alloc::Heap)
     , key_(key)
@@ -153,7 +154,7 @@ Arg::Arg(const char* key, const Arg val[], size_t size)
 }
 
 
-Arg::Arg(const char* key, std::initializer_list<Arg> l)
+Arg::Arg(std::string_view key, std::initializer_list<Arg> l)
     : Arg(key, &*l.begin(), l.size())
 {
 }
@@ -189,7 +190,7 @@ Arg::~Arg() noexcept
 void Arg::refAcquire() noexcept
 {
     if (alloc_ == Alloc::Heap) {
-        if (type_ == Type::CString)
+        if (type_ == Type::String)
             ++val_.str_->cnt_;
         else if (type_ == Type::Array)
             ++val_.arr_->cnt_;
@@ -200,7 +201,7 @@ void Arg::refAcquire() noexcept
 void Arg::refRelease() noexcept
 {
     if (alloc_ == Alloc::Heap) {
-        if (type_ == Type::CString && --val_.str_->cnt_ == 0)
+        if (type_ == Type::String && --val_.str_->cnt_ == 0)
             delete val_.str_;
         else if (type_ == Type::Array && --val_.arr_->cnt_ == 0)
             delete val_.arr_;
@@ -233,7 +234,7 @@ size_t Arg::count() const noexcept
 
     case Type::Int:
     case Type::Double:
-    case Type::CString:
+    case Type::String:
         return 1;
 
     case Type::Array:
@@ -252,7 +253,7 @@ size_t Arg::refCount() const noexcept
     case Type::Double:
         return 0;
 
-    case Type::CString:
+    case Type::String:
         if (alloc_ != Alloc::Heap)
             return 0;
         else
@@ -272,7 +273,7 @@ Arg::Type Arg::type() const noexcept
 }
 
 
-const char* Arg::key() const noexcept
+std::string_view Arg::key() const noexcept
 {
     return key_;
 }
@@ -296,23 +297,23 @@ double Arg::toDouble() const noexcept
 }
 
 
-const char* Arg::toCString() const noexcept
+std::string_view Arg::toString() const noexcept
 {
-    if (type_ != Type::CString)
-        return nullptr;
+    if (type_ != Type::String)
+        return std::string_view();
 
     switch (alloc_) {
     case Alloc::None:
         return val_.chr_;
 
     case Alloc::Stack:
-        return val_.buf_;
+        return std::string_view(val_.buf_.dat_, val_.buf_.siz_);
 
     case Alloc::Heap:
-        return val_.str_->buf_;
+        return std::string_view(val_.str_->buf_, val_.str_->siz_);
     }
 
-    return nullptr;
+    return std::string_view();
 }
 
 
@@ -334,14 +335,14 @@ Handler::~Handler()
 }
 
 namespace {
-inline void printkey(std::ostream& os, const char* key)
+inline void printkey(std::ostream& os, std::string_view key)
 {
-    if (key != nullptr)
+    if (!key.empty())
         os << key << ": ";
 }
 
 template<typename T>
-inline void printarg(std::ostream& os, const char* key, T val)
+inline void printarg(std::ostream& os, std::string_view key, T val)
 {
     printkey(os, key);
     os << val;
@@ -380,8 +381,8 @@ std::ostream& operator<<(std::ostream& os, const Arg& arg)
     case Arg::Type::Double:
         printarg(os, arg.key(), arg.toDouble());
         break;
-    case Arg::Type::CString:
-        printarg(os, arg.key(), arg.toCString());
+    case Arg::Type::String:
+        printarg(os, arg.key(), arg.toString());
         break;
     case Arg::Type::Array:
         printkey(os, arg.key());

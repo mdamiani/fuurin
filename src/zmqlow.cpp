@@ -143,7 +143,7 @@ int sendMultipartMessage(void* socket, int flags, const T& part)
     zmq_msg_t msg;
     rc = zmq_msg_init_size(&msg, getPartSize<T>(part));
     if (BOOST_UNLIKELY(rc != 0)) {
-        LOG_ERROR("zmq_msg_init_size", zmq_strerror(errno));
+        LOG_ERROR("zmq_msg_init_size", std::string_view(zmq_strerror(errno)));
         return -1;
     }
 
@@ -155,7 +155,7 @@ int sendMultipartMessage(void* socket, int flags, const T& part)
 
     if (BOOST_UNLIKELY(rc == -1)) {
         if (errno != EAGAIN) {
-            LOG_ERROR("zmq_send", zmq_strerror(errno));
+            LOG_ERROR("zmq_send", std::string_view(zmq_strerror(errno)));
         }
 
         closeZmqMsg(&msg);
@@ -186,7 +186,7 @@ int recvMultipartMessage(void* socket, int flags, T* part)
 
     if (BOOST_UNLIKELY(rc == -1)) {
         if (errno != EAGAIN) {
-            LOG_ERROR("zmq_msg_recv", zmq_strerror(errno));
+            LOG_ERROR("zmq_msg_recv", std::string_view(zmq_strerror(errno)));
         }
     } else {
         memcpyFromMessage<T>(zmq_msg_data(&msg), zmq_msg_size(&msg), part);
@@ -208,7 +208,7 @@ void* initContext()
     void* context = zmq_ctx_new();
 
     if (!context) {
-        LOG_ERROR("zmq_ctx_new", zmq_strerror(errno));
+        LOG_ERROR("zmq_ctx_new", std::string_view(zmq_strerror(errno)));
     }
 
     return context;
@@ -220,7 +220,7 @@ bool deleteContext(void* context)
     const int rc = zmq_ctx_term(context);
 
     if (rc == -1) {
-        LOG_ERROR("zmq_ctx_term", zmq_strerror(errno));
+        LOG_ERROR("zmq_ctx_term", std::string_view(zmq_strerror(errno)));
     }
 
     return rc != -1;
@@ -232,7 +232,7 @@ void* createSocket(void* context, int type)
     void* socket = zmq_socket(context, type);
 
     if (!socket) {
-        LOG_ERROR("zmq_socket", zmq_strerror(errno));
+        LOG_ERROR("zmq_socket", std::string_view(zmq_strerror(errno)));
     }
 
     return socket;
@@ -246,7 +246,7 @@ bool closeSocket(void* socket)
     const int rc = zmq_close(socket);
 
     if (rc == -1) {
-        LOG_ERROR("zmq_close", zmq_strerror(errno));
+        LOG_ERROR("zmq_close", std::string_view(zmq_strerror(errno)));
     }
 
     return rc != -1;
@@ -258,7 +258,7 @@ bool connectSocket(void* socket, const char* endpoint)
     const int rc = zmq_connect(socket, endpoint);
 
     if (rc == -1) {
-        LOG_ERROR("zmq_connect", zmq_strerror(errno));
+        LOG_ERROR("zmq_connect", std::string_view(zmq_strerror(errno)));
     }
 
     return rc != -1;
@@ -287,7 +287,7 @@ bool bindSocket(void* socket, const char* endpoint, int timeout)
     } while (1);
 
     if (rc == -1) {
-        LOG_ERROR("zmq_bind", zmq_strerror(errno));
+        LOG_ERROR("zmq_bind", std::string_view(zmq_strerror(errno)));
     }
 
     return rc != -1;
@@ -303,7 +303,7 @@ bool pollSocket(zmq_pollitem_t* items, int nitems, long msecs)
     } while (rc == -1 && errno == EINTR);
 
     if (rc == -1) {
-        LOG_ERROR("zmq_poll", zmq_strerror(errno));
+        LOG_ERROR("zmq_poll", std::string_view(zmq_strerror(errno)));
     }
 
     return rc != -1;
@@ -319,7 +319,7 @@ bool setSocketOption(void* socket, int option, int value)
     } while (rc == -1 && errno == EINTR);
 
     if (rc == -1) {
-        LOG_ERROR("zmq_setsockopt", zmq_strerror(errno));
+        LOG_ERROR("zmq_setsockopt", std::string_view(zmq_strerror(errno)));
     }
 
     return rc != -1;
@@ -335,7 +335,7 @@ bool setSocketSubscription(void* socket, const std::string& filter)
     } while (rc == -1 && errno == EINTR);
 
     if (rc == -1) {
-        LOG_ERROR("zmq_setsockopt", zmq_strerror(errno));
+        LOG_ERROR("zmq_setsockopt", std::string_view(zmq_strerror(errno)));
     }
 
     return rc != -1;
@@ -359,7 +359,7 @@ int socketOption(void* socket, int option, int defaultValue, bool* ok)
     *ok = rc != -1;
 
     if (!*ok) {
-        LOG_ERROR("zmq_getsockopt", zmq_strerror(errno));
+        LOG_ERROR("zmq_getsockopt", std::string_view(zmq_strerror(errno)));
     }
 
     return *ok ? optval : defaultValue;

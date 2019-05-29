@@ -15,9 +15,12 @@
 
 #include <boost/preprocessor/seq/for_each.hpp>
 
+using namespace std::literals;
+
 
 namespace fuurin {
 namespace log {
+
 
 /**
  * \brief Simple formatting function for logs.

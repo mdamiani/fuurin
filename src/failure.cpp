@@ -18,7 +18,7 @@ namespace fuurin {
 
 void failure(const char* file, unsigned int line, const char* expr, const char* what)
 {
-    log::fatal({file, line}, log::Arg("ASSERT", expr), log::Arg("FAILURE", what));
+    log::fatal({file, line}, log::Arg("ASSERT", std::string_view(expr)), log::Arg("FAILURE", std::string_view(what)));
     std::abort();
 }
 }

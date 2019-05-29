@@ -13,6 +13,7 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 #include <ostream>
 #include <initializer_list>
 
@@ -57,7 +58,7 @@ public:
         Invalid, ///< Invalid argument.
         Int,     ///< Integer.
         Double,  ///< Double.
-        CString, ///< Null terminated C string.
+        String,  ///< String.
         Array,   ///< Array of arguments.
     };
 
@@ -67,11 +68,6 @@ public:
      * \brief Constructs an invalid argument.
      */
     Arg() noexcept;
-
-    /**
-     * \brief Destroys this argument.
-     */
-    ~Arg() noexcept;
 
     /**
      * \brief Constructs a valid \c val argument, of the specified type.
@@ -84,12 +80,12 @@ public:
     ///{@
     explicit Arg(int val) noexcept;
     explicit Arg(double val) noexcept;
-    explicit Arg(const char* val) noexcept;
+    explicit Arg(std::string_view val) noexcept;
     explicit Arg(const std::string& val);
     explicit Arg(std::initializer_list<Arg> l);
     template<size_t N>
     explicit Arg(const Arg (&val)[N])
-        : Arg(nullptr, val, N)
+        : Arg(std::string_view(), val, N)
     {
     }
     ///@}
@@ -104,13 +100,13 @@ public:
      * \see refCount()
      */
     ///{@
-    explicit Arg(const char* key, int val) noexcept;
-    explicit Arg(const char* key, double val) noexcept;
-    explicit Arg(const char* key, const char* val) noexcept;
-    explicit Arg(const char* key, const std::string& val);
-    explicit Arg(const char* key, std::initializer_list<Arg> l);
+    explicit Arg(std::string_view key, int val) noexcept;
+    explicit Arg(std::string_view key, double val) noexcept;
+    explicit Arg(std::string_view key, std::string_view val) noexcept;
+    explicit Arg(std::string_view key, const std::string& val);
+    explicit Arg(std::string_view key, std::initializer_list<Arg> l);
     template<size_t N>
-    explicit Arg(const char* key, const Arg (&val)[N])
+    explicit Arg(std::string_view key, const Arg (&val)[N])
         : Arg(key, val, N)
     {
     }
@@ -129,6 +125,12 @@ public:
     Arg(Arg&& other) noexcept;
 
     /**
+     * \brief Destroys this argument.
+     * \see refRelease()
+     */
+    ~Arg() noexcept;
+
+    /**
      * \return The type of this argument.
      */
     Type type() const noexcept;
@@ -136,7 +138,7 @@ public:
     /**
      * \return The key of this argument, or \c nullptr if it was not set.
      */
-    const char* key() const noexcept;
+    std::string_view key() const noexcept;
 
     /**
      * \return The value of this argument if the type matches the requested value,
@@ -145,7 +147,7 @@ public:
     ///{@
     int toInt() const noexcept;
     double toDouble() const noexcept;
-    const char* toCString() const noexcept;
+    std::string_view toString() const noexcept;
     const Arg* toArray() const noexcept;
     ///@}
 
@@ -209,7 +211,7 @@ private:
         ///{@
         explicit Val(int) noexcept;
         explicit Val(double) noexcept;
-        explicit Val(const char*) noexcept;
+        explicit Val(std::string_view) noexcept;
         explicit Val(Ref<char>*) noexcept;
         explicit Val(Ref<Arg>*) noexcept;
         ///@}
@@ -218,8 +220,12 @@ private:
         ///{@
         int int_;
         double dbl_;
-        const char* chr_;
-        char buf_[sizeof(double)];
+        std::string_view chr_;
+        struct Buf
+        {
+            uint8_t siz_;
+            char dat_[sizeof(chr_) - sizeof(siz_)];
+        } buf_;
         Ref<char>* str_;
         Ref<Arg>* arr_;
         ///@}
@@ -243,7 +249,7 @@ private:
      * \param[in] arg Array of arguments.
      * \param[in] size Size of the array.
      */
-    Arg(const char* key, const Arg arg[], size_t size);
+    Arg(std::string_view key, const Arg arg[], size_t size);
 
     /**
      * \brief Acquires a reference counted data.
@@ -258,11 +264,16 @@ private:
     void refRelease() noexcept;
 
 
+public:
+    /// Maximum size for strings stored as \ref Alloc::Stack.
+    static constexpr size_t MaxStringStackSize{sizeof(Val::Buf::dat_)};
+
+
 private:
-    Type type_;       ///< Type of argument.
-    Alloc alloc_;     ///< Type of value allocation.
-    const char* key_; ///< Argument key.
-    Val val_;         ///< Argument value.
+    Type type_;            ///< Type of argument.
+    Alloc alloc_;          ///< Type of value allocation.
+    std::string_view key_; ///< Argument key.
+    Val val_;              ///< Argument value.
 };
 
 
