@@ -106,7 +106,7 @@ void Socket::setOption(int option, const T& value)
     } while (rc == -1 && zmq_errno() == EINTR);
 
     if (rc == -1) {
-        throw ERROR(ZMQSocketOptionSetFailed, "could not set socket option", zmq_errno());
+        throw ERROR(ZMQSocketOptionSetFailed, "could not set socket option", log::Arg{log::ec_t{zmq_errno()}});
     }
 }
 
@@ -121,7 +121,7 @@ void Socket::setOption(int option, const std::string& value)
     } while (rc == -1 && zmq_errno() == EINTR);
 
     if (rc == -1) {
-        throw ERROR(ZMQSocketOptionSetFailed, "could not set socket option", zmq_errno());
+        throw ERROR(ZMQSocketOptionSetFailed, "could not set socket option", log::Arg{log::ec_t{zmq_errno()}});
     }
 }
 
@@ -140,7 +140,7 @@ T Socket::getOption(int option) const
     } while (rc == -1 && zmq_errno() == EINTR);
 
     if (rc == -1) {
-        throw ERROR(ZMQSocketOptionGetFailed, "could not get socket option", zmq_errno());
+        throw ERROR(ZMQSocketOptionGetFailed, "could not get socket option", log::Arg{log::ec_t{zmq_errno()}});
     }
 
     return optval;
@@ -159,7 +159,7 @@ std::string Socket::getOption(int option) const
     } while (rc == -1 && zmq_errno() == EINTR);
 
     if (rc == -1) {
-        throw ERROR(ZMQSocketOptionGetFailed, "could not get socket option", zmq_errno());
+        throw ERROR(ZMQSocketOptionGetFailed, "could not get socket option", log::Arg{log::ec_t{zmq_errno()}});
     }
 
     return std::string(optval, optsize);
@@ -183,14 +183,14 @@ void Socket::bind()
 void Socket::open(std::function<void(std::string)> action)
 {
     if (ptr_ != nullptr)
-        throw ERROR(ZMQSocketCreateFailed, "could not open socket", "already opened");
+        throw ERROR(ZMQSocketCreateFailed, "could not open socket", log::Arg{"already opened"sv});
 
     bool commit = false;
 
     // Create socket.
     ptr_ = zmq_socket(ctx_->ptr_, type_);
     if (ptr_ == nullptr) {
-        throw ERROR(ZMQSocketCreateFailed, "could not create socket", zmq_errno());
+        throw ERROR(ZMQSocketCreateFailed, "could not create socket", log::Arg{log::ec_t{zmq_errno()}});
     }
     BOOST_SCOPE_EXIT(this, &commit)
     {
@@ -237,7 +237,7 @@ void Socket::connect(const std::string& endpoint)
     const int rc = zmq_connect(ptr_, endpoint.c_str());
 
     if (rc == -1) {
-        throw ERROR(ZMQSocketConnectFailed, "could not connect socket", zmq_errno());
+        throw ERROR(ZMQSocketConnectFailed, "could not connect socket", log::Arg{log::ec_t{zmq_errno()}});
     }
 }
 
@@ -265,7 +265,7 @@ void Socket::bind(const std::string& endpoint, int timeout)
     } while (1);
 
     if (rc == -1) {
-        throw ERROR(ZMQSocketBindFailed, "could not bind socket", zmq_errno());
+        throw ERROR(ZMQSocketBindFailed, "could not bind socket", log::Arg{log::ec_t{zmq_errno()}});
     }
 }
 }

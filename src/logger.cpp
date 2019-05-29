@@ -11,6 +11,7 @@
 #include "fuurin/logger.h"
 #include "failure.h"
 
+#include <zmq.h>
 #include <boost/preprocessor/seq/for_each.hpp>
 
 #include <cstring>
@@ -70,6 +71,12 @@ Arg::Arg(int val) noexcept
 }
 
 
+Arg::Arg(ec_t val) noexcept
+    : Arg(std::string_view(), val)
+{
+}
+
+
 Arg::Arg(double val) noexcept
     : Arg(std::string_view(), val)
 {
@@ -99,6 +106,15 @@ Arg::Arg(std::string_view key, int val) noexcept
     , alloc_(Alloc::None)
     , key_(key)
     , val_(val)
+{
+}
+
+
+Arg::Arg(std::string_view key, ec_t val) noexcept
+    : type_(Type::Errno)
+    , alloc_(Alloc::None)
+    , key_(key)
+    , val_(val.val)
 {
 }
 
@@ -233,6 +249,7 @@ size_t Arg::count() const noexcept
         return 0;
 
     case Type::Int:
+    case Type::Errno:
     case Type::Double:
     case Type::String:
         return 1;
@@ -250,6 +267,7 @@ size_t Arg::refCount() const noexcept
     switch (type_) {
     case Type::Invalid:
     case Type::Int:
+    case Type::Errno:
     case Type::Double:
         return 0;
 
@@ -281,7 +299,7 @@ std::string_view Arg::key() const noexcept
 
 int Arg::toInt() const noexcept
 {
-    if (type_ != Type::Int)
+    if (type_ != Type::Int && type_ != Type::Errno)
         return 0;
 
     return val_.int_;
@@ -299,18 +317,19 @@ double Arg::toDouble() const noexcept
 
 std::string_view Arg::toString() const noexcept
 {
-    if (type_ != Type::String)
-        return std::string_view();
+    if (type_ == Type::String) {
+        switch (alloc_) {
+        case Alloc::None:
+            return val_.chr_;
 
-    switch (alloc_) {
-    case Alloc::None:
-        return val_.chr_;
+        case Alloc::Stack:
+            return std::string_view(val_.buf_.dat_, val_.buf_.siz_);
 
-    case Alloc::Stack:
-        return std::string_view(val_.buf_.dat_, val_.buf_.siz_);
-
-    case Alloc::Heap:
-        return std::string_view(val_.str_->buf_, val_.str_->siz_);
+        case Alloc::Heap:
+            return std::string_view(val_.str_->buf_, val_.str_->siz_);
+        }
+    } else if (type_ == Type::Errno) {
+        return std::string_view(zmq_strerror(val_.int_));
     }
 
     return std::string_view();
@@ -381,6 +400,7 @@ std::ostream& operator<<(std::ostream& os, const Arg& arg)
     case Arg::Type::Double:
         printarg(os, arg.key(), arg.toDouble());
         break;
+    case Arg::Type::Errno:
     case Arg::Type::String:
         printarg(os, arg.key(), arg.toString());
         break;

@@ -44,15 +44,15 @@ BOOST_PP_SEQ_FOR_EACH(LOG_LEVEL, _, (debug)(info)(warn)(error)(fatal))
 #undef LOG
 
 #ifndef NDEBUG
-#define LOG_DEBUG(wh, wa) debug({__FILE__, __LINE__}, log::Arg(wh, wa))
+#define LOG_DEBUG(...) debug({__FILE__, __LINE__}, __VA_ARGS__)
 #else
-#define LOG_DEBUG(wh, wa)
+#define LOG_DEBUG(...)
 #endif
 
-#define LOG_INFO(wh, wa) info({__FILE__, __LINE__}, log::Arg(wh, wa))
-#define LOG_WARN(wh, wa) warn({__FILE__, __LINE__}, log::Arg(wh, wa))
-#define LOG_ERROR(wh, wa) error({__FILE__, __LINE__}, log::Arg(wh, wa))
-#define LOG_FATAL(wh, wa) fatal({__FILE__, __LINE__}, log::Arg(wh, wa))
+#define LOG_INFO(...) info({__FILE__, __LINE__}, __VA_ARGS__)
+#define LOG_WARN(...) warn({__FILE__, __LINE__}, __VA_ARGS__)
+#define LOG_ERROR(...) error({__FILE__, __LINE__}, __VA_ARGS__)
+#define LOG_FATAL(...) fatal({__FILE__, __LINE__}, __VA_ARGS__)
 }
 }
 

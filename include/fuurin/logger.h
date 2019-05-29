@@ -31,6 +31,13 @@ struct Loc
 };
 
 
+/// Type which represents an error code.
+struct ec_t
+{
+    int val;
+};
+
+
 /**
  * \brief Arg is a light class for variant arguments to be logged.
  *
@@ -41,8 +48,9 @@ struct Loc
  * is shared among different copies of this argument, avoiding multiple heap
  * allocations.
  *
- * However, as a special case, when the dymanic value fits the size of the biggest
- * value (8 bytes), then it's still stored in the stack, without allocations.
+ * However, as a special case, when the dymanic value fits the size of the
+ * biggest underlying type (~16 bytes), then it's still stored in the stack,
+ * without allocations.
  *
  * When an argument is storing an array value, a heap data is always allocated
  * and reference counted.
@@ -57,6 +65,7 @@ public:
     {
         Invalid, ///< Invalid argument.
         Int,     ///< Integer.
+        Errno,   ///< Error Code.
         Double,  ///< Double.
         String,  ///< String.
         Array,   ///< Array of arguments.
@@ -79,6 +88,7 @@ public:
      */
     ///{@
     explicit Arg(int val) noexcept;
+    explicit Arg(ec_t val) noexcept;
     explicit Arg(double val) noexcept;
     explicit Arg(std::string_view val) noexcept;
     explicit Arg(const std::string& val);
@@ -101,6 +111,7 @@ public:
      */
     ///{@
     explicit Arg(std::string_view key, int val) noexcept;
+    explicit Arg(std::string_view key, ec_t val) noexcept;
     explicit Arg(std::string_view key, double val) noexcept;
     explicit Arg(std::string_view key, std::string_view val) noexcept;
     explicit Arg(std::string_view key, const std::string& val);

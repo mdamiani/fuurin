@@ -13,7 +13,7 @@ Context::Context()
     : ptr_(zmq_ctx_new())
 {
     if (ptr_ == nullptr) {
-        throw ERROR(ZMQContextCreateFailed, "could not create context", zmq_errno());
+        throw ERROR(ZMQContextCreateFailed, "could not create context", log::Arg{log::ec_t{zmq_errno()}});
     }
 }
 

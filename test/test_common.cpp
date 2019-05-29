@@ -27,6 +27,7 @@
 #include <utility>
 #include <iterator>
 #include <string_view>
+#include <errno.h>
 
 
 using namespace std::string_literals;
@@ -179,6 +180,7 @@ BOOST_DATA_TEST_CASE(logArgType,
     bdata::make({
         std::make_tuple(log::Arg::Invalid, "key1"sv, 0, 0.0, "0"sv, ""s, false, 0),
         std::make_tuple(log::Arg::Int, "key2"sv, 10, 0.0, "0"sv, ""s, false, 0),
+        std::make_tuple(log::Arg::Errno, "key2.1"sv, ENOENT, 0.0, "0"sv, ""s, false, 0),
         std::make_tuple(log::Arg::Double, "key3"sv, 0, 10.0, "0"sv, ""s, false, 0),
         std::make_tuple(log::Arg::String, "key4"sv, 0, 0.0, "charval"sv, ""s, false, 0),
         std::make_tuple(log::Arg::String, "key5"sv, 0, 0.0, ""sv, "strval"s, true, 0),
@@ -201,6 +203,11 @@ BOOST_DATA_TEST_CASE(logArgType,
         testArg(a, argType, argKey, argInt, 0, std::string_view(), 1, 0);
         break;
     }
+    case log::Arg::Type::Errno: {
+        log::Arg a{argKey, log::ec_t{argInt}};
+        testArg(a, argType, argKey, argInt, 0, "No such file or directory"sv, 1, 0);
+        break;
+    }
     case log::Arg::Type::Double: {
         log::Arg a{argKey, argDouble};
         testArg(a, argType, argKey, 0, argDouble, std::string_view(), 1, 0);
@@ -212,7 +219,7 @@ BOOST_DATA_TEST_CASE(logArgType,
             testArg(a, argType, argKey, 0, 0, argChar, 1, 0);
         } else {
             log::Arg a{argKey, argString};
-            testArg(a, argType, argKey, 0, 0, argString.c_str(), 1, refCnt);
+            testArg(a, argType, argKey, 0, 0, argString, 1, refCnt);
         }
         break;
     }
@@ -248,7 +255,7 @@ BOOST_DATA_TEST_CASE(logArgType,
         testArg(arr1[0], log::Arg::Type::Int, "k1"sv, argInt, 0, std::string_view(), 1, 0);
         testArg(arr1[1], log::Arg::Type::Double, "k2"sv, 0, argDouble, std::string_view(), 1, 0);
         testArg(arr1[2], log::Arg::Type::String, "k3"sv, 0, 0, argChar, 1, 0);
-        testArg(arr1[3], log::Arg::Type::String, "k4"sv, 0, 0, argString.c_str(), 1, refCnt);
+        testArg(arr1[3], log::Arg::Type::String, "k4"sv, 0, 0, argString, 1, refCnt);
         testArg(arr1[4], log::Arg::Type::Array, "k5"sv, 0, 0, std::string_view(), 3, 1);
         testArg(arr1[5], log::Arg::Type::Array, "k6"sv, 0, 0, std::string_view(), 0, 1);
         const auto& arr2 = arr1[4].toArray();
@@ -256,7 +263,7 @@ BOOST_DATA_TEST_CASE(logArgType,
         testArg(arr2[1], log::Arg::Type::Double, "p1"sv, 0, argDouble, std::string_view(), 1, 0);
         testArg(arr2[2], log::Arg::Type::Array, "p2"sv, 0, 0, std::string_view(), 1, 1);
         const auto& arr3 = arr2[2].toArray();
-        testArg(arr3[0], log::Arg::Type::String, "u0"sv, 0, 0, longstr.c_str(), 1, 1);
+        testArg(arr3[0], log::Arg::Type::String, "u0"sv, 0, 0, longstr, 1, 1);
         break;
     }
     }
@@ -278,7 +285,7 @@ BOOST_DATA_TEST_CASE(logArgRef,
         const std::string val("very long long value");
 
         test = [key, val](const log::Arg& arg, unsigned cnt) {
-            testArg(arg, log::Arg::Type::String, key, 0, 0, val.c_str(), 1, cnt);
+            testArg(arg, log::Arg::Type::String, key, 0, 0, val, 1, cnt);
         };
 
         a = log::Arg{key, val};
@@ -336,6 +343,16 @@ BOOST_DATA_TEST_CASE(logArgRef,
     test(f, 2);
 
     testArg(a, log::Arg::Type::Invalid, std::string_view(), 0, 0, std::string_view(), 0, 0);
+}
+
+
+BOOST_AUTO_TEST_CASE(logArgCopyStringStack)
+{
+    log::Arg a{"key"sv, "value"sv};
+    testArg(a, log::Arg::Type::String, "key"sv, 0, 0, "value"sv, 1, 0);
+
+    log::Arg b = a;
+    testArg(b, log::Arg::Type::String, "key"sv, 0, 0, "value"sv, 1, 0);
 }
 
 
