@@ -323,7 +323,7 @@ bool setSocketSubscription(void* socket, const std::string& filter);
  * \return The value of the specified \c option, otherwise \c defaultValue.
  */
 int socketOption(void* socket, int option, int defaultValue = 0, bool* ok = 0);
-}
-}
+} // namespace zmq
+} // namespace fuurin
 
 #endif // ZMQLOW_H

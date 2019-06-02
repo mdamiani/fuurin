@@ -31,5 +31,5 @@ const log::Arg& Error::arg() const noexcept
 {
     return arg_;
 }
-}
-}
+} // namespace err
+} // namespace fuurin

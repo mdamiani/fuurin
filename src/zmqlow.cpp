@@ -132,7 +132,7 @@ inline void closeZmqMsg(zmq_msg_t* msg)
     const int rc = zmq_msg_close(msg);
     ASSERT(rc == 0, "zmq_msg_close failed");
 }
-}
+} // namespace
 
 
 template<typename T>
@@ -364,5 +364,5 @@ int socketOption(void* socket, int option, int defaultValue, bool* ok)
 
     return *ok ? optval : defaultValue;
 }
-}
-}
+} // namespace zmq
+} // namespace fuurin

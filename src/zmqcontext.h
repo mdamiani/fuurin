@@ -50,7 +50,7 @@ public:
 private:
     void* const ptr_; ///< ZMQ context.
 };
-}
-}
+} // namespace zmq
+} // namespace fuurin
 
 #endif // ZMQCONTEXT_H

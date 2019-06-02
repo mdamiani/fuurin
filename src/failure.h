@@ -39,7 +39,7 @@ void failure(const char* file, unsigned int line, const char* expr, const char* 
     if (BOOST_UNLIKELY(!(expr))) { \
         failure(__FILE__, __LINE__, #expr, msg); \
     }
-}
+} // namespace fuurin
 
 
 #endif // FAILURE_H

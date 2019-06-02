@@ -24,4 +24,4 @@ char* version()
 
     return _version_buf;
 }
-}
+} // namespace fuurin

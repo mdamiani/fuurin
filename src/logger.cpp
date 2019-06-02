@@ -385,7 +385,7 @@ inline void println(std::ostream& os, const Arg args[], size_t num)
     printargs(os, args, num);
     os << std::endl;
 }
-}
+} // namespace
 
 
 std::ostream& operator<<(std::ostream& os, const Arg& arg)
@@ -488,5 +488,5 @@ void Logger::installContentHandler(Handler* handler)
     }
 BOOST_PP_SEQ_FOR_EACH(LOGGER_LEVEL, _, (debug)(info)(warn)(error)(fatal))
 #undef LOGGER_LEVEL
-}
-}
+} // namespace log
+} // namespace fuurin

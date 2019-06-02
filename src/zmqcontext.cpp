@@ -28,5 +28,5 @@ Context::~Context() noexcept
 
     ASSERT(rc == 0, "zmq_ctx_term failed");
 }
-}
-}
+} // namespace zmq
+} // namespace fuurin

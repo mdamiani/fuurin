@@ -39,5 +39,5 @@ std::string format(const char* format, ...)
 
     return str;
 }
-}
-}
+} // namespace log
+} // namespace fuurin

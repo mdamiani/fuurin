@@ -246,7 +246,7 @@ private:
     std::list<std::string> endpoints_;     ///< List of endpoints to connect/bind.
     std::list<std::string> openEndpoints_; ///< List of connected/bound endpoints.
 };
-}
-}
+} // namespace zmq
+} // namespace fuurin
 
 #endif // ZMQSOCKET_H

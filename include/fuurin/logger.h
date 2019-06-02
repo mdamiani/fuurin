@@ -401,6 +401,6 @@ public:
 private:
     static std::unique_ptr<Handler> handler_; ///< The user defined log handler.
 };
-}
-}
+} // namespace log
+} // namespace fuurin
 #endif // LOGGER_H

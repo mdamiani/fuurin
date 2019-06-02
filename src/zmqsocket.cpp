@@ -91,7 +91,7 @@ void static_assert_option_types()
 {
     static_assert(std::is_same<T, int>::value, "socket option type not supported");
 }
-}
+} // namespace
 
 
 template<typename T>
@@ -268,5 +268,5 @@ void Socket::bind(const std::string& endpoint, int timeout)
         throw ERROR(ZMQSocketBindFailed, "could not bind socket", log::Arg{log::ec_t{zmq_errno()}});
     }
 }
-}
-}
+} // namespace zmq
+} // namespace fuurin

@@ -21,6 +21,6 @@
 namespace fuurin {
 using ByteArray = std::vector<uint8_t>;
 using String = std::string;
-}
+} // namespace fuurin
 
 #endif // TYPES_H

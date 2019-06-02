@@ -53,7 +53,7 @@ BOOST_PP_SEQ_FOR_EACH(LOG_LEVEL, _, (debug)(info)(warn)(error)(fatal))
 #define LOG_WARN(...) warn({__FILE__, __LINE__}, __VA_ARGS__)
 #define LOG_ERROR(...) error({__FILE__, __LINE__}, __VA_ARGS__)
 #define LOG_FATAL(...) fatal({__FILE__, __LINE__}, __VA_ARGS__)
-}
-}
+} // namespace log
+} // namespace fuurin
 
 #endif // LOG_H
