@@ -16,6 +16,7 @@
 #include <string_view>
 #include <ostream>
 #include <initializer_list>
+#include <atomic>
 
 
 namespace fuurin {
@@ -54,8 +55,10 @@ struct ec_t
  *
  * When an argument is storing an array value, a heap data is always allocated
  * and reference counted.
+ *
+ * Reference counter is manage atomically, so it's thread-safe.
  */
-class Arg
+class Arg final
 {
 public:
     /**
@@ -189,9 +192,9 @@ private:
     template<typename T>
     struct Ref
     {
-        T* const buf_;     ///< Data buffer.
-        const size_t siz_; ///< Size of buffer.
-        size_t cnt_;       ///< Reference count.
+        T* const buf_;            ///< Data buffer.
+        const size_t siz_;        ///< Size of buffer.
+        std::atomic<size_t> cnt_; ///< Reference count.
 
         /**
          * \brief Initializes the reference and allocated the string buffer.
@@ -289,7 +292,7 @@ private:
 
 
 /**
- * \brief Outputs a log argument.
+ * \brief Outputs an argument.
  */
 std::ostream& operator<<(std::ostream& os, const Arg& arg);
 

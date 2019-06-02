@@ -36,7 +36,7 @@ public:
      * \param[in] ctx A valid ZMQ context.
      * \param[in] type Type of ZMQ socket.
      */
-    Socket(Context* ctx, int type);
+    explicit Socket(Context* ctx, int type);
 
     /**
      * \brief Destroys (and closes) this socket.

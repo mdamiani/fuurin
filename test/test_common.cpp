@@ -28,6 +28,7 @@
 #include <iterator>
 #include <string_view>
 #include <errno.h>
+#include <thread>
 
 
 using namespace std::string_literals;
@@ -353,6 +354,57 @@ BOOST_AUTO_TEST_CASE(logArgCopyStringStack)
 
     log::Arg b = a;
     testArg(b, log::Arg::Type::String, "key"sv, 0, 0, "value"sv, 1, 0);
+}
+
+
+BOOST_DATA_TEST_CASE(logArgShareAtomic,
+    bdata::make({
+        log::Arg::Type::String,
+        log::Arg::Type::Array,
+    }),
+    argType)
+{
+    const auto& longstr = std::string(log::Arg::MaxStringStackSize + 1, 'a');
+    log::Arg a;
+
+    if (argType == log::Arg::Type::String) {
+        a = log::Arg{"key"sv, longstr};
+
+    } else if (argType == log::Arg::Type::Array) {
+        a = log::Arg{
+            "m0"sv,
+            {
+                log::Arg{"k1"sv, 1},
+                log::Arg{"k2"sv, 1.0},
+                log::Arg{"k3"sv, "hey"sv},
+                log::Arg{
+                    "k5"sv,
+                    {
+                        log::Arg{"p0"sv, 2},
+                        log::Arg{"p1"sv, 2.0},
+                        log::Arg{
+                            "p2"sv,
+                            {
+                                log::Arg{"u0"sv, longstr},
+                            },
+                        },
+                    },
+                },
+                log::Arg{"k6"sv, {}},
+            },
+        };
+    }
+
+    auto f = [&a]() {
+        log::Arg b(a);
+        b.refCount();
+    };
+
+    std::thread t1(f);
+    std::thread t2(f);
+
+    t1.join();
+    t2.join();
 }
 
 

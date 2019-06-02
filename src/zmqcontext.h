@@ -30,7 +30,7 @@ public:
      * This method calls \c zmq_ctx_new.
      * \exception ZMQContextCreateFailed Context could not be created.
      */
-    Context();
+    explicit Context();
 
     /**
      * \brief Stops this ZMQ context.

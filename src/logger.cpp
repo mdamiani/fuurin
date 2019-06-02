@@ -339,7 +339,7 @@ std::string_view Arg::toString() const noexcept
 const Arg* Arg::toArray() const noexcept
 {
     if (type_ != Type::Array)
-        return 0;
+        return nullptr;
 
     return val_.arr_->buf_;
 }
