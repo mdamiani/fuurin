@@ -51,9 +51,11 @@ set(LIB_SOURCES
     src/zmqsocket.cpp
     src/failure.cpp
     src/log.cpp
+    src/arg.cpp
 )
 
 set(LIB_PUBLIC_HEADERS
+    include/fuurin/arg.h
     include/fuurin/fuurin.h
     include/fuurin/errors.h
     include/fuurin/logger.h
