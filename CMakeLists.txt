@@ -49,6 +49,7 @@ set(LIB_SOURCES
     src/zmqlow.cpp
     src/zmqcontext.cpp
     src/zmqsocket.cpp
+    src/zmqmessage.cpp
     src/failure.cpp
     src/log.cpp
     src/arg.cpp

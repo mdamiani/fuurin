@@ -14,6 +14,7 @@
 #include <string>
 #include <list>
 #include <functional>
+#include <type_traits>
 
 
 namespace fuurin {
@@ -21,6 +22,7 @@ namespace zmq {
 
 
 class Context;
+class Message;
 
 
 /**
@@ -167,6 +169,50 @@ public:
      */
     const std::list<std::string>& openEndpoints() const;
 
+    /**
+     * \brief Sends a ZMQ multipart message.
+     *
+     * The passed \ref Message parts are nullified one by one,
+     * during the send call.
+     *
+     * \param[in] args More message parts to send.
+     * \param[in] part Last message part to send.
+     *
+     * \return Total number of bytes of every part.
+     *
+     * \exception ZMQSocketSendFailed A part could not be sent.
+     *
+     * \see sendMessageMore(Message *)
+     * \see sendMessageLast(Message *)
+     */
+    template<typename T, typename... Args>
+    std::enable_if_t<std::is_same_v<std::decay_t<T>, Message>, int>
+    sendMessage(Args&&... args, T&& part)
+    {
+        return (sendMessageMore(&args) + ... + sendMessageLast(&part));
+    }
+
+    /**
+     * \brief Receives a ZMQ multipart message.
+     *
+     * Passed \ref Message parts are cleared if the are not empty.
+     *
+     * \param[out] args More message parts to receive.
+     * \param[out] part Last message part to fill with the received data.
+     *
+     * \return Total number of bytes of every part.
+     *
+     * \exception ZMQSocketRecvFailed A part could not be received.
+     *
+     * \see recvMessageMore(Message *)
+     * \see recvMessageLast(Message *)
+     */
+    template<typename... Args>
+    int recvMessage(Args&&... args, Message* part)
+    {
+        return (recvMessageMore(args) + ... + recvMessageLast(part));
+    }
+
 
 private:
     /**
@@ -234,6 +280,41 @@ private:
      */
     template<typename T>
     T getOption(int option) const;
+
+    /**
+     * \brief Sends a ZMQ message part to this socket.
+     *
+     * When the more multiple parts are being sent,
+     * then flag ZMQ_SNDMORE is passed to \c zmq_msg_send.
+     *
+     * The part is nullified by \c zmq_msg_send, after the call.
+     *
+     * \param[in] part Message part to send.
+     *
+     * \exception ZMQSocketSendFailed The part could not be sent.
+     */
+    ///{@
+    int sendMessageMore(Message* part);
+    int sendMessageLast(Message* part);
+    ///@}
+
+    /**
+     * \brief Receives a ZMQ multipart message.
+     *
+     * The behaviour of this function if the same of \c zmq_recv_msg.
+     * The passed part is filled with data read from this socket, as is,
+     * and possibly cleared if its contents is not empty.
+     *
+     * \param[out] part A single message part to fill with the received data.
+     *
+     * \return Number of bytes in the message part.
+     *
+     * \exception ZMQSocketRecvFailed The part could not be received.
+     */
+    ///{@
+    int recvMessageMore(Message* part);
+    int recvMessageLast(Message* part);
+    ///@}
 
 
 private:

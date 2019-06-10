@@ -1,10 +1,12 @@
 #include "zmqsocket.h"
 #include "zmqcontext.h"
+#include "zmqmessage.h"
 #include "failure.h"
 #include "log.h"
 #include "fuurin/errors.h"
 
 #include <zmq.h>
+#include <boost/config.hpp> // for BOOST_LIKELY
 #include <boost/scope_exit.hpp>
 
 #include <type_traits>
@@ -296,5 +298,72 @@ void Socket::bind(const std::string& endpoint, int timeout)
             });
     }
 }
+
+
+namespace {
+inline int sendMessagePart(void* socket, int flags, zmq_msg_t* msg)
+{
+    int rc;
+
+    do {
+        rc = zmq_msg_send(msg, socket, flags);
+    } while (rc == -1 && zmq_errno() == EINTR);
+
+    if (BOOST_UNLIKELY(rc == -1)) {
+        // TODO: check for non-blocking mode?
+        //if (zmq_errno() == EAGAIN)
+        //    return 0;
+        throw ERROR(ZMQSocketSendFailed, "could not send message part",
+            log::Arg{"reason"sv, log::ec_t{zmq_errno()}});
+    }
+
+    return rc;
+}
+
+
+inline int recvMessagePart(void* socket, int flags, zmq_msg_t* msg)
+{
+    int rc;
+
+    do {
+        rc = zmq_msg_recv(msg, socket, flags);
+    } while (rc == -1 && zmq_errno() == EINTR);
+
+    if (BOOST_UNLIKELY(rc == -1)) {
+        // TODO: check for non-blocking mode?
+        //if (zmq_errno() == EAGAIN)
+        //    return 0;
+        throw ERROR(ZMQSocketRecvFailed, "could not recv message part",
+            log::Arg{"reason"sv, log::ec_t{zmq_errno()}});
+    }
+
+    return rc;
+}
+} // namespace
+
+
+int Socket::sendMessageMore(Message* part)
+{
+    return sendMessagePart(ptr_, ZMQ_SNDMORE, &part->msg_);
+}
+
+
+int Socket::sendMessageLast(Message* part)
+{
+    return sendMessagePart(ptr_, 0, &part->msg_);
+}
+
+
+int Socket::recvMessageMore(Message* part)
+{
+    return recvMessagePart(ptr_, 0, &part->msg_);
+}
+
+
+int Socket::recvMessageLast(Message* part)
+{
+    return recvMessagePart(ptr_, 0, &part->msg_);
+}
+
 } // namespace zmq
 } // namespace fuurin

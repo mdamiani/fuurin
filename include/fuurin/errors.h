@@ -68,6 +68,10 @@ DECL_ERROR(ZMQSocketOptionSetFailed)
 DECL_ERROR(ZMQSocketOptionGetFailed)
 DECL_ERROR(ZMQSocketConnectFailed)
 DECL_ERROR(ZMQSocketBindFailed)
+DECL_ERROR(ZMQSocketSendFailed)
+DECL_ERROR(ZMQSocketRecvFailed)
+DECL_ERROR(ZMQMessageCreateFailed)
+DECL_ERROR(ZMQMessageMoveFailed)
 
 #undef DECL_ERROR
 
