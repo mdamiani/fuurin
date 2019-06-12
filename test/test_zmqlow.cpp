@@ -442,6 +442,65 @@ static void BM_TransferSinglePartBig(benchmark::State& state)
 BENCHMARK(BM_TransferSinglePartBig);
 
 
+static void BM_TransferMultiPart(benchmark::State& state)
+{
+    const auto [ctx, s1, s2] = transferSetup(ZMQ_PAIR, ZMQ_PAIR);
+    const auto part01 = uint8_t{0u};
+    const auto part02 = uint8_t{255u};
+    const auto part03 = uint16_t{0u};
+    const auto part04 = uint16_t{61689u};
+    const auto part05 = uint16_t{65535u};
+    const auto part06 = uint32_t{0ul};
+    const auto part07 = uint32_t{4278583165ul};
+    const auto part08 = uint32_t{4294967295ul};
+    const auto part09 = uint64_t{0ull};
+    const auto part10 = uint64_t{11460521682733600767ull};
+    const auto part11 = uint64_t{18446744073709551615ull};
+    const auto part12 = std::string();
+    const auto part13 = std::string{"汉字漢字唐字"};
+    const auto part14 = std::string(2048, 'y');
+
+    for (auto _ : state) {
+        Message s01(part01);
+        Message s02(part02);
+        Message s03(part03);
+        Message s04(part04);
+        Message s05(part05);
+        Message s06(part06);
+        Message s07(part07);
+        Message s08(part08);
+        Message s09(part09);
+        Message s10(part10);
+        Message s11(part11);
+        Message s12(part12.data(), part12.size());
+        Message s13(part13.data(), part13.size());
+        Message s14(part14.data(), part14.size());
+        s1->sendMessage(s01, s02, s03, s04, s05, s06, s07,
+            s08, s09, s10, s11, s12, s13, s14);
+
+        Message r01;
+        Message r02;
+        Message r03;
+        Message r04;
+        Message r05;
+        Message r06;
+        Message r07;
+        Message r08;
+        Message r09;
+        Message r10;
+        Message r11;
+        Message r12;
+        Message r13;
+        Message r14;
+        s2->recvMessage(&r01, &r02, &r03, &r04, &r05, &r06, &r07,
+            &r08, &r09, &r10, &r11, &r12, &r13, &r14);
+    }
+
+    transferTeardown(ctx, s1, s2);
+}
+BENCHMARK(BM_TransferMultiPart);
+
+
 BOOST_AUTO_TEST_CASE(bench, *utf::disabled())
 {
     ::benchmark::RunSpecifiedBenchmarks();

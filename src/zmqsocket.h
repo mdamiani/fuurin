@@ -175,8 +175,8 @@ public:
      * The passed \ref Message parts are nullified one by one,
      * during the send call.
      *
-     * \param[in] args More message parts to send.
      * \param[in] part Last message part to send.
+     * \param[in] args More message parts to send.
      *
      * \return Total number of bytes of every part.
      *
@@ -185,20 +185,29 @@ public:
      * \see sendMessageMore(Message *)
      * \see sendMessageLast(Message *)
      */
+    ///{@
     template<typename T, typename... Args>
     std::enable_if_t<std::is_same_v<std::decay_t<T>, Message>, int>
-    sendMessage(Args&&... args, T&& part)
+    sendMessage(T&& part, Args&&... args)
     {
-        return (sendMessageMore(&args) + ... + sendMessageLast(&part));
+        return sendMessageMore(&part) + sendMessage(args...);
     }
+
+    template<typename T>
+    std::enable_if_t<std::is_same_v<std::decay_t<T>, Message>, int>
+    sendMessage(T&& part)
+    {
+        return sendMessageLast(&part);
+    }
+    ///@}
 
     /**
      * \brief Receives a ZMQ multipart message.
      *
      * Passed \ref Message parts are cleared if the are not empty.
      *
-     * \param[out] args More message parts to receive.
      * \param[out] part Last message part to fill with the received data.
+     * \param[out] args More message parts to receive.
      *
      * \return Total number of bytes of every part.
      *
@@ -207,12 +216,18 @@ public:
      * \see recvMessageMore(Message *)
      * \see recvMessageLast(Message *)
      */
+    ///{@
     template<typename... Args>
-    int recvMessage(Args&&... args, Message* part)
+    int recvMessage(Message* part, Args&&... args)
     {
-        return (recvMessageMore(args) + ... + recvMessageLast(part));
+        return recvMessageMore(part) + recvMessage(args...);
     }
 
+    int recvMessage(Message* part)
+    {
+        return recvMessageLast(part);
+    }
+    ///@}
 
 private:
     /**
