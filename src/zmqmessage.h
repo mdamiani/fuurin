@@ -11,8 +11,6 @@
 #ifndef ZMQMESSAGE_H
 #define ZMQMESSAGE_H
 
-#include <zmq.h>
-
 #include <cstddef>
 #include <cstdint>
 
@@ -24,6 +22,9 @@
 #if !defined(FUURIN_ENDIANESS_BIG) && !defined(FUURIN_ENDIANESS_LITTLE)
 #define FUURIN_ENDIANESS_LITTLE
 #endif
+
+
+struct zmq_msg_t;
 
 
 namespace fuurin {
@@ -158,7 +159,20 @@ public:
 
 
 private:
-    zmq_msg_t msg_; ///< ZMQ message
+    /**
+     * \brief This is the backing array to hold a bare \c zmq_msg_t type.
+     *
+     * Size and alignment depends on values found in zmq.h header file.
+     */
+    struct alignas(8) Raw
+    {
+        char msg_[64];
+    } raw_;
+
+    /**
+     * \brief ZMQ message (referencing the \ref raw_ backing storage.
+     */
+    zmq_msg_t& msg_;
 };
 
 } // namespace zmq

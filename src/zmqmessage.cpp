@@ -13,6 +13,7 @@
 #include "failure.h"
 #include "log.h"
 
+#include <zmq.h>
 #include <boost/config.hpp> // for BOOST_LIKELY
 
 #include <cstring>
@@ -73,37 +74,46 @@ namespace zmq {
 
 
 Message::Message()
+    : msg_(*reinterpret_cast<zmq_msg_t*>(raw_.msg_))
 {
+    static_assert(sizeof(Raw) == sizeof(zmq_msg_t));
+    static_assert(alignof(Raw) >= alignof(zmq_msg_t));
+
     const int rc = zmq_msg_init(&msg_);
     ASSERT(rc == 0, "zmq_msg_init failed");
 }
 
 
 Message::Message(uint8_t val)
+    : msg_(*reinterpret_cast<zmq_msg_t*>(raw_.msg_))
 {
     initMessageWithEndian(&msg_, val);
 }
 
 
 Message::Message(uint16_t val)
+    : msg_(*reinterpret_cast<zmq_msg_t*>(raw_.msg_))
 {
     initMessageWithEndian(&msg_, val);
 }
 
 
 Message::Message(uint32_t val)
+    : msg_(*reinterpret_cast<zmq_msg_t*>(raw_.msg_))
 {
     initMessageWithEndian(&msg_, val);
 }
 
 
 Message::Message(uint64_t val)
+    : msg_(*reinterpret_cast<zmq_msg_t*>(raw_.msg_))
 {
     initMessageWithEndian(&msg_, val);
 }
 
 
 Message::Message(const char* data, size_t size)
+    : msg_(*reinterpret_cast<zmq_msg_t*>(raw_.msg_))
 {
     initMessageSize(&msg_, size);
     std::memcpy(zmq_msg_data(&msg_), data, size);
