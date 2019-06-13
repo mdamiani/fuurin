@@ -20,6 +20,18 @@
 #include <algorithm>
 
 
+/**
+ * Define ENDIANESS
+ */
+
+#if defined(FUURIN_ENDIANESS_BIG) && defined(FUURIN_ENDIANESS_LITTLE)
+#error "Please #define either FUURIN_ENDIANESS_BIG or FUURIN_ENDIANESS_LITTLE, not both"
+#endif
+
+#if !defined(FUURIN_ENDIANESS_BIG) && !defined(FUURIN_ENDIANESS_LITTLE)
+#define FUURIN_ENDIANESS_LITTLE
+#endif
+
 #if defined(FUURIN_ENDIANESS_BIG)
 #define ENDIANESS_STRAIGHT __BIG_ENDIAN
 #define ENDIANESS_OPPOSITE __LITTLE_ENDIAN
