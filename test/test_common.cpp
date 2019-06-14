@@ -16,6 +16,7 @@
 #include "fuurin/fuurin.h"
 #include "fuurin/logger.h"
 #include "log.h"
+#include "types.h"
 
 #include <cstdio>
 #include <string>
@@ -84,6 +85,8 @@ BOOST_DATA_TEST_CASE(standardLogContentHandler,
         std::stringstream buf;
         const auto& ro = redirect(std::cout, buf.rdbuf());
         const auto& re = redirect(std::cerr, buf.rdbuf());
+        UNUSED(ro);
+        UNUSED(re);
 
         log::Logger::installContentHandler(new log::StandardHandler);
 
