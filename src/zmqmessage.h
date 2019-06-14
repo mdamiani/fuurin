@@ -13,6 +13,9 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <string>
+#include <string_view>
+#include <ostream>
 
 
 #if defined(FUURIN_ENDIANESS_BIG) && defined(FUURIN_ENDIANESS_LITTLE)
@@ -68,6 +71,8 @@ public:
     explicit Message(uint16_t val);
     explicit Message(uint32_t val);
     explicit Message(uint64_t val);
+    explicit Message(std::string_view val);
+    explicit Message(const std::string& val);
     ///{@
 
     /**
@@ -97,11 +102,27 @@ public:
      * and any previous contents of this message is released.
      *
      * \param other Another message to move data from.
+     * \return A reference to this message.
+     *
+     * \exception ZMQMessageMoveFailed The message could not be moved.
      */
     ///{@
-    void move(Message& other);
-    void move(Message&& other);
+    Message& move(Message& other);
+    Message& move(Message&& other);
     ///@}
+
+    /**
+     * \brief Creates a copy from an \c other message.
+     *
+     * It calls \c zmq_msg_copy, so this messages is cleared
+     * if it contains any contents.
+     *
+     * \param[in] other Another message to copy from.
+     * \return A reference to this message.
+     *
+     * \exception ZMQMessageCopyFailed The message could not be copied.
+     */
+    Message& copy(const Message& other);
 
     /**
      * \brief Checks whether an \c other message is equal to this one.
@@ -174,6 +195,14 @@ private:
      */
     zmq_msg_t& msg_;
 };
+
+
+/**
+ * \brief Outputs a message.
+ * \param[in] msg Message to print.
+ */
+std::ostream& operator<<(std::ostream& os, const Message& msg);
+
 
 } // namespace zmq
 } // namespace fuurin

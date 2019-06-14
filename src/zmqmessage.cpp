@@ -18,6 +18,7 @@
 
 #include <cstring>
 #include <algorithm>
+#include <iomanip>
 
 
 /**
@@ -132,6 +133,18 @@ Message::Message(const char* data, size_t size)
 }
 
 
+Message::Message(std::string_view val)
+    : Message(val.data(), val.size())
+{
+}
+
+
+Message::Message(const std::string& val)
+    : Message(val.data(), val.size())
+{
+}
+
+
 Message::~Message() noexcept
 {
     const int rc = zmq_msg_close(&msg_);
@@ -149,15 +162,27 @@ void moveMsg(zmq_msg_t* dst, zmq_msg_t* src)
 } // namespace
 
 
-void Message::move(Message& other)
+Message& Message::move(Message& other)
 {
     moveMsg(&msg_, &other.msg_);
+    return *this;
 }
 
 
-void Message::move(Message&& other)
+Message& Message::move(Message&& other)
 {
     moveMsg(&msg_, &other.msg_);
+    return *this;
+}
+
+
+Message& Message::copy(const Message& other)
+{
+    const int rc = zmq_msg_copy(&msg_, &other.msg_);
+    if (rc == -1)
+        throw ERROR(ZMQMessageCopyFailed, "could not copy message");
+
+    return *this;
 }
 
 
@@ -266,6 +291,22 @@ uint64_t Message::toUint64() const noexcept
         (static_cast<uint64_t>(d[6]) << 8) |
         (static_cast<uint64_t>(d[7]));
 #endif
+}
+
+
+std::ostream& operator<<(std::ostream& os, const Message& msg)
+{
+    const std::ios_base::fmtflags f(os.flags());
+
+    for (size_t i = 0; i < msg.size(); ++i) {
+        os << std::hex << std::uppercase
+           << std::setfill('0') << std::setw(2)
+           << int(msg.data()[i]);
+    }
+
+    os.flags(f);
+
+    return os;
 }
 
 

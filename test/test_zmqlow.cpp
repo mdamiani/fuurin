@@ -23,9 +23,10 @@
 #include <tuple>
 #include <memory>
 #include <type_traits>
+#include <sstream>
 
 
-using namespace std::string_literals;
+using namespace std::literals;
 
 using namespace fuurin::zmq;
 namespace utf = boost::unit_test;
@@ -97,6 +98,16 @@ BOOST_AUTO_TEST_CASE(messageEndianessArray)
     BOOST_TEST(std::memcmp(m.data(), &val[0], sizeof(networkDataBuf)) == 0);
 
     testMessageIntValue(&m, 0, 0, 0, 0);
+}
+
+
+BOOST_AUTO_TEST_CASE(messageOstream)
+{
+    Message m{"ijk"sv};
+    std::ostringstream os;
+    os << m;
+
+    BOOST_TEST(os.str() == "696A6B");
 }
 
 
@@ -279,46 +290,48 @@ BOOST_DATA_TEST_CASE(transferSinglePart,
 }
 
 
-//BOOST_AUTO_TEST_CASE(transferMultiPart)
-//{
-//    const auto [ctx, s1, s2] = transferSetup(ZMQ_PAIR, ZMQ_PAIR);
-//
-//    uint8_t send_p1{255u};
-//    uint16_t send_p2{65535u};
-//    uint32_t send_p3{4294967295ul};
-//    uint64_t send_p4{18446744073709551615ull};
-//    ByteArray send_p5{'a', 'b', 'c'};
-//    ByteArray send_p6;
-//
-//    const int sz = sizeof(send_p1) + sizeof(send_p2) + sizeof(send_p3) + sizeof(send_p4) +
-//        send_p5.size() + send_p6.size();
-//
-//    const int rc1 =
-//        zmq::sendMultipartMessage(s1, 0, send_p1, send_p2, send_p3, send_p4, send_p5, send_p6);
-//
-//    BOOST_TEST(rc1 == sz);
-//
-//    uint8_t recv_p1;
-//    uint16_t recv_p2;
-//    uint32_t recv_p3;
-//    uint64_t recv_p4;
-//    ByteArray recv_p5;
-//    ByteArray recv_p6;
-//
-//    const int rc2 = zmq::recvMultipartMessage(
-//        s2, 0, &recv_p1, &recv_p2, &recv_p3, &recv_p4, &recv_p5, &recv_p6);
-//
-//    BOOST_TEST(rc2 == sz);
-//
-//    BOOST_TEST(send_p1 == recv_p1);
-//    BOOST_TEST(send_p2 == recv_p2);
-//    BOOST_TEST(send_p3 == recv_p3);
-//    BOOST_TEST(send_p4 == recv_p4);
-//    BOOST_TEST(send_p5 == recv_p5);
-//    BOOST_TEST(send_p6 == recv_p6);
-//
-//    transferTeardown(ctx, s1, s2);
-//}
+BOOST_AUTO_TEST_CASE(transferMultiPart)
+{
+    const auto [ctx, s1, s2] = transferSetup(ZMQ_PAIR, ZMQ_PAIR);
+
+    const auto v1 = uint8_t(255u);
+    const auto v2 = uint16_t(65535u);
+    const auto v3 = uint32_t(4294967295ul);
+    const auto v4 = uint64_t(18446744073709551615ull);
+    const auto v5 = "ijk"sv;
+    const auto v7 = "last"sv;
+
+    Message p1{v1}, p2{v2}, p3{v3}, p4{v4}, p5{v5}, p6{}, p7{v7};
+    const int sz = p1.size() + p2.size() + p3.size() + p4.size() + p5.size() + p6.size() + p7.size();
+    const int np = s1->sendMessage(p1, p2, p3, p4, p5, p6, Message().copy(p7));
+
+    BOOST_TEST(np == sz);
+
+    BOOST_TEST(p1.empty());
+    BOOST_TEST(p2.empty());
+    BOOST_TEST(p3.empty());
+    BOOST_TEST(p4.empty());
+    BOOST_TEST(p5.empty());
+    BOOST_TEST(p6.empty());
+    BOOST_TEST(!p7.empty());
+
+    Message r1, r2, r3, r4, r5, r6, r7;
+    const int nr = s2->recvMessage(&r1, &r2, &r3, &r4, &r5, &r6, &r7);
+
+    BOOST_TEST(nr == sz);
+
+    Message t1{v1}, t2{v2}, t3{v3}, t4{v4}, t5{v5}, t6{}, t7{v7};
+
+    BOOST_TEST(t1 == r1);
+    BOOST_TEST(t2 == r2);
+    BOOST_TEST(t3 == r3);
+    BOOST_TEST(t4 == r4);
+    BOOST_TEST(t5 == r5);
+    BOOST_TEST(t6 == r6);
+    BOOST_TEST(t7 == r7);
+
+    transferTeardown(ctx, s1, s2);
+}
 
 
 //void testWaitForEvents(void* socket, short event, int timeout, bool expected)
@@ -445,55 +458,30 @@ BENCHMARK(BM_TransferSinglePartBig);
 static void BM_TransferMultiPart(benchmark::State& state)
 {
     const auto [ctx, s1, s2] = transferSetup(ZMQ_PAIR, ZMQ_PAIR);
-    const auto part01 = uint8_t{0u};
-    const auto part02 = uint8_t{255u};
-    const auto part03 = uint16_t{0u};
-    const auto part04 = uint16_t{61689u};
-    const auto part05 = uint16_t{65535u};
-    const auto part06 = uint32_t{0ul};
-    const auto part07 = uint32_t{4278583165ul};
-    const auto part08 = uint32_t{4294967295ul};
-    const auto part09 = uint64_t{0ull};
-    const auto part10 = uint64_t{11460521682733600767ull};
-    const auto part11 = uint64_t{18446744073709551615ull};
-    const auto part12 = std::string();
-    const auto part13 = std::string{"汉字漢字唐字"};
-    const auto part14 = std::string(2048, 'y');
+
+    const auto v1 = uint8_t{0u};
+    const auto v2 = uint8_t{255u};
+    const auto v3 = uint16_t{0u};
+    const auto v4 = uint16_t{61689u};
+    const auto v5 = uint16_t{65535u};
+    const auto v6 = uint32_t{0ul};
+    const auto v7 = uint32_t{4278583165ul};
+    const auto v8 = uint32_t{4294967295ul};
+    const auto v9 = uint64_t{0ull};
+    const auto v10 = uint64_t{11460521682733600767ull};
+    const auto v11 = uint64_t{18446744073709551615ull};
+    const auto v12 = std::string();
+    const auto v13 = std::string{"汉字漢字唐字"};
+    const auto v14 = std::string(2048, 'y');
 
     for (auto _ : state) {
-        Message s01(part01);
-        Message s02(part02);
-        Message s03(part03);
-        Message s04(part04);
-        Message s05(part05);
-        Message s06(part06);
-        Message s07(part07);
-        Message s08(part08);
-        Message s09(part09);
-        Message s10(part10);
-        Message s11(part11);
-        Message s12(part12.data(), part12.size());
-        Message s13(part13.data(), part13.size());
-        Message s14(part14.data(), part14.size());
-        s1->sendMessage(s01, s02, s03, s04, s05, s06, s07,
-            s08, s09, s10, s11, s12, s13, s14);
+        Message p1(v1), p2(v2), p3(v3), p4(v4), p5(v5), p6(v6), p7(v7), p8(v8), p9(v9),
+            p10(v10), p11(v11), p12(v12), p13(v13), p14(v14);
+        s1->sendMessage(p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14);
 
-        Message r01;
-        Message r02;
-        Message r03;
-        Message r04;
-        Message r05;
-        Message r06;
-        Message r07;
-        Message r08;
-        Message r09;
-        Message r10;
-        Message r11;
-        Message r12;
-        Message r13;
-        Message r14;
-        s2->recvMessage(&r01, &r02, &r03, &r04, &r05, &r06, &r07,
-            &r08, &r09, &r10, &r11, &r12, &r13, &r14);
+        Message r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14;
+        s2->recvMessage(&r1, &r2, &r3, &r4, &r5, &r6, &r7,
+            &r8, &r9, &r10, &r11, &r12, &r13, &r14);
     }
 
     transferTeardown(ctx, s1, s2);
