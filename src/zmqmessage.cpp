@@ -89,6 +89,7 @@ namespace zmq {
 Message::Message()
     : msg_(*reinterpret_cast<zmq_msg_t*>(raw_.msg_))
 {
+    // assert raw backing array
     static_assert(sizeof(Raw) == sizeof(zmq_msg_t));
     static_assert(alignof(Raw) >= alignof(zmq_msg_t));
 

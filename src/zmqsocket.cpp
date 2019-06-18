@@ -200,7 +200,7 @@ void Socket::bind()
 
 void Socket::open(std::function<void(std::string)> action)
 {
-    if (ptr_ != nullptr) {
+    if (isOpen()) {
         throw ERROR(ZMQSocketCreateFailed, "could not open socket",
             log::Arg{"reason"sv, "already open"sv});
     }
@@ -238,7 +238,7 @@ void Socket::open(std::function<void(std::string)> action)
 
 void Socket::close() noexcept
 {
-    if (ptr_ == nullptr)
+    if (!isOpen())
         return;
 
     try {
@@ -250,6 +250,12 @@ void Socket::close() noexcept
     } catch (...) {
         ASSERT(false, "zmq_close threw exception");
     }
+}
+
+
+bool Socket::isOpen() const noexcept
+{
+    return ptr_ != nullptr;
 }
 
 

@@ -20,6 +20,7 @@ add_definitions(
     -Wall
     -Wextra
     -DBOOST_SCOPE_EXIT_CONFIG_USE_LAMBDAS
+    -DZMQ_BUILD_DRAFT_API
 )
 
 include(BuildType)
@@ -35,12 +36,13 @@ ExternalProject_Add(zeromq
     INSTALL_DIR "${3RDPARTY_DIR}"
 
     CMAKE_ARGS
-        -D CMAKE_INSTALL_PREFIX=<INSTALL_DIR>
-        -D BUILD_TESTS=OFF
-        -D ENABLE_CPACK=OFF
-        -D BUILD_SHARED=OFF
-        -D BUILD_STATIC=ON
-        -D CMAKE_BUILD_TYPE=Release
+        -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
+        -DBUILD_TESTS=OFF
+        -DENABLE_CPACK=OFF
+        -DBUILD_SHARED=OFF
+        -DBUILD_STATIC=ON
+        -DENABLE_DRAFTS=ON
+        -DCMAKE_BUILD_TYPE=Release
 )
 
 set(LIB_SOURCES
@@ -50,6 +52,7 @@ set(LIB_SOURCES
     src/zmqlow.cpp
     src/zmqcontext.cpp
     src/zmqsocket.cpp
+    src/zmqpoller.cpp
     src/zmqmessage.cpp
     src/failure.cpp
     src/log.cpp

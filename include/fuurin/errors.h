@@ -73,6 +73,8 @@ DECL_ERROR(ZMQSocketRecvFailed)
 DECL_ERROR(ZMQMessageCreateFailed)
 DECL_ERROR(ZMQMessageMoveFailed)
 DECL_ERROR(ZMQMessageCopyFailed)
+DECL_ERROR(ZMQPollerCreateFailed)
+DECL_ERROR(ZMQPollerWaitFailed)
 
 #undef DECL_ERROR
 

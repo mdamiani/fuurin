@@ -24,6 +24,10 @@ namespace zmq {
 class Context;
 class Message;
 
+namespace internal {
+class PollerImpl;
+}
+
 
 /**
  * \brief This class wraps a ZMQ socket.
@@ -31,6 +35,11 @@ class Message;
  */
 class Socket final
 {
+    template<typename...>
+    friend class Poller;
+
+    friend class internal::PollerImpl;
+
 public:
     /**
      * \brief Initializes this socket with default values.
@@ -137,6 +146,7 @@ public:
      * \see open()
      * \see close()
      * \see setOption()
+     * \see isOpen()
      */
     ///{@
     void connect();
@@ -155,6 +165,14 @@ public:
      * \see ~Socket
      */
     void close() noexcept;
+
+    /**
+     * \return Whether this socket is connected or bound.
+     * \see connect()
+     * \see bind()
+     * \see close()
+     */
+    bool isOpen() const noexcept;
 
     /**
      * \return The list of connected or bound endpoints.
@@ -228,6 +246,7 @@ public:
         return recvMessageLast(part);
     }
     ///@}
+
 
 private:
     /**

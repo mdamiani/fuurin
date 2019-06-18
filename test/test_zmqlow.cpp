@@ -15,8 +15,9 @@
 #include <benchmark/benchmark.h>
 
 #include "../src/zmqcontext.h"
-#include "../src/zmqsocket.h"
 #include "../src/zmqmessage.h"
+#include "../src/zmqsocket.h"
+#include "../src/zmqpoller.h"
 #include "../src/zmqlow.h"
 
 #include <string>
@@ -214,6 +215,9 @@ transferSetup(int type1, int type2)
     s1->connect();
     s2->bind(); // TODO: pass timeout 10000
 
+    BOOST_TEST(s1->isOpen());
+    BOOST_TEST(s2->isOpen());
+
     return std::make_tuple(ctx, s1, s2);
 }
 
@@ -221,6 +225,10 @@ void transferTeardown(std::shared_ptr<Context> ctx, std::shared_ptr<Socket> s1, 
 {
     s1->close();
     s2->close();
+
+    BOOST_TEST(!s1->isOpen());
+    BOOST_TEST(!s2->isOpen());
+
     UNUSED(ctx);
 }
 
@@ -334,45 +342,115 @@ BOOST_AUTO_TEST_CASE(transferMultiPart)
 }
 
 
-//void testWaitForEvents(void* socket, short event, int timeout, bool expected)
-//{
-//    zmq_pollitem_t items[] = {
-//        {socket, 0, event, 0},
-//    };
-//
-//    BOOST_TEST(zmq::pollSocket(items, 1, timeout) == true);
-//    BOOST_TEST(!!(items[0].revents & event) == !!expected);
-//}
-//
-//
-//BOOST_DATA_TEST_CASE(waitForEvents,
-//    bdata::make({
-//        std::make_tuple('w', ZMQ_POLLOUT, 250, true),
-//        std::make_tuple('w', ZMQ_POLLIN, 250, false),
-//        std::make_tuple('r', ZMQ_POLLOUT, 250, true),
-//        std::make_tuple('r', ZMQ_POLLIN, 2500, true),
-//    }),
-//    type, event, timeout, expected)
-//{
-//    const auto [ctx, s1, s2] = transferSetup(ZMQ_PAIR, ZMQ_PAIR);
-//    uint32_t data = 0;
-//
-//    if (type == 'w')
-//        testWaitForEvents(s1, event, timeout, expected);
-//
-//    const int rc1 = zmq::sendMultipartMessage(s1, 0, data);
-//    BOOST_TEST(rc1 != -1);
-//
-//    if (type == 'r')
-//        testWaitForEvents(s2, event, timeout, expected);
-//
-//    const int rc2 = zmq::recvMultipartMessage(s2, 0, &data);
-//    BOOST_TEST(rc2 != -1);
-//
-//    transferTeardown(ctx, s1, s2);
-//}
-//
-//
+void testWaitForEvents(Socket* socket, PollerEvents::Type type, int timeout, bool expected)
+{
+    Poller poll(type, socket);
+    poll.setTimeout(timeout);
+
+    const auto events = poll.wait();
+
+    BOOST_TEST(poll.type() == type);
+    BOOST_TEST(events.type() == type);
+    BOOST_TEST(events.size() == size_t(!!expected));
+    BOOST_TEST(events.empty() == !expected);
+
+    if (!events.empty())
+        BOOST_TEST(events[0] == socket);
+
+    size_t i = 0;
+    for (auto it : events) {
+        ++i;
+        BOOST_TEST(it == socket);
+    }
+    BOOST_TEST(i == events.size());
+}
+
+
+BOOST_DATA_TEST_CASE(waitForEventOne,
+    bdata::make({
+        std::make_tuple('w', PollerEvents::Type::Write, 250, true),
+        std::make_tuple('w', PollerEvents::Type::Read, 250, false),
+        std::make_tuple('r', PollerEvents::Type::Write, 250, true),
+        std::make_tuple('r', PollerEvents::Type::Read, 2500, true),
+    }),
+    type, event, timeout, expected)
+{
+    const auto [ctx, s1, s2] = transferSetup(ZMQ_PAIR, ZMQ_PAIR);
+    Message data(uint32_t(0));
+
+    if (type == 'w')
+        testWaitForEvents(s1.get(), event, timeout, expected);
+
+    const int ns = s1->sendMessage(data);
+    BOOST_TEST(ns == int(sizeof(uint32_t)));
+
+    if (type == 'r')
+        testWaitForEvents(s2.get(), event, timeout, expected);
+
+    const int nr = s2->recvMessage(&data);
+    BOOST_TEST(nr == int(sizeof(uint32_t)));
+
+    transferTeardown(ctx, s1, s2);
+}
+
+
+BOOST_AUTO_TEST_CASE(waitForEventMore)
+{
+    auto ctx = std::make_shared<Context>();
+    auto s1 = std::make_shared<Socket>(ctx.get(), ZMQ_PAIR);
+    auto s2 = std::make_shared<Socket>(ctx.get(), ZMQ_PAIR);
+    auto s3 = std::make_shared<Socket>(ctx.get(), ZMQ_PAIR);
+    auto s4 = std::make_shared<Socket>(ctx.get(), ZMQ_PAIR);
+
+    s1->setEndpoints({"inproc://transfer1"});
+    s2->setEndpoints({"inproc://transfer1"});
+    s3->setEndpoints({"inproc://transfer2"});
+    s4->setEndpoints({"inproc://transfer2"});
+
+    s1->connect();
+    s3->connect();
+    s2->bind();
+    s4->bind();
+
+    BOOST_TEST(s1->isOpen());
+    BOOST_TEST(s2->isOpen());
+    BOOST_TEST(s3->isOpen());
+    BOOST_TEST(s4->isOpen());
+
+    s1->sendMessage(Message(uint8_t(1)));
+    s3->sendMessage(Message(uint8_t(2)));
+
+    Poller poll(PollerEvents::Type::Read, s2.get(), s4.get());
+    poll.setTimeout(2500);
+
+    const auto events = poll.wait();
+
+    BOOST_TEST(poll.type() == PollerEvents::Type::Read);
+    BOOST_TEST(events.type() == PollerEvents::Type::Read);
+    BOOST_TEST(events.size() == size_t(2));
+
+    BOOST_TEST(((events[0] == s2.get() && events[1] == s4.get()) ||
+        (events[0] == s4.get() && events[1] == s2.get())));
+
+    size_t i = 0;
+    for (auto it : events) {
+        BOOST_TEST(it == events[i]);
+        ++i;
+    }
+    BOOST_TEST(i == events.size());
+
+    s1->close();
+    s2->close();
+    s3->close();
+    s4->close();
+
+    BOOST_TEST(!s1->isOpen());
+    BOOST_TEST(!s2->isOpen());
+    BOOST_TEST(!s3->isOpen());
+    BOOST_TEST(!s4->isOpen());
+}
+
+
 //BOOST_DATA_TEST_CASE(publishMessage,
 //    bdata::make({
 //        std::make_tuple("filt1"s, "filt1"s, 100, 50, true),

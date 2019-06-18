@@ -182,10 +182,9 @@ public:
 private:
     /**
      * \brief This is the backing array to hold a bare \c zmq_msg_t type.
-     *
      * Size and alignment depends on values found in zmq.h header file.
      */
-    struct alignas(8) Raw
+    struct alignas(void*) Raw
     {
         char msg_[64];
     } raw_;
