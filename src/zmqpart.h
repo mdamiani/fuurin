@@ -8,8 +8,8 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-#ifndef ZMQMESSAGE_H
-#define ZMQMESSAGE_H
+#ifndef ZMQPART_H
+#define ZMQPART_H
 
 #include <cstddef>
 #include <cstdint>
@@ -35,24 +35,24 @@ namespace zmq {
 
 
 /**
- * \brief This class stores a ZMQ message to be sent or received.
+ * \brief This class stores a ZMQ message part to be sent or received.
  *
  * Memory for storage is allocated following the same behaviour
  * of \c zmq_msg_init* functions.
  *
  * Data is stored with the proper sending/receiving endianess.
  */
-class Message final
+class Part final
 {
     friend class Socket;
 
 public:
     /**
-     * \brief Initializes an empty message.
+     * \brief Initializes an empty part.
      *
      * This method calls \c zmq_msg_init.
      */
-    explicit Message();
+    explicit Part();
 
     /**
      * \brief Inizializes with an integer value.
@@ -62,76 +62,76 @@ public:
      *
      * This method calls \c zmq_msg_init_size.
      *
-     * \param[in] val Value to be stored in the message.
+     * \param[in] val Value to be stored in the part.
      *
-     * \exception ZMQMessageCreateFailed The message could not be created.
+     * \exception ZMQPartCreateFailed The part could not be created.
      */
     ///{@
-    explicit Message(uint8_t val);
-    explicit Message(uint16_t val);
-    explicit Message(uint32_t val);
-    explicit Message(uint64_t val);
-    explicit Message(std::string_view val);
-    explicit Message(const std::string& val);
+    explicit Part(uint8_t val);
+    explicit Part(uint16_t val);
+    explicit Part(uint32_t val);
+    explicit Part(uint64_t val);
+    explicit Part(std::string_view val);
+    explicit Part(const std::string& val);
     ///{@
 
     /**
      * \brief Initializes with raw data.
      *
-     * The message data is copied as is, without any
+     * Data is copied as is, without any
      * endianess convertion.
      *
      * This method calls \c zmq_msg_init_size.
      *
-     * \param[in] data Data to be stored in this message.
+     * \param[in] data Data to be stored in this part.
      * \param[in] size Size of the data.
      */
-    explicit Message(const char* data, size_t size);
+    explicit Part(const char* data, size_t size);
 
     /**
-     * \brief Releases resources for this message.
+     * \brief Releases resources for this part.
      *
      * This method calls \c zmq_msg_close.
      */
-    ~Message() noexcept;
+    ~Part() noexcept;
 
     /**
-     * \brief Moves an \c other message contents to this message.
+     * \brief Moves an \c other part contents to this part.
      *
-     * It calls \c zmq_msg_move so the \c other message is cleared
-     * and any previous contents of this message is released.
+     * It calls \c zmq_msg_move so the \c other part is cleared
+     * and any previous contents of this part is released.
      *
-     * \param other Another message to move data from.
-     * \return A reference to this message.
+     * \param other Another part to move data from.
+     * \return A reference to this part.
      *
-     * \exception ZMQMessageMoveFailed The message could not be moved.
+     * \exception ZMQPartMoveFailed The part could not be moved.
      */
     ///{@
-    Message& move(Message& other);
-    Message& move(Message&& other);
+    Part& move(Part& other);
+    Part& move(Part&& other);
     ///@}
 
     /**
-     * \brief Creates a copy from an \c other message.
+     * \brief Creates a copy from an \c other part.
      *
      * It calls \c zmq_msg_copy, so this messages is cleared
      * if it contains any contents.
      *
-     * \param[in] other Another message to copy from.
-     * \return A reference to this message.
+     * \param[in] other Another part to copy from.
+     * \return A reference to this part.
      *
-     * \exception ZMQMessageCopyFailed The message could not be copied.
+     * \exception ZMQPartCopyFailed The part could not be copied.
      */
-    Message& copy(const Message& other);
+    Part& copy(const Part& other);
 
     /**
-     * \brief Checks whether an \c other message is equal to this one.
-     * \param[in] other Another message to compare.
+     * \brief Checks whether an \c other part is equal to this one.
+     * \param[in] other Another part to compare.
      * \return Whether messages are equal.
      */
     ///{@
-    bool operator==(const Message& other) const noexcept;
-    bool operator!=(const Message& other) const noexcept;
+    bool operator==(const Part& other) const noexcept;
+    bool operator!=(const Part& other) const noexcept;
     ///@}
 
     /**
@@ -174,8 +174,8 @@ public:
      * Disable copy.
      */
     ///{@
-    Message(const Message&) = delete;
-    Message& operator=(const Message&) = delete;
+    Part(const Part&) = delete;
+    Part& operator=(const Part&) = delete;
     ///@}
 
 
@@ -190,20 +190,20 @@ private:
     } raw_;
 
     /**
-     * \brief ZMQ message (referencing the \ref raw_ backing storage.
+     * \brief ZMQ part (referencing the \ref raw_ backing storage.
      */
     zmq_msg_t& msg_;
 };
 
 
 /**
- * \brief Outputs a message.
- * \param[in] msg Message to print.
+ * \brief Outputs a part.
+ * \param[in] msg Part to print.
  */
-std::ostream& operator<<(std::ostream& os, const Message& msg);
+std::ostream& operator<<(std::ostream& os, const Part& msg);
 
 
 } // namespace zmq
 } // namespace fuurin
 
-#endif // ZMQMESSAGE_H
+#endif // ZMQPART_H

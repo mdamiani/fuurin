@@ -8,7 +8,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-#include "zmqmessage.h"
+#include "zmqpart.h"
 #include "fuurin/errors.h"
 #include "failure.h"
 #include "log.h"
@@ -64,7 +64,7 @@ void initMessageSize(zmq_msg_t* msg, size_t size)
     const int rc = zmq_msg_init_size(msg, size);
 
     if (BOOST_UNLIKELY(rc == -1)) {
-        throw ERROR(ZMQMessageCreateFailed, "could not create message",
+        throw ERROR(ZMQPartCreateFailed, "could not create message part",
             log::Arg{
                 log::Arg{"reason"sv, log::ec_t{zmq_errno()}},
                 log::Arg{"size"sv, int(size)},
@@ -86,7 +86,7 @@ namespace fuurin {
 namespace zmq {
 
 
-Message::Message()
+Part::Part()
     : msg_(*reinterpret_cast<zmq_msg_t*>(raw_.msg_))
 {
     // assert raw backing array
@@ -98,35 +98,35 @@ Message::Message()
 }
 
 
-Message::Message(uint8_t val)
+Part::Part(uint8_t val)
     : msg_(*reinterpret_cast<zmq_msg_t*>(raw_.msg_))
 {
     initMessageWithEndian(&msg_, val);
 }
 
 
-Message::Message(uint16_t val)
+Part::Part(uint16_t val)
     : msg_(*reinterpret_cast<zmq_msg_t*>(raw_.msg_))
 {
     initMessageWithEndian(&msg_, val);
 }
 
 
-Message::Message(uint32_t val)
+Part::Part(uint32_t val)
     : msg_(*reinterpret_cast<zmq_msg_t*>(raw_.msg_))
 {
     initMessageWithEndian(&msg_, val);
 }
 
 
-Message::Message(uint64_t val)
+Part::Part(uint64_t val)
     : msg_(*reinterpret_cast<zmq_msg_t*>(raw_.msg_))
 {
     initMessageWithEndian(&msg_, val);
 }
 
 
-Message::Message(const char* data, size_t size)
+Part::Part(const char* data, size_t size)
     : msg_(*reinterpret_cast<zmq_msg_t*>(raw_.msg_))
 {
     initMessageSize(&msg_, size);
@@ -134,19 +134,19 @@ Message::Message(const char* data, size_t size)
 }
 
 
-Message::Message(std::string_view val)
-    : Message(val.data(), val.size())
+Part::Part(std::string_view val)
+    : Part(val.data(), val.size())
 {
 }
 
 
-Message::Message(const std::string& val)
-    : Message(val.data(), val.size())
+Part::Part(const std::string& val)
+    : Part(val.data(), val.size())
 {
 }
 
 
-Message::~Message() noexcept
+Part::~Part() noexcept
 {
     const int rc = zmq_msg_close(&msg_);
     ASSERT(rc == 0, "zmq_msg_close failed");
@@ -158,67 +158,67 @@ void moveMsg(zmq_msg_t* dst, zmq_msg_t* src)
 {
     const int rc = zmq_msg_move(dst, src);
     if (rc == -1)
-        throw ERROR(ZMQMessageMoveFailed, "could not move message");
+        throw ERROR(ZMQPartMoveFailed, "could not move message part");
 }
 } // namespace
 
 
-Message& Message::move(Message& other)
+Part& Part::move(Part& other)
 {
     moveMsg(&msg_, &other.msg_);
     return *this;
 }
 
 
-Message& Message::move(Message&& other)
+Part& Part::move(Part&& other)
 {
     moveMsg(&msg_, &other.msg_);
     return *this;
 }
 
 
-Message& Message::copy(const Message& other)
+Part& Part::copy(const Part& other)
 {
     const int rc = zmq_msg_copy(&msg_, &other.msg_);
     if (rc == -1)
-        throw ERROR(ZMQMessageCopyFailed, "could not copy message");
+        throw ERROR(ZMQPartCopyFailed, "could not copy message part");
 
     return *this;
 }
 
 
-bool Message::operator==(const Message& other) const noexcept
+bool Part::operator==(const Part& other) const noexcept
 {
     const size_t sz = size();
     return sz == other.size() && std::memcmp(data(), other.data(), sz) == 0;
 }
 
 
-bool Message::operator!=(const Message& other) const noexcept
+bool Part::operator!=(const Part& other) const noexcept
 {
     return !(*this == other);
 }
 
 
-const char* Message::data() const noexcept
+const char* Part::data() const noexcept
 {
     return static_cast<const char*>(zmq_msg_data(const_cast<zmq_msg_t*>(&msg_)));
 }
 
 
-size_t Message::size() const noexcept
+size_t Part::size() const noexcept
 {
     return zmq_msg_size(const_cast<zmq_msg_t*>(&msg_));
 }
 
 
-bool Message::empty() const noexcept
+bool Part::empty() const noexcept
 {
     return size() == 0u;
 }
 
 
-uint8_t Message::toUint8() const noexcept
+uint8_t Part::toUint8() const noexcept
 {
     if (size() != 1)
         return 0;
@@ -228,7 +228,7 @@ uint8_t Message::toUint8() const noexcept
 }
 
 
-uint16_t Message::toUint16() const noexcept
+uint16_t Part::toUint16() const noexcept
 {
     if (size() != 2)
         return 0;
@@ -245,7 +245,7 @@ uint16_t Message::toUint16() const noexcept
 }
 
 
-uint32_t Message::toUint32() const noexcept
+uint32_t Part::toUint32() const noexcept
 {
     if (size() != 4)
         return 0;
@@ -266,7 +266,7 @@ uint32_t Message::toUint32() const noexcept
 }
 
 
-uint64_t Message::toUint64() const noexcept
+uint64_t Part::toUint64() const noexcept
 {
     if (size() != 8)
         return 0;
@@ -295,7 +295,7 @@ uint64_t Message::toUint64() const noexcept
 }
 
 
-std::ostream& operator<<(std::ostream& os, const Message& msg)
+std::ostream& operator<<(std::ostream& os, const Part& msg)
 {
     const std::ios_base::fmtflags f(os.flags());
 

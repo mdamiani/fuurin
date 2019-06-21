@@ -1,6 +1,6 @@
 #include "zmqsocket.h"
 #include "zmqcontext.h"
-#include "zmqmessage.h"
+#include "zmqpart.h"
 #include "failure.h"
 #include "log.h"
 #include "fuurin/errors.h"
@@ -348,25 +348,25 @@ inline int recvMessagePart(void* socket, int flags, zmq_msg_t* msg)
 } // namespace
 
 
-int Socket::sendMessageMore(Message* part)
+int Socket::sendMessageMore(Part* part)
 {
     return sendMessagePart(ptr_, ZMQ_SNDMORE, &part->msg_);
 }
 
 
-int Socket::sendMessageLast(Message* part)
+int Socket::sendMessageLast(Part* part)
 {
     return sendMessagePart(ptr_, 0, &part->msg_);
 }
 
 
-int Socket::recvMessageMore(Message* part)
+int Socket::recvMessageMore(Part* part)
 {
     return recvMessagePart(ptr_, 0, &part->msg_);
 }
 
 
-int Socket::recvMessageLast(Message* part)
+int Socket::recvMessageLast(Part* part)
 {
     return recvMessagePart(ptr_, 0, &part->msg_);
 }

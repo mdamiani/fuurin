@@ -22,7 +22,7 @@ namespace zmq {
 
 
 class Context;
-class Message;
+class Part;
 
 namespace internal {
 class PollerImpl;
@@ -190,7 +190,7 @@ public:
     /**
      * \brief Sends a ZMQ multipart message.
      *
-     * The passed \ref Message parts are nullified one by one,
+     * Every passed message \ref Part is nullified one by one,
      * during the send call.
      *
      * \param[in] part Last message part to send.
@@ -200,19 +200,19 @@ public:
      *
      * \exception ZMQSocketSendFailed A part could not be sent.
      *
-     * \see sendMessageMore(Message *)
-     * \see sendMessageLast(Message *)
+     * \see sendMessageMore(Part *)
+     * \see sendMessageLast(Part *)
      */
     ///{@
     template<typename T, typename... Args>
-    std::enable_if_t<std::is_same_v<std::decay_t<T>, Message>, int>
+    std::enable_if_t<std::is_same_v<std::decay_t<T>, Part>, int>
     sendMessage(T&& part, Args&&... args)
     {
         return sendMessageMore(&part) + sendMessage(args...);
     }
 
     template<typename T>
-    std::enable_if_t<std::is_same_v<std::decay_t<T>, Message>, int>
+    std::enable_if_t<std::is_same_v<std::decay_t<T>, Part>, int>
     sendMessage(T&& part)
     {
         return sendMessageLast(&part);
@@ -222,7 +222,7 @@ public:
     /**
      * \brief Receives a ZMQ multipart message.
      *
-     * Passed \ref Message parts are cleared if the are not empty.
+     * Every passed message \ref Part is cleared if the are not empty.
      *
      * \param[out] part Last message part to fill with the received data.
      * \param[out] args More message parts to receive.
@@ -231,17 +231,17 @@ public:
      *
      * \exception ZMQSocketRecvFailed A part could not be received.
      *
-     * \see recvMessageMore(Message *)
-     * \see recvMessageLast(Message *)
+     * \see recvMessageMore(Part *)
+     * \see recvMessageLast(Part *)
      */
     ///{@
     template<typename... Args>
-    int recvMessage(Message* part, Args&&... args)
+    int recvMessage(Part* part, Args&&... args)
     {
         return recvMessageMore(part) + recvMessage(args...);
     }
 
-    int recvMessage(Message* part)
+    int recvMessage(Part* part)
     {
         return recvMessageLast(part);
     }
@@ -328,8 +328,8 @@ private:
      * \exception ZMQSocketSendFailed The part could not be sent.
      */
     ///{@
-    int sendMessageMore(Message* part);
-    int sendMessageLast(Message* part);
+    int sendMessageMore(Part* part);
+    int sendMessageLast(Part* part);
     ///@}
 
     /**
@@ -346,8 +346,8 @@ private:
      * \exception ZMQSocketRecvFailed The part could not be received.
      */
     ///{@
-    int recvMessageMore(Message* part);
-    int recvMessageLast(Message* part);
+    int recvMessageMore(Part* part);
+    int recvMessageLast(Part* part);
     ///@}
 
 

@@ -53,7 +53,7 @@ set(LIB_SOURCES
     src/zmqcontext.cpp
     src/zmqsocket.cpp
     src/zmqpoller.cpp
-    src/zmqmessage.cpp
+    src/zmqpart.cpp
     src/failure.cpp
     src/log.cpp
     src/arg.cpp

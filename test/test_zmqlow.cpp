@@ -15,7 +15,7 @@
 #include <benchmark/benchmark.h>
 
 #include "../src/zmqcontext.h"
-#include "../src/zmqmessage.h"
+#include "../src/zmqpart.h"
 #include "../src/zmqsocket.h"
 #include "../src/zmqpoller.h"
 #include "../src/zmqlow.h"
@@ -34,7 +34,7 @@ namespace utf = boost::unit_test;
 namespace bdata = utf::data;
 
 
-void testMessageIntValue(const Message* m, uint8_t v1, uint16_t v2, uint32_t v4, uint64_t v8)
+void testMessageIntValue(const Part* m, uint8_t v1, uint16_t v2, uint32_t v4, uint64_t v8)
 {
     BOOST_TEST(m->toUint8() == v1);
     BOOST_TEST(m->toUint16() == v2);
@@ -49,14 +49,14 @@ static const uint8_t networkDataBuf[] = {
 typedef boost::mpl::list<uint8_t, uint16_t, uint32_t, uint64_t> messageIntTypes;
 
 
-BOOST_AUTO_TEST_CASE_TEMPLATE(messageEndianessInt, T, messageIntTypes)
+BOOST_AUTO_TEST_CASE_TEMPLATE(partEndianessInt, T, messageIntTypes)
 {
     T val = 0;
     for (size_t i = 0; i < sizeof(T); ++i) {
         val |= uint64_t(networkDataBuf[i]) << (8 * i);
     }
 
-    const Message m(val);
+    const Part m(val);
 
     BOOST_TEST(m.size() == sizeof(T));
 
@@ -84,16 +84,16 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(messageEndianessInt, T, messageIntTypes)
         testMessageIntValue(&m, 0, 0, 0, val);
         break;
     default:
-        BOOST_FAIL("Message data type not supported!");
+        BOOST_FAIL("Part data type not supported!");
     }
 }
 
 
-BOOST_AUTO_TEST_CASE(messageEndianessArray)
+BOOST_AUTO_TEST_CASE(partEndianessArray)
 {
     std::string val(networkDataBuf, networkDataBuf + sizeof(networkDataBuf));
 
-    const Message m(val.data(), val.size());
+    const Part m(val.data(), val.size());
 
     BOOST_TEST(m.size() == val.size());
     BOOST_TEST(std::memcmp(m.data(), &val[0], sizeof(networkDataBuf)) == 0);
@@ -102,9 +102,9 @@ BOOST_AUTO_TEST_CASE(messageEndianessArray)
 }
 
 
-BOOST_AUTO_TEST_CASE(messageOstream)
+BOOST_AUTO_TEST_CASE(partOstream)
 {
-    Message m{"ijk"sv};
+    Part m{"ijk"sv};
     std::ostringstream os;
     os << m;
 
@@ -239,22 +239,22 @@ void testTransferSingle(const T& part)
 
     int sz;
     const char* data;
-    Message m1;
+    Part m1;
 
     if constexpr (std::is_integral<T>::value) {
         sz = sizeof(part);
         data = (char*)&part;
-        m1.move(Message(part));
+        m1.move(Part(part));
     } else {
         sz = part.size();
         data = part.data();
-        m1.move(Message(part.data(), part.size()));
+        m1.move(Part(part.data(), part.size()));
     }
 
     const int rc1 = s1->sendMessage(m1);
     BOOST_TEST(rc1 == sz);
 
-    Message m2;
+    Part m2;
     const int rc2 = s2->recvMessage(&m2);
     BOOST_TEST(rc2 == sz);
 
@@ -309,9 +309,9 @@ BOOST_AUTO_TEST_CASE(transferMultiPart)
     const auto v5 = "ijk"sv;
     const auto v7 = "last"sv;
 
-    Message p1{v1}, p2{v2}, p3{v3}, p4{v4}, p5{v5}, p6{}, p7{v7};
+    Part p1{v1}, p2{v2}, p3{v3}, p4{v4}, p5{v5}, p6{}, p7{v7};
     const int sz = p1.size() + p2.size() + p3.size() + p4.size() + p5.size() + p6.size() + p7.size();
-    const int np = s1->sendMessage(p1, p2, p3, p4, p5, p6, Message().copy(p7));
+    const int np = s1->sendMessage(p1, p2, p3, p4, p5, p6, Part().copy(p7));
 
     BOOST_TEST(np == sz);
 
@@ -323,12 +323,12 @@ BOOST_AUTO_TEST_CASE(transferMultiPart)
     BOOST_TEST(p6.empty());
     BOOST_TEST(!p7.empty());
 
-    Message r1, r2, r3, r4, r5, r6, r7;
+    Part r1, r2, r3, r4, r5, r6, r7;
     const int nr = s2->recvMessage(&r1, &r2, &r3, &r4, &r5, &r6, &r7);
 
     BOOST_TEST(nr == sz);
 
-    Message t1{v1}, t2{v2}, t3{v3}, t4{v4}, t5{v5}, t6{}, t7{v7};
+    Part t1{v1}, t2{v2}, t3{v3}, t4{v4}, t5{v5}, t6{}, t7{v7};
 
     BOOST_TEST(t1 == r1);
     BOOST_TEST(t2 == r2);
@@ -376,7 +376,7 @@ BOOST_DATA_TEST_CASE(waitForEventOne,
     type, event, timeout, expected)
 {
     const auto [ctx, s1, s2] = transferSetup(ZMQ_PAIR, ZMQ_PAIR);
-    Message data(uint32_t(0));
+    Part data(uint32_t(0));
 
     if (type == 'w')
         testWaitForEvents(s1.get(), event, timeout, expected);
@@ -417,8 +417,8 @@ BOOST_AUTO_TEST_CASE(waitForEventMore)
     BOOST_TEST(s3->isOpen());
     BOOST_TEST(s4->isOpen());
 
-    s1->sendMessage(Message(uint8_t(1)));
-    s3->sendMessage(Message(uint8_t(2)));
+    s1->sendMessage(Part(uint8_t(1)));
+    s3->sendMessage(Part(uint8_t(2)));
 
     Poller poll(PollerEvents::Type::Read, s2.get(), s4.get());
     poll.setTimeout(2500);
@@ -505,10 +505,10 @@ static void BM_TransferSinglePartSmall(benchmark::State& state)
     const auto part = uint64_t(11460521682733600767ull);
 
     for (auto _ : state) {
-        Message m1(part);
+        Part m1(part);
         s1->sendMessage(m1);
 
-        Message m2;
+        Part m2;
         s2->recvMessage(&m2);
     }
     transferTeardown(ctx, s1, s2);
@@ -522,10 +522,10 @@ static void BM_TransferSinglePartBig(benchmark::State& state)
     const auto part = std::string(2048, 'y');
 
     for (auto _ : state) {
-        Message m1(part.data(), part.size());
+        Part m1(part.data(), part.size());
         s1->sendMessage(m1);
 
-        Message m2;
+        Part m2;
         s2->recvMessage(&m2);
     }
     transferTeardown(ctx, s1, s2);
@@ -553,11 +553,11 @@ static void BM_TransferMultiPart(benchmark::State& state)
     const auto v14 = std::string(2048, 'y');
 
     for (auto _ : state) {
-        Message p1(v1), p2(v2), p3(v3), p4(v4), p5(v5), p6(v6), p7(v7), p8(v8), p9(v9),
+        Part p1(v1), p2(v2), p3(v3), p4(v4), p5(v5), p6(v6), p7(v7), p8(v8), p9(v9),
             p10(v10), p11(v11), p12(v12), p13(v13), p14(v14);
         s1->sendMessage(p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14);
 
-        Message r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14;
+        Part r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14;
         s2->recvMessage(&r1, &r2, &r3, &r4, &r5, &r6, &r7,
             &r8, &r9, &r10, &r11, &r12, &r13, &r14);
     }
