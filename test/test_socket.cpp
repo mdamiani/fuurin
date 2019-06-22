@@ -14,10 +14,10 @@
 #include <boost/mpl/list.hpp>
 #include <benchmark/benchmark.h>
 
-#include "../src/zmqcontext.h"
-#include "../src/zmqpart.h"
-#include "../src/zmqsocket.h"
-#include "../src/zmqpoller.h"
+#include "fuurin/zmqcontext.h"
+#include "fuurin/zmqpart.h"
+#include "fuurin/zmqsocket.h"
+#include "fuurin/zmqpoller.h"
 
 #include <zmq.h>
 

@@ -63,6 +63,10 @@ set(LIB_PUBLIC_HEADERS
     include/fuurin/fuurin.h
     include/fuurin/errors.h
     include/fuurin/logger.h
+    include/fuurin/zmqcontext.h
+    include/fuurin/zmqsocket.h
+    include/fuurin/zmqpoller.h
+    include/fuurin/zmqpart.h
     include/fuurin/broker.h
     include/fuurin/worker.h
 )

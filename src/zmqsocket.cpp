@@ -1,9 +1,9 @@
-#include "zmqsocket.h"
-#include "zmqcontext.h"
-#include "zmqpart.h"
+#include "fuurin/zmqsocket.h"
+#include "fuurin/zmqcontext.h"
+#include "fuurin/zmqpart.h"
+#include "fuurin/errors.h"
 #include "failure.h"
 #include "log.h"
-#include "fuurin/errors.h"
 
 #include <zmq.h>
 #include <boost/config.hpp> // for BOOST_LIKELY

@@ -8,11 +8,11 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-#include "zmqpoller.h"
-#include "zmqsocket.h"
+#include "fuurin/zmqpoller.h"
+#include "fuurin/zmqsocket.h"
+#include "fuurin/errors.h"
 #include "failure.h"
 #include "log.h"
-#include "fuurin/errors.h"
 
 #include <zmq.h>
 #include <boost/scope_exit.hpp>
