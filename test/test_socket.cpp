@@ -18,7 +18,8 @@
 #include "../src/zmqpart.h"
 #include "../src/zmqsocket.h"
 #include "../src/zmqpoller.h"
-#include "../src/zmqlow.h"
+
+#include <zmq.h>
 
 #include <string>
 #include <tuple>
