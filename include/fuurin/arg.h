@@ -44,7 +44,7 @@ struct ec_t
  * biggest underlying type (~16 bytes), then it's still stored in the stack,
  * without allocations.
  *
- * When an argument is storing an array value, a heap data is always allocated
+ * When an argument is storing an array value, heap data is always allocated
  * and reference counted.
  *
  * Reference counter is manage atomically, so it's thread-safe.
@@ -253,7 +253,7 @@ private:
      * \param[in] arg Array of arguments.
      * \param[in] size Size of the array.
      */
-    Arg(std::string_view key, const Arg arg[], size_t size);
+    Arg(std::string_view key, const Arg* arg, size_t size);
 
     /**
      * \brief Acquires a reference counted data.

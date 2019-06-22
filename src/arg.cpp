@@ -151,7 +151,7 @@ Arg::Arg(std::string_view key, const std::string& val)
 }
 
 
-Arg::Arg(std::string_view key, const Arg val[], size_t size)
+Arg::Arg(std::string_view key, const Arg* val, size_t size)
     : type_(Type::Array)
     , alloc_(Alloc::Heap)
     , key_(key)
