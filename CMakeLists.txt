@@ -67,8 +67,6 @@ set(LIB_PUBLIC_HEADERS
     include/fuurin/zmqsocket.h
     include/fuurin/zmqpoller.h
     include/fuurin/zmqpart.h
-    include/fuurin/broker.h
-    include/fuurin/worker.h
 )
 
 set(LIB_DEPS
