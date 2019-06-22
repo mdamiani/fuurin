@@ -29,6 +29,6 @@ constexpr const int VERSION_PATCH = 1;
  * \return Library version, formatted as string.
  */
 char* version();
-}
+} // namespace fuurin
 
 #endif // FUURIN_H

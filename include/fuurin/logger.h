@@ -11,6 +11,8 @@
 #ifndef LOGGER_H
 #define LOGGER_H
 
+#include "fuurin/arg.h"
+
 #include <memory>
 
 
@@ -18,15 +20,14 @@ namespace fuurin {
 namespace log {
 
 /**
- * \brief Content that holds the log details.
+ * \brief Location of the log message.
  */
-struct Content
+struct Loc
 {
-    const unsigned int line; ///< Code line where the log happened.
     const char* const file;  ///< File name where the log happened.
-    const char* const where; ///< Function that caused the log.
-    const char* const what;  ///< Main log content.
+    const unsigned int line; ///< Code line where the log happened.
 };
+
 
 /**
  * \brief Interface for a generic content handler.
@@ -38,14 +39,16 @@ public:
     /**
      * \brief Logging function.
      *
-     * \param[in] c Content to be logged.
+     * \param[in] loc Location of the log message.
+     * \param[in] args Arguments of the log message.
+     * \param[in] num Number of arguments.
      */
     ///{@
-    virtual void debug(const Content& c) = 0;
-    virtual void info(const Content& c) = 0;
-    virtual void warn(const Content& c) = 0;
-    virtual void error(const Content& c) = 0;
-    virtual void fatal(const Content& c) = 0;
+    virtual void debug(const Loc& loc, const Arg args[], size_t num) const = 0;
+    virtual void info(const Loc& loc, const Arg args[], size_t num) const = 0;
+    virtual void warn(const Loc& loc, const Arg args[], size_t num) const = 0;
+    virtual void error(const Loc& loc, const Arg args[], size_t num) const = 0;
+    virtual void fatal(const Loc& loc, const Arg args[], size_t num) const = 0;
     ///@}
 
     /// Destructor.
@@ -61,14 +64,14 @@ public:
 class StandardHandler : public Handler
 {
     /**
-     * \brief Logging function which prints the \c content to stdout/stderr.
+     * \brief Logging function which prints the content to stdout/stderr.
      */
     ///{@
-    void debug(const Content&);
-    void info(const Content&);
-    void warn(const Content&);
-    void error(const Content&);
-    void fatal(const Content&);
+    void debug(const Loc&, const Arg[], size_t) const override;
+    void info(const Loc&, const Arg[], size_t) const override;
+    void warn(const Loc&, const Arg[], size_t) const override;
+    void error(const Loc&, const Arg[], size_t) const override;
+    void fatal(const Loc&, const Arg[], size_t) const override;
     ///@}
 };
 
@@ -84,27 +87,28 @@ class SilentHandler : public Handler
      * \brief Logging function which discards the content.
      */
     ///{@
-    void debug(const Content&);
-    void info(const Content&);
-    void warn(const Content&);
-    void error(const Content&);
-    void fatal(const Content&);
+    void debug(const Loc&, const Arg[], size_t) const override;
+    void info(const Loc&, const Arg[], size_t) const override;
+    void warn(const Loc&, const Arg[], size_t) const override;
+    void error(const Loc&, const Arg[], size_t) const override;
+    void fatal(const Loc&, const Arg[], size_t) const override;
     ///@}
 };
 
 /**
  * \brief Library-level generic logger.
  *
- * This logger shall use the installed \ref Handler to log any \ref Content.
+ * This logger shall use the installed \ref Handler to log any content.
  *
  * \see Handler
- * \see Content
+ * \see Loc
+ * \see Arg
  */
 class Logger
 {
 public:
     /**
-     * \brief Installs a custom \ref Handler for any library log \ref Content.
+     * \brief Installs a custom \ref Handler for any library log content.
      *
      * \param[in] handler A valid pointer to the content \ref Handler.
      *      The ownership of the object is taken.
@@ -112,23 +116,27 @@ public:
     static void installContentHandler(Handler* handler);
 
     /**
-     * \brief Logs a \ref Content for level, using the installed \ref Handler.
+     * \brief Logs a content for level, using the installed \ref Handler.
      * In case no handler was installed, then the default one is used.
      * The default handler causes the application to be aborted on a \c fatal log.
      *
-     * \param[in] c Content to be logged.
+     * \param[in] loc Location of the log message.
+     * \param[in] args Arguments of the log message.
+     * \param[in] num Number of arguments of the log message.
      */
     ///{@
-    static void debug(const Content& c);
-    static void info(const Content& c);
-    static void warn(const Content& c);
-    static void error(const Content& c);
-    static void fatal(const Content& c);
+    static void debug(const Loc& loc, const Arg args[], size_t num) noexcept;
+    static void info(const Loc& loc, const Arg args[], size_t num) noexcept;
+    static void warn(const Loc& loc, const Arg args[], size_t num) noexcept;
+    static void error(const Loc& loc, const Arg args[], size_t num) noexcept;
+    static void fatal(const Loc& loc, const Arg args[], size_t num) noexcept;
     ///@}
+
 
 private:
     static std::unique_ptr<Handler> handler_; ///< The user defined log handler.
 };
-}
-}
+
+} // namespace log
+} // namespace fuurin
 #endif // LOGGER_H

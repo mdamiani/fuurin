@@ -84,6 +84,25 @@ $> ctest -v
 ```
 
 
+### How to enable sanitizers
+
+Sanitizers can enabled with some cmake options:
+
+  - Address Sanitizer: cmake -D ENABLE_ASAN=ON ...
+  - Thread Sanitezer: cmake -D ENABLE_TSAN=ON ...
+  - Memory Sanitezer: cmake -D ENABLE_MSAN=ON ...
+  - Undefined Behavior Sanitizer: cmake -D ENABLE_UBSAN=ON ...
+
+
+### How to compile with clang
+
+
+```
+$> cmake -D CMAKE_C_COMPILER=/usr/bin/clang -D CMAKE_CXX_COMPILER=/usr/bin/clang++ /path/to/fuurin/folder
+$> make
+```
+
+
 ### Vendoring
 
 External libraries used by *fuurin* are integrated through a vendoring approach.

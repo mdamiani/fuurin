@@ -19,9 +19,12 @@ set(CMAKE_CXX_STANDARD 17)
 add_definitions(
     -Wall
     -Wextra
+    -DBOOST_SCOPE_EXIT_CONFIG_USE_LAMBDAS
+    -DZMQ_BUILD_DRAFT_API
 )
 
 include(BuildType)
+include(Sanitizer)
 include(ExternalProject)
 
 find_package(Threads REQUIRED)
@@ -34,23 +37,36 @@ ExternalProject_Add(zeromq
 
     CMAKE_ARGS
         -D CMAKE_INSTALL_PREFIX=<INSTALL_DIR>
-        -D ZMQ_BUILD_TESTS=OFF
+        -D BUILD_TESTS=OFF
         -D ENABLE_CPACK=OFF
         -D BUILD_SHARED=OFF
         -D BUILD_STATIC=ON
+        -D ENABLE_DRAFTS=ON
         -D CMAKE_BUILD_TYPE=Release
 )
 
 set(LIB_SOURCES
     src/fuurin.cpp
-    src/zmqlow.cpp
+    src/errors.cpp
+    src/logger.cpp
+    src/zmqcontext.cpp
+    src/zmqsocket.cpp
+    src/zmqpoller.cpp
+    src/zmqpart.cpp
     src/failure.cpp
     src/log.cpp
+    src/arg.cpp
 )
 
 set(LIB_PUBLIC_HEADERS
+    include/fuurin/arg.h
     include/fuurin/fuurin.h
+    include/fuurin/errors.h
     include/fuurin/logger.h
+    include/fuurin/zmqcontext.h
+    include/fuurin/zmqsocket.h
+    include/fuurin/zmqpoller.h
+    include/fuurin/zmqpart.h
     include/fuurin/broker.h
     include/fuurin/worker.h
 )
@@ -93,7 +109,8 @@ include_directories(
 target_link_libraries(fuurin_static zmq ${CMAKE_THREAD_LIBS_INIT})
 target_link_libraries(fuurin_shared zmq ${CMAKE_THREAD_LIBS_INIT})
 
-if(DEFINED BUILD_TESTS AND BUILD_TESTS EQUAL 1)
+option(BUILD_TESTS "Build fuurin tests" OFF)
+if(BUILD_TESTS)
     message(STATUS "Tests enabled")
     include(CTest)
     add_subdirectory(${PROJECT_SOURCE_DIR}/test)
@@ -102,7 +119,8 @@ else()
 endif()
 
 
-if(DEFINED BUILD_DEB_PACKAGE AND BUILD_DEB_PACKAGE EQUAL 1)
+option(BUILD_DEB_PACKAGE "Build fuurin Debian package" OFF)
+if(BUILD_DEB_PACKAGE)
     message(STATUS "CPack Debian enabled")
 
     # CPack configuration
