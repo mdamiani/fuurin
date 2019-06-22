@@ -212,7 +212,7 @@ struct sock_setup_t
 };
 
 
-sock_setup_t transferSetup(int type1, int type2)
+sock_setup_t transferSetup(Socket::Type type1, Socket::Type type2)
 {
     auto ctx = std::make_shared<Context>();
     auto s1 = std::make_shared<Socket>(ctx.get(), type1);
@@ -242,7 +242,7 @@ void transferTeardown(sock_setup_t ss)
 template<typename T>
 void testTransferSingle(const T& part)
 {
-    const auto [ctx, s1, s2] = transferSetup(ZMQ_PAIR, ZMQ_PAIR);
+    const auto [ctx, s1, s2] = transferSetup(Socket::Type::PAIR, Socket::Type::PAIR);
 
     int sz;
     const char* data;
@@ -307,7 +307,7 @@ BOOST_DATA_TEST_CASE(transferSinglePart,
 
 BOOST_AUTO_TEST_CASE(transferMultiPart)
 {
-    const auto [ctx, s1, s2] = transferSetup(ZMQ_PAIR, ZMQ_PAIR);
+    const auto [ctx, s1, s2] = transferSetup(Socket::Type::PAIR, Socket::Type::PAIR);
 
     const auto v1 = uint8_t(255u);
     const auto v2 = uint16_t(65535u);
@@ -382,7 +382,7 @@ BOOST_DATA_TEST_CASE(waitForEventOne,
     }),
     type, event, timeout, expected)
 {
-    const auto [ctx, s1, s2] = transferSetup(ZMQ_PAIR, ZMQ_PAIR);
+    const auto [ctx, s1, s2] = transferSetup(Socket::Type::PAIR, Socket::Type::PAIR);
     Part data(uint32_t(0));
 
     if (type == 'w')
@@ -404,10 +404,10 @@ BOOST_DATA_TEST_CASE(waitForEventOne,
 BOOST_AUTO_TEST_CASE(waitForEventMore)
 {
     auto ctx = std::make_shared<Context>();
-    auto s1 = std::make_shared<Socket>(ctx.get(), ZMQ_PAIR);
-    auto s2 = std::make_shared<Socket>(ctx.get(), ZMQ_PAIR);
-    auto s3 = std::make_shared<Socket>(ctx.get(), ZMQ_PAIR);
-    auto s4 = std::make_shared<Socket>(ctx.get(), ZMQ_PAIR);
+    auto s1 = std::make_shared<Socket>(ctx.get(), Socket::Type::PAIR);
+    auto s2 = std::make_shared<Socket>(ctx.get(), Socket::Type::PAIR);
+    auto s3 = std::make_shared<Socket>(ctx.get(), Socket::Type::PAIR);
+    auto s4 = std::make_shared<Socket>(ctx.get(), Socket::Type::PAIR);
 
     s1->setEndpoints({"inproc://transfer1"});
     s2->setEndpoints({"inproc://transfer1"});
@@ -468,7 +468,7 @@ BOOST_DATA_TEST_CASE(publishMessage,
     }),
     pubFilt, subFilt, timeout, count, expected)
 {
-    const auto [ctx, s1, s2] = transferSetup(ZMQ_PUB, ZMQ_SUB);
+    const auto [ctx, s1, s2] = transferSetup(Socket::Type::PUB, Socket::Type::SUB);
 
     s2->setSubscriptions({subFilt});
     s2->close();
@@ -505,7 +505,7 @@ BOOST_DATA_TEST_CASE(publishMessage,
 
 static void BM_TransferSinglePartSmall(benchmark::State& state)
 {
-    const auto [ctx, s1, s2] = transferSetup(ZMQ_PAIR, ZMQ_PAIR);
+    const auto [ctx, s1, s2] = transferSetup(Socket::Type::PAIR, Socket::Type::PAIR);
     const auto part = uint64_t(11460521682733600767ull);
 
     for (auto _ : state) {
@@ -522,7 +522,7 @@ BENCHMARK(BM_TransferSinglePartSmall);
 
 static void BM_TransferSinglePartBig(benchmark::State& state)
 {
-    const auto [ctx, s1, s2] = transferSetup(ZMQ_PAIR, ZMQ_PAIR);
+    const auto [ctx, s1, s2] = transferSetup(Socket::Type::PAIR, Socket::Type::PAIR);
     const auto part = std::string(2048, 'y');
 
     for (auto _ : state) {
@@ -539,7 +539,7 @@ BENCHMARK(BM_TransferSinglePartBig);
 
 static void BM_TransferMultiPart(benchmark::State& state)
 {
-    const auto [ctx, s1, s2] = transferSetup(ZMQ_PAIR, ZMQ_PAIR);
+    const auto [ctx, s1, s2] = transferSetup(Socket::Type::PAIR, Socket::Type::PAIR);
 
     const auto v1 = uint8_t{0u};
     const auto v2 = uint8_t{255u};

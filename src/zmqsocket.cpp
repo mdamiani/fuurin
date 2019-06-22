@@ -17,8 +17,41 @@
 namespace fuurin {
 namespace zmq {
 
+namespace {
+int zmqSocketType(Socket::Type type)
+{
+    switch (type) {
+    case Socket::Type::PAIR:
+        return ZMQ_PAIR;
+    case Socket::Type::PUB:
+        return ZMQ_PUB;
+    case Socket::Type::SUB:
+        return ZMQ_SUB;
+    case Socket::Type::REQ:
+        return ZMQ_REQ;
+    case Socket::Type::REP:
+        return ZMQ_REP;
+    case Socket::Type::DEALER:
+        return ZMQ_DEALER;
+    case Socket::Type::ROUTER:
+        return ZMQ_ROUTER;
+    case Socket::Type::PULL:
+        return ZMQ_PULL;
+    case Socket::Type::PUSH:
+        return ZMQ_PUSH;
+    case Socket::Type::SERVER:
+        return ZMQ_SERVER;
+    case Socket::Type::CLIENT:
+        return ZMQ_CLIENT;
+    }
 
-Socket::Socket(Context* ctx, int type)
+    ASSERT(false, "invalid socket type");
+    return -1;
+}
+} // namespace
+
+
+Socket::Socket(Context* ctx, Type type)
     : ctx_(ctx)
     , type_(type)
     , ptr_(nullptr)
@@ -39,7 +72,7 @@ Context* Socket::context() const noexcept
 }
 
 
-int Socket::type() const noexcept
+Socket::Type Socket::type() const noexcept
 {
     return type_;
 }
@@ -208,7 +241,7 @@ void Socket::open(std::function<void(std::string)> action)
     bool commit = false;
 
     // Create socket.
-    ptr_ = zmq_socket(ctx_->ptr_, type_);
+    ptr_ = zmq_socket(ctx_->ptr_, zmqSocketType(type_));
     if (ptr_ == nullptr) {
         throw ERROR(ZMQSocketCreateFailed, "could not create socket",
             log::Arg{"reason"sv, log::ec_t{zmq_errno()}});

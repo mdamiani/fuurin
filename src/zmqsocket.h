@@ -40,6 +40,25 @@ class Socket final
 
     friend class internal::PollerImpl;
 
+
+public:
+    /// Type of ZMQ socket.
+    enum Type
+    {
+        PAIR,
+        PUB,
+        SUB,
+        REQ,
+        REP,
+        DEALER,
+        ROUTER,
+        PULL,
+        PUSH,
+        SERVER,
+        CLIENT,
+    };
+
+
 public:
     /**
      * \brief Initializes this socket with default values.
@@ -47,7 +66,7 @@ public:
      * \param[in] ctx A valid ZMQ context.
      * \param[in] type Type of ZMQ socket.
      */
-    explicit Socket(Context* ctx, int type);
+    explicit Socket(Context* ctx, Type type);
 
     /**
      * \brief Destroys (and closes) this socket.
@@ -72,7 +91,7 @@ public:
     /**
      * \return The type of this \ref Socket.
      */
-    int type() const noexcept;
+    Type type() const noexcept;
 
     /**
      * \brief Sets a \c ZMQ_LINGER value to this socket.
@@ -353,7 +372,7 @@ private:
 
 private:
     Context* const ctx_; ///< ZMQ context this socket belongs to.
-    const int type_;     ///< ZMQ type of socket.
+    const Type type_;    ///< ZMQ type of socket.
     void* ptr_;          ///< ZMQ socket.
 
     int linger_;                           ///< Linger value.
