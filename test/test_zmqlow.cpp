@@ -97,6 +97,7 @@ BOOST_AUTO_TEST_CASE(partEndianessArray)
 
     BOOST_TEST(m.size() == val.size());
     BOOST_TEST(std::memcmp(m.data(), &val[0], sizeof(networkDataBuf)) == 0);
+    BOOST_TEST(m.toString() == val);
 
     testMessageIntValue(&m, 0, 0, 0, 0);
 }
@@ -202,8 +203,15 @@ std::ostream& operator<<(std::ostream& os, const TVal& ts)
 }
 
 
-std::tuple<std::shared_ptr<Context>, std::shared_ptr<Socket>, std::shared_ptr<Socket>>
-transferSetup(int type1, int type2)
+struct sock_setup_t
+{
+    std::shared_ptr<Context> ctx;
+    std::shared_ptr<Socket> s1;
+    std::shared_ptr<Socket> s2;
+};
+
+
+sock_setup_t transferSetup(int type1, int type2)
 {
     auto ctx = std::make_shared<Context>();
     auto s1 = std::make_shared<Socket>(ctx.get(), type1);
@@ -212,24 +220,22 @@ transferSetup(int type1, int type2)
     s1->setEndpoints({"inproc://transfer"});
     s2->setEndpoints({"inproc://transfer"});
 
-    s1->connect();
-    s2->bind(); // TODO: pass timeout 10000
+    s1->bind();
+    s2->connect(); // TODO: pass timeout 10000
 
     BOOST_TEST(s1->isOpen());
     BOOST_TEST(s2->isOpen());
 
-    return std::make_tuple(ctx, s1, s2);
+    return {ctx, s1, s2};
 }
 
-void transferTeardown(std::shared_ptr<Context> ctx, std::shared_ptr<Socket> s1, std::shared_ptr<Socket> s2)
+void transferTeardown(sock_setup_t ss)
 {
-    s1->close();
-    s2->close();
+    ss.s1->close();
+    ss.s2->close();
 
-    BOOST_TEST(!s1->isOpen());
-    BOOST_TEST(!s2->isOpen());
-
-    UNUSED(ctx);
+    BOOST_TEST(!ss.s1->isOpen());
+    BOOST_TEST(!ss.s2->isOpen());
 }
 
 template<typename T>
@@ -260,7 +266,7 @@ void testTransferSingle(const T& part)
 
     BOOST_TEST(std::memcmp(m2.data(), data, sz) == 0);
 
-    transferTeardown(ctx, s1, s2);
+    transferTeardown({ctx, s1, s2});
 }
 
 BOOST_DATA_TEST_CASE(transferSinglePart,
@@ -338,7 +344,7 @@ BOOST_AUTO_TEST_CASE(transferMultiPart)
     BOOST_TEST(t6 == r6);
     BOOST_TEST(t7 == r7);
 
-    transferTeardown(ctx, s1, s2);
+    transferTeardown({ctx, s1, s2});
 }
 
 
@@ -390,7 +396,7 @@ BOOST_DATA_TEST_CASE(waitForEventOne,
     const int nr = s2->recvMessage(&data);
     BOOST_TEST(nr == int(sizeof(uint32_t)));
 
-    transferTeardown(ctx, s1, s2);
+    transferTeardown({ctx, s1, s2});
 }
 
 
@@ -451,52 +457,49 @@ BOOST_AUTO_TEST_CASE(waitForEventMore)
 }
 
 
-//BOOST_DATA_TEST_CASE(publishMessage,
-//    bdata::make({
-//        std::make_tuple("filt1"s, "filt1"s, 100, 50, true),
-//        std::make_tuple("filt1"s, ""s, 100, 50, true),
-//        std::make_tuple(""s, ""s, 100, 50, true),
-//        std::make_tuple(""s, "filt2"s, 100, 10, false),
-//        std::make_tuple("filt1"s, "filt2"s, 100, 10, false),
-//    }),
-//    pubFilt, subFilt, timeout, count, expected)
-//{
-//    const auto [ctx, s1, s2] = transferSetup(ZMQ_PUB, ZMQ_SUB);
-//
-//    BOOST_TEST(zmq::setSocketSubscription(s2, subFilt) == true);
-//
-//    int retry = 0, rc1;
-//    bool ready, p2;
-//
-//    do {
-//        rc1 = zmq::sendMultipartMessage(s1, 0, pubFilt);
-//        BOOST_TEST(rc1 != -1);
-//
-//        zmq_pollitem_t items[] = {
-//            {s2, 0, ZMQ_POLLIN, 0},
-//        };
-//
-//        p2 = zmq::pollSocket(items, 1, timeout);
-//        BOOST_TEST(p2 == true);
-//
-//        ready = items[0].revents & ZMQ_POLLIN;
-//        ++retry;
-//    } while (!ready && retry < count && rc1 != -1 && p2 == true);
-//
-//    BOOST_TEST(ready == expected);
-//
-//    if (ready) {
-//        std::string recvFilt;
-//
-//        const int rc2 = zmq::recvMultipartMessage(s2, 0, &recvFilt);
-//        BOOST_TEST(rc2 != -1);
-//
-//        if (!subFilt.empty())
-//            BOOST_TEST(recvFilt == subFilt);
-//    }
-//
-//    transferTeardown(ctx, s1, s2);
-//}
+BOOST_DATA_TEST_CASE(publishMessage,
+    bdata::make({
+        std::make_tuple("filt1"s, "filt1"s, 100, 50, true),
+        std::make_tuple("filt1"s, ""s, 100, 50, true),
+        std::make_tuple(""s, ""s, 100, 50, true),
+        std::make_tuple(""s, "filt2"s, 100, 10, false),
+        std::make_tuple("filt1"s, "filt2"s, 100, 10, false),
+    }),
+    pubFilt, subFilt, timeout, count, expected)
+{
+    const auto [ctx, s1, s2] = transferSetup(ZMQ_PUB, ZMQ_SUB);
+
+    s2->setSubscriptions({subFilt});
+    s2->close();
+    s2->connect();
+
+    Poller poll(PollerEvents::Type::Read, s2.get());
+    poll.setTimeout(timeout);
+
+    int retry = 0;
+    bool ready = false;
+
+    do {
+        const int ns = s1->sendMessage(Part(pubFilt));
+        BOOST_TEST(ns == int(pubFilt.size()));
+
+        ready = !poll.wait().empty();
+        ++retry;
+    } while (!ready && retry < count);
+
+    BOOST_TEST(ready == expected);
+
+    if (ready) {
+        Part recvFilt;
+        const int nr = s2->recvMessage(&recvFilt);
+        BOOST_TEST(nr == int(pubFilt.size()));
+
+        if (!subFilt.empty())
+            BOOST_TEST(recvFilt.toString() == subFilt);
+    }
+
+    transferTeardown({ctx, s1, s2});
+}
 
 
 static void BM_TransferSinglePartSmall(benchmark::State& state)
@@ -511,7 +514,7 @@ static void BM_TransferSinglePartSmall(benchmark::State& state)
         Part m2;
         s2->recvMessage(&m2);
     }
-    transferTeardown(ctx, s1, s2);
+    transferTeardown({ctx, s1, s2});
 }
 BENCHMARK(BM_TransferSinglePartSmall);
 
@@ -528,7 +531,7 @@ static void BM_TransferSinglePartBig(benchmark::State& state)
         Part m2;
         s2->recvMessage(&m2);
     }
-    transferTeardown(ctx, s1, s2);
+    transferTeardown({ctx, s1, s2});
 }
 BENCHMARK(BM_TransferSinglePartBig);
 
@@ -562,7 +565,7 @@ static void BM_TransferMultiPart(benchmark::State& state)
             &r8, &r9, &r10, &r11, &r12, &r13, &r14);
     }
 
-    transferTeardown(ctx, s1, s2);
+    transferTeardown({ctx, s1, s2});
 }
 BENCHMARK(BM_TransferMultiPart);
 

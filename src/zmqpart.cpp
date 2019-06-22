@@ -295,6 +295,12 @@ uint64_t Part::toUint64() const noexcept
 }
 
 
+std::string_view Part::toString() const
+{
+    return std::string_view(data(), size());
+}
+
+
 std::ostream& operator<<(std::ostream& os, const Part& msg)
 {
     const std::ios_base::fmtflags f(os.flags());

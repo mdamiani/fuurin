@@ -171,6 +171,13 @@ public:
     ///@}
 
     /**
+     * \return A string view upon the internal data, without any endianess conversions.
+     * \see data()
+     * \see size()
+     */
+    std::string_view toString() const;
+
+    /**
      * Disable copy.
      */
     ///{@
