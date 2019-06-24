@@ -123,7 +123,9 @@ public:
     /**
      * \brief Direct access to element.
      * No boundary checking is performed.
+     *
      * \param[in] pos Position of the element.
+     *
      * \return The element at the specified position \c pos.
      */
     Socket* operator[](size_t pos) const;
@@ -194,7 +196,10 @@ private:
 
 /**
  * \brief This class takes one or more \ref Socket objects and performs polling.
- * Addes sockets must be valid and open.
+ *
+ * Sockets must be valid and open.
+ * Before closing a socket, it must be removed first from the poller,
+ * hence the poller must be destroyed.
  */
 template<typename... Args>
 class Poller final
@@ -208,9 +213,15 @@ public:
 
 public:
     /**
-     * \brief Creates the poller and add the specified sockets.
+     * \brief Creates the poller and adds the specified sockets.
+     *
+     * \param[in] ev Type of event to poll.
+     * \param[in] args Sockets to poll for events.
+     *      Every socket must be valid and open.
+     *
      * \exception ZMQPollerCreateFailed The poller could not be created.
-     * \see PollerImpl::createPoller(Socket*[], size_t)
+     *
+     * \see PollerImpl::createPoller(Socket*[], size_t, bool, bool)
      * \see sockets()
      */
     Poller(PollerEvents::Type ev, Args*... args)
@@ -224,6 +235,7 @@ public:
 
     /**
      * \brief Destroys the poller and removes all sockets.
+     *
      * \see PollerImpl::destroyPoller(void**)
      */
     ~Poller() noexcept
@@ -232,7 +244,7 @@ public:
     }
 
     /**
-     * \return Array of added sockets to this poller.
+     * \return Array of sockets of this poller.
      */
     inline const Array& sockets() const noexcept
     {
@@ -248,10 +260,13 @@ public:
     }
 
     /**
-     * \brief Sets the timeout in ms.
+     * \brief Sets the timeout of a \ref wait() operation.
+     *
      * \param[in] ms Timeout in milliseconds,
      *      any negative value will disable timeout.
+     *
      * \see timeout()
+     * \see wait()
      */
     inline void setTimeout(int ms) noexcept
     {
@@ -268,16 +283,17 @@ public:
     }
 
     /**
-     * \brief Wait for an \ref Event on multiple \ref Socket objects.
-     * The currently configured \ref timeout() is used, or it will
-     * block until any socket is ready.
+     * \brief Waits for an event on multiple \ref Socket objects.
+     * This function will block until at least one socket is ready,
+     * or it will return after the configured \ref timeout().
      *
      * Returned \ref PollerEvents and \ref PollerIterator structures
      * are valid until this object is alive and until the next call
      * to this method.
      *
      * \exception ZMQPollerWaitFailed Polling could not be performed.
-     * \return An iterable \ref PollerEvents object over the ready sockets.
+     * \return An iterable \ref PollerEvents object over the subset of ready sockets.
+     *      This subset can be empty if \ref timeout() has expired and sockets are not ready.
      *
      * \see setTimeout(int)
      * \see PollerImpl::waitForEvents
