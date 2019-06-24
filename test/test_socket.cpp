@@ -258,11 +258,11 @@ void testTransferSingle(const T& part)
         m1.move(Part(part.data(), part.size()));
     }
 
-    const int rc1 = s1->sendMessage(m1);
+    const int rc1 = s1->send(m1);
     BOOST_TEST(rc1 == sz);
 
     Part m2;
-    const int rc2 = s2->recvMessage(&m2);
+    const int rc2 = s2->recv(&m2);
     BOOST_TEST(rc2 == sz);
 
     BOOST_TEST(std::memcmp(m2.data(), data, sz) == 0);
@@ -318,7 +318,7 @@ BOOST_AUTO_TEST_CASE(transferMultiPart)
 
     Part p1{v1}, p2{v2}, p3{v3}, p4{v4}, p5{v5}, p6{}, p7{v7};
     const int sz = p1.size() + p2.size() + p3.size() + p4.size() + p5.size() + p6.size() + p7.size();
-    const int np = s1->sendMessage(p1, p2, p3, p4, p5, p6, Part().copy(p7));
+    const int np = s1->send(p1, p2, p3, p4, p5, p6, Part().copy(p7));
 
     BOOST_TEST(np == sz);
 
@@ -331,7 +331,7 @@ BOOST_AUTO_TEST_CASE(transferMultiPart)
     BOOST_TEST(!p7.empty());
 
     Part r1, r2, r3, r4, r5, r6, r7;
-    const int nr = s2->recvMessage(&r1, &r2, &r3, &r4, &r5, &r6, &r7);
+    const int nr = s2->recv(&r1, &r2, &r3, &r4, &r5, &r6, &r7);
 
     BOOST_TEST(nr == sz);
 
@@ -388,13 +388,13 @@ BOOST_DATA_TEST_CASE(waitForEventOne,
     if (type == 'w')
         testWaitForEvents(s1.get(), event, timeout, expected);
 
-    const int ns = s1->sendMessage(data);
+    const int ns = s1->send(data);
     BOOST_TEST(ns == int(sizeof(uint32_t)));
 
     if (type == 'r')
         testWaitForEvents(s2.get(), event, timeout, expected);
 
-    const int nr = s2->recvMessage(&data);
+    const int nr = s2->recv(&data);
     BOOST_TEST(nr == int(sizeof(uint32_t)));
 
     transferTeardown({ctx, s1, s2});
@@ -424,8 +424,8 @@ BOOST_AUTO_TEST_CASE(waitForEventMore)
     BOOST_TEST(s3->isOpen());
     BOOST_TEST(s4->isOpen());
 
-    s1->sendMessage(Part(uint8_t(1)));
-    s3->sendMessage(Part(uint8_t(2)));
+    s1->send(Part(uint8_t(1)));
+    s3->send(Part(uint8_t(2)));
 
     Poller poll(PollerEvents::Type::Read, s2.get(), s4.get());
     poll.setTimeout(2500);
@@ -481,7 +481,7 @@ BOOST_DATA_TEST_CASE(publishMessage,
     bool ready = false;
 
     do {
-        const int ns = s1->sendMessage(Part(pubFilt));
+        const int ns = s1->send(Part(pubFilt));
         BOOST_TEST(ns == int(pubFilt.size()));
 
         ready = !poll.wait().empty();
@@ -492,7 +492,7 @@ BOOST_DATA_TEST_CASE(publishMessage,
 
     if (ready) {
         Part recvFilt;
-        const int nr = s2->recvMessage(&recvFilt);
+        const int nr = s2->recv(&recvFilt);
         BOOST_TEST(nr == int(pubFilt.size()));
 
         if (!subFilt.empty())
@@ -510,10 +510,10 @@ static void BM_TransferSinglePartSmall(benchmark::State& state)
 
     for (auto _ : state) {
         Part m1(part);
-        s1->sendMessage(m1);
+        s1->send(m1);
 
         Part m2;
-        s2->recvMessage(&m2);
+        s2->recv(&m2);
     }
     transferTeardown({ctx, s1, s2});
 }
@@ -527,10 +527,10 @@ static void BM_TransferSinglePartBig(benchmark::State& state)
 
     for (auto _ : state) {
         Part m1(part.data(), part.size());
-        s1->sendMessage(m1);
+        s1->send(m1);
 
         Part m2;
-        s2->recvMessage(&m2);
+        s2->recv(&m2);
     }
     transferTeardown({ctx, s1, s2});
 }
@@ -559,10 +559,10 @@ static void BM_TransferMultiPart(benchmark::State& state)
     for (auto _ : state) {
         Part p1(v1), p2(v2), p3(v3), p4(v4), p5(v5), p6(v6), p7(v7), p8(v8), p9(v9),
             p10(v10), p11(v11), p12(v12), p13(v13), p14(v14);
-        s1->sendMessage(p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14);
+        s1->send(p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14);
 
         Part r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14;
-        s2->recvMessage(&r1, &r2, &r3, &r4, &r5, &r6, &r7,
+        s2->recv(&r1, &r2, &r3, &r4, &r5, &r6, &r7,
             &r8, &r9, &r10, &r11, &r12, &r13, &r14);
     }
 

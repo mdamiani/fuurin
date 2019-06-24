@@ -225,14 +225,14 @@ public:
     ///{@
     template<typename T, typename... Args>
     std::enable_if_t<std::is_same_v<std::decay_t<T>, Part>, int>
-    sendMessage(T&& part, Args&&... args)
+    send(T&& part, Args&&... args)
     {
-        return sendMessageMore(&part) + sendMessage(args...);
+        return sendMessageMore(&part) + send(args...);
     }
 
     template<typename T>
     std::enable_if_t<std::is_same_v<std::decay_t<T>, Part>, int>
-    sendMessage(T&& part)
+    send(T&& part)
     {
         return sendMessageLast(&part);
     }
@@ -255,12 +255,12 @@ public:
      */
     ///{@
     template<typename... Args>
-    int recvMessage(Part* part, Args&&... args)
+    int recv(Part* part, Args&&... args)
     {
-        return recvMessageMore(part) + recvMessage(args...);
+        return recvMessageMore(part) + recv(args...);
     }
 
-    int recvMessage(Part* part)
+    int recv(Part* part)
     {
         return recvMessageLast(part);
     }
