@@ -25,6 +25,11 @@ Error::Error(const log::Loc& loc, const char* what, const log::Arg& arg) noexcep
 }
 
 
+Error::~Error() noexcept
+{
+}
+
+
 const char* Error::what() const noexcept
 {
     return what_;

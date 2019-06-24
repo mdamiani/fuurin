@@ -35,6 +35,11 @@ public:
     explicit Error(const log::Loc& loc, const char* what, const log::Arg& arg = log::Arg{}) noexcept;
 
     /**
+     * \brief Destructor.
+     */
+    virtual ~Error() noexcept;
+
+    /**
      * \return Error explanatory string.
      */
     const char* what() const noexcept override;
@@ -80,6 +85,7 @@ DECL_ERROR(ZMQPollerWaitFailed)
 
 #define ERROR(type, reason, ...) \
     fuurin::err::type({__FILE__, __LINE__}, reason, ##__VA_ARGS__)
+
 } // namespace err
 } // namespace fuurin
 

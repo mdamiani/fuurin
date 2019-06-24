@@ -85,7 +85,7 @@ private:
 /**
  * \brief Events that are available after a \ref Poller::wait() action.
  */
-class PollerEvents
+class PollerEvents final
 {
 public:
     /**
@@ -99,6 +99,7 @@ public:
 
     /**
      * \brief Initializes the list of events.
+     *
      * \param[in] type Type of events.
      * \param[in] first First event of the array.
      * \param[in] size Number of events.
@@ -151,7 +152,7 @@ private:
 /**
  * \brief Iterator over the available events after a \ref Poller::wait() action.
  */
-class PollerIterator : public std::iterator<std::input_iterator_tag, Socket*>
+class PollerIterator final : public std::iterator<std::input_iterator_tag, Socket*>
 {
 public:
     /**
