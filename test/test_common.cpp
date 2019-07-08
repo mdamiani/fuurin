@@ -286,7 +286,7 @@ BOOST_DATA_TEST_CASE(logArgRef,
 
     if (argType == log::Arg::Type::String) {
         const std::string_view key("key");
-        const std::string val("very long long value");
+        const std::string val(log::Arg::MaxStringStackSize + 1, 'a');
 
         test = [key, val](const log::Arg& arg, unsigned cnt) {
             testArg(arg, log::Arg::Type::String, key, 0, 0, val, 1, cnt);
