@@ -85,13 +85,33 @@ public:
      *
      * \param[in] data Data to be stored in this part.
      * \param[in] size Size of the data.
+     *
+     * \exception ZMQPartCreateFailed The part could not be created.
      */
     explicit Part(const char* data, size_t size);
+
+    /**
+     * \brief Constructs a part by hard copying another one.
+     * \param[in] other Another part.
+     *
+     * \exception ZMQPartCreateFailed The part could not be created.
+     */
+    Part(const Part& other);
+
+    /**
+     * \brief Constructs a part by moving from another one.
+     * \param[in] other Another part.
+     *
+     * \exception ZMQPartMoveFailed The part could not be moved.
+     */
+    Part(Part&& other);
 
     /**
      * \brief Releases resources for this part.
      *
      * This method calls \c zmq_msg_close.
+     *
+     * \see close()
      */
     ~Part() noexcept;
 
@@ -101,7 +121,7 @@ public:
      * It calls \c zmq_msg_move so the \c other part is cleared
      * and any previous contents of this part is released.
      *
-     * \param other Another part to move data from.
+     * \param[in] other Another part to move data from.
      * \return A reference to this part.
      *
      * \exception ZMQPartMoveFailed The part could not be moved.
@@ -136,6 +156,21 @@ public:
     bool operator==(const Part& other) const noexcept;
     bool operator!=(const Part& other) const noexcept;
     ///@}
+
+    /**
+     * \brief Assigns the contents of another part by hard copying it.
+     *
+     * Current contents is released before assignment and data
+     * is copied with memcpy.
+     *
+     * \param[in] other Another part.
+     * \return A reference to this part.
+     *
+     * \exception ZMQPartCreateFailed The part could not be copied.
+     *
+     * \see close()
+     */
+    Part& operator=(const Part& other);
 
     /**
      * \return The internal stored data, possibly with a different endianess format.
@@ -180,13 +215,14 @@ public:
      */
     std::string_view toString() const;
 
+
+private:
     /**
-     * Disable copy.
+     * \brief Releases resources for this part.
+     *
+     * This method calls \c zmq_msg_close.
      */
-    ///{@
-    Part(const Part&) = delete;
-    Part& operator=(const Part&) = delete;
-    ///@}
+    inline void close() noexcept;
 
 
 private:

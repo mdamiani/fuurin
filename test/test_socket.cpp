@@ -35,7 +35,69 @@ namespace utf = boost::unit_test;
 namespace bdata = utf::data;
 
 
-void testMessageIntValue(const Part* m, uint8_t v1, uint16_t v2, uint32_t v4, uint64_t v8)
+BOOST_AUTO_TEST_CASE(partCreateCopy)
+{
+    Part p1(uint64_t(12345));
+    Part p2(p1);
+
+    BOOST_TEST(!p1.empty());
+    BOOST_TEST(!p2.empty());
+    BOOST_TEST(p1 == p2);
+    BOOST_TEST(!(p1 != p2));
+}
+
+
+BOOST_AUTO_TEST_CASE(partCreateMove)
+{
+    Part p1(Part(uint64_t(12345)));
+    BOOST_TEST(!p1.empty());
+    BOOST_TEST(p1.toUint64() == 12345ull);
+
+    Part p2;
+    p2.move(p1);
+    BOOST_TEST(p1.empty());
+    BOOST_TEST(!p2.empty());
+    BOOST_TEST(p2.toUint64() == 12345ull);
+}
+
+
+BOOST_AUTO_TEST_CASE(partCopyShare)
+{
+    Part p1(Part(std::string(4096, 'a')));
+    Part p2;
+    p2.share(p1);
+    Part p3(p2);
+
+    BOOST_TEST(!p1.empty());
+    BOOST_TEST(!p2.empty());
+    BOOST_TEST(!p3.empty());
+    BOOST_TEST(p1 == p2);
+    BOOST_TEST(!(p1 != p2));
+    BOOST_TEST(p1 == p3);
+    BOOST_TEST(!(p1 != p3));
+}
+
+
+BOOST_AUTO_TEST_CASE(partAssignment)
+{
+    Part p1(Part(std::string(4096, 'a')));
+    Part p2(Part(uint64_t(12345)));
+
+    BOOST_TEST(!p1.empty());
+    BOOST_TEST(!p2.empty());
+    BOOST_TEST(!(p1 == p2));
+    BOOST_TEST(p1 != p2);
+
+    p2 = p1;
+
+    BOOST_TEST(!p1.empty());
+    BOOST_TEST(!p2.empty());
+    BOOST_TEST(p1 == p2);
+    BOOST_TEST(!(p1 != p2));
+}
+
+
+void testPartIntValue(const Part* m, uint8_t v1, uint16_t v2, uint32_t v4, uint64_t v8)
 {
     BOOST_TEST(m->toUint8() == v1);
     BOOST_TEST(m->toUint16() == v2);
@@ -47,10 +109,10 @@ void testMessageIntValue(const Part* m, uint8_t v1, uint16_t v2, uint32_t v4, ui
 static const uint8_t networkDataBuf[] = {
     0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xAA};
 
-typedef boost::mpl::list<uint8_t, uint16_t, uint32_t, uint64_t> messageIntTypes;
+typedef boost::mpl::list<uint8_t, uint16_t, uint32_t, uint64_t> partIntTypes;
 
 
-BOOST_AUTO_TEST_CASE_TEMPLATE(partEndianessInt, T, messageIntTypes)
+BOOST_AUTO_TEST_CASE_TEMPLATE(partEndianessInt, T, partIntTypes)
 {
     T val = 0;
     for (size_t i = 0; i < sizeof(T); ++i) {
@@ -73,16 +135,16 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(partEndianessInt, T, messageIntTypes)
 
     switch (sizeof(T)) {
     case 1:
-        testMessageIntValue(&m, val, 0, 0, 0);
+        testPartIntValue(&m, val, 0, 0, 0);
         break;
     case 2:
-        testMessageIntValue(&m, 0, val, 0, 0);
+        testPartIntValue(&m, 0, val, 0, 0);
         break;
     case 4:
-        testMessageIntValue(&m, 0, 0, val, 0);
+        testPartIntValue(&m, 0, 0, val, 0);
         break;
     case 8:
-        testMessageIntValue(&m, 0, 0, 0, val);
+        testPartIntValue(&m, 0, 0, 0, val);
         break;
     default:
         BOOST_FAIL("Part data type not supported!");
@@ -100,7 +162,7 @@ BOOST_AUTO_TEST_CASE(partEndianessArray)
     BOOST_TEST(std::memcmp(m.data(), &val[0], sizeof(networkDataBuf)) == 0);
     BOOST_TEST(m.toString() == val);
 
-    testMessageIntValue(&m, 0, 0, 0, 0);
+    testPartIntValue(&m, 0, 0, 0, 0);
 }
 
 

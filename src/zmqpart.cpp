@@ -79,6 +79,14 @@ inline void initMessageWithEndian(zmq_msg_t* msg, T val)
     initMessageSize(msg, sizeof(val));
     memcpyWithEndian(zmq_msg_data(msg), &val, sizeof(val));
 }
+
+
+void moveMsg(zmq_msg_t* dst, zmq_msg_t* src)
+{
+    const int rc = zmq_msg_move(dst, src);
+    if (rc == -1)
+        throw ERROR(ZMQPartMoveFailed, "could not move message part");
+}
 } // namespace
 
 
@@ -146,21 +154,32 @@ Part::Part(const std::string& val)
 }
 
 
+Part::Part(const Part& other)
+    : msg_(*reinterpret_cast<zmq_msg_t*>(raw_.msg_))
+{
+    initMessageSize(&msg_, other.size());
+    std::memcpy(zmq_msg_data(&msg_), other.data(), other.size());
+}
+
+
+Part::Part(Part&& other)
+    : msg_(*reinterpret_cast<zmq_msg_t*>(raw_.msg_))
+{
+    moveMsg(&msg_, &other.msg_);
+}
+
+
 Part::~Part() noexcept
+{
+    close();
+}
+
+
+void Part::close() noexcept
 {
     const int rc = zmq_msg_close(&msg_);
     ASSERT(rc == 0, "zmq_msg_close failed");
 }
-
-
-namespace {
-void moveMsg(zmq_msg_t* dst, zmq_msg_t* src)
-{
-    const int rc = zmq_msg_move(dst, src);
-    if (rc == -1)
-        throw ERROR(ZMQPartMoveFailed, "could not move message part");
-}
-} // namespace
 
 
 Part& Part::move(Part& other)
@@ -197,6 +216,19 @@ bool Part::operator==(const Part& other) const noexcept
 bool Part::operator!=(const Part& other) const noexcept
 {
     return !(*this == other);
+}
+
+
+Part& Part::operator=(const Part& other)
+{
+    zmq_msg_t tmp;
+    initMessageSize(&tmp, other.size());
+    std::memcpy(zmq_msg_data(&tmp), other.data(), other.size());
+
+    close();
+    msg_ = tmp;
+
+    return *this;
 }
 
 
