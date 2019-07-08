@@ -318,7 +318,7 @@ BOOST_AUTO_TEST_CASE(transferMultiPart)
 
     Part p1{v1}, p2{v2}, p3{v3}, p4{v4}, p5{v5}, p6{}, p7{v7};
     const int sz = p1.size() + p2.size() + p3.size() + p4.size() + p5.size() + p6.size() + p7.size();
-    const int np = s1->send(p1, p2, p3, p4, p5, p6, Part().copy(p7));
+    const int np = s1->send(p1, p2, p3, p4, p5, p6, Part().share(p7));
 
     BOOST_TEST(np == sz);
 

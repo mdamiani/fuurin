@@ -112,17 +112,20 @@ public:
     ///@}
 
     /**
-     * \brief Creates a copy from an \c other part.
+     * \brief Creates a copy or share data from an \c other part.
      *
      * It calls \c zmq_msg_copy, so this messages is cleared
      * if it contains any contents.
      *
-     * \param[in] other Another part to copy from.
+     * Modifying contents after calling this function can lead
+     * to undefined behaviour.
+     *
+     * \param[in] other Another part to copy/share from.
      * \return A reference to this part.
      *
-     * \exception ZMQPartCopyFailed The part could not be copied.
+     * \exception ZMQPartCopyFailed The part could not be copied/shared.
      */
-    Part& copy(const Part& other);
+    Part& share(const Part& other);
 
     /**
      * \brief Checks whether an \c other part is equal to this one.

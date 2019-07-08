@@ -177,11 +177,11 @@ Part& Part::move(Part&& other)
 }
 
 
-Part& Part::copy(const Part& other)
+Part& Part::share(const Part& other)
 {
     const int rc = zmq_msg_copy(&msg_, &other.msg_);
     if (rc == -1)
-        throw ERROR(ZMQPartCopyFailed, "could not copy message part");
+        throw ERROR(ZMQPartCopyFailed, "could not share message part");
 
     return *this;
 }
