@@ -142,6 +142,10 @@ $> ./bin.v2/tools/bcp/.../bcp \
     boost/mpl/list.hpp \
     boost/scope_exit.hpp \
     boost/typeof/incr_registration_group.hpp \
+    boost/uuid/uuid.hpp \
+    boost/uuid/uuid_generators.hpp \
+    boost/uuid/uuid_io.hpp \
+    boost/uuid/uuid_hash.hpp \
     /path/to/fuurin/folder
 ```
 
