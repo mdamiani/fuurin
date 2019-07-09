@@ -31,6 +31,13 @@ The [Boost Test Framework](https://github.com/boostorg/test), which is part of t
 [Boost Software License 1.0](http://www.boost.org/LICENSE_1_0.txt).
 See the accompanying file [LICENSE_1_0.txt](vendor/boost/LICENSE_1_0.txt).
 
+### Apache License 2.0
+
+The [Google Benchmark](https://github.com/google/benchmark) library is distributed under
+[Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0).
+See the accompanying file [LICENSE](vendor/google/benchmark/LICENSE).
+
+
 ## How to build the library
 
 [CMake](ttps://cmake.org) is used as project management tool to
