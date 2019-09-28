@@ -45,18 +45,6 @@
 
 
 namespace {
-inline void memcpyWithEndian(void* dest, const void* source, size_t size)
-{
-#if __BYTE_ORDER == ENDIANESS_STRAIGHT
-    std::memcpy(dest, source, size);
-#elif __BYTE_ORDER == ENDIANESS_OPPOSITE
-    std::reverse_copy((uint8_t*)source, ((uint8_t*)source) + size, (uint8_t*)dest);
-#else
-#error "Unable to detect endianness"
-#endif
-}
-
-
 void initMessageSize(zmq_msg_t* msg, size_t size)
 {
     namespace log = fuurin::log;
@@ -67,17 +55,9 @@ void initMessageSize(zmq_msg_t* msg, size_t size)
         throw ERROR(ZMQPartCreateFailed, "could not create message part",
             log::Arg{
                 log::Arg{"reason"sv, log::ec_t{zmq_errno()}},
-                log::Arg{"size"sv, int(size)},
+                log::Arg{"size"sv, int(size)}, // FIXME: allow size_t/unsigned in Arg
             });
     }
-}
-
-
-template<typename T>
-inline void initMessageWithEndian(zmq_msg_t* msg, T val)
-{
-    initMessageSize(msg, sizeof(val));
-    memcpyWithEndian(zmq_msg_data(msg), &val, sizeof(val));
 }
 
 
@@ -94,6 +74,18 @@ namespace fuurin {
 namespace zmq {
 
 
+void Part::memcpyWithEndian(void* dest, const void* source, size_t size)
+{
+#if __BYTE_ORDER == ENDIANESS_STRAIGHT
+    std::memcpy(dest, source, size);
+#elif __BYTE_ORDER == ENDIANESS_OPPOSITE
+    std::reverse_copy((char*)source, ((char*)source) + size, (char*)dest);
+#else
+#error "Unable to detect endianness"
+#endif
+}
+
+
 Part::Part()
     : msg_(*reinterpret_cast<zmq_msg_t*>(raw_.msg_))
 {
@@ -106,38 +98,44 @@ Part::Part()
 }
 
 
-Part::Part(uint8_t val)
+Part::Part(msg_init_size_t, size_t size)
     : msg_(*reinterpret_cast<zmq_msg_t*>(raw_.msg_))
 {
-    initMessageWithEndian(&msg_, val);
+    initMessageSize(&msg_, size);
+}
+
+
+Part::Part(uint8_t val)
+    : Part(msg_init_size, sizeof(val))
+{
+    memcpyWithEndian(zmq_msg_data(&msg_), &val, sizeof(val));
 }
 
 
 Part::Part(uint16_t val)
-    : msg_(*reinterpret_cast<zmq_msg_t*>(raw_.msg_))
+    : Part(msg_init_size, sizeof(val))
 {
-    initMessageWithEndian(&msg_, val);
+    memcpyWithEndian(zmq_msg_data(&msg_), &val, sizeof(val));
 }
 
 
 Part::Part(uint32_t val)
-    : msg_(*reinterpret_cast<zmq_msg_t*>(raw_.msg_))
+    : Part(msg_init_size, sizeof(val))
 {
-    initMessageWithEndian(&msg_, val);
+    memcpyWithEndian(zmq_msg_data(&msg_), &val, sizeof(val));
 }
 
 
 Part::Part(uint64_t val)
-    : msg_(*reinterpret_cast<zmq_msg_t*>(raw_.msg_))
+    : Part(msg_init_size, sizeof(val))
 {
-    initMessageWithEndian(&msg_, val);
+    memcpyWithEndian(zmq_msg_data(&msg_), &val, sizeof(val));
 }
 
 
 Part::Part(const char* data, size_t size)
-    : msg_(*reinterpret_cast<zmq_msg_t*>(raw_.msg_))
+    : Part(msg_init_size, size)
 {
-    initMessageSize(&msg_, size);
     std::memcpy(zmq_msg_data(&msg_), data, size);
 }
 
@@ -155,15 +153,14 @@ Part::Part(const std::string& val)
 
 
 Part::Part(const Part& other)
-    : msg_(*reinterpret_cast<zmq_msg_t*>(raw_.msg_))
+    : Part(msg_init_size, other.size())
 {
-    initMessageSize(&msg_, other.size());
     std::memcpy(zmq_msg_data(&msg_), other.data(), other.size());
 }
 
 
 Part::Part(Part&& other)
-    : msg_(*reinterpret_cast<zmq_msg_t*>(raw_.msg_))
+    : Part()
 {
     moveMsg(&msg_, &other.msg_);
 }
@@ -229,6 +226,12 @@ Part& Part::operator=(const Part& other)
     msg_ = tmp;
 
     return *this;
+}
+
+
+char* Part::buffer() noexcept
+{
+    return static_cast<char*>(zmq_msg_data(&msg_));
 }
 
 

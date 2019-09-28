@@ -227,7 +227,7 @@ public:
     std::enable_if_t<std::is_same_v<std::decay_t<T>, Part>, int>
     send(T&& part, Args&&... args)
     {
-        return sendMessageMore(&part) + send(args...);
+        return sendMessageMore(&part) + send(std::forward<Args>(args)...);
     }
 
     template<typename T>
@@ -257,7 +257,7 @@ public:
     template<typename... Args>
     int recv(Part* part, Args&&... args)
     {
-        return recvMessageMore(part) + recv(args...);
+        return recvMessageMore(part) + recv(std::forward<Args>(args)...);
     }
 
     int recv(Part* part)

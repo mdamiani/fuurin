@@ -15,6 +15,7 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <ostream>
 
 
@@ -38,13 +39,15 @@ namespace zmq {
  * \brief This class stores a ZMQ message part to be sent or received.
  *
  * Memory for storage is allocated following the same behaviour
- * of \c zmq_msg_init* functions.
+ * of \c zmq_msg_init* functions. The semantics are the same
+ * as exposed by \c zmq_msg_t (e.g. it is cleared after sending).
  *
  * Data is stored with the proper sending/receiving endianess.
  */
 class Part final
 {
     friend class Socket;
+    friend class PartMulti;
 
 public:
     /**
@@ -55,7 +58,7 @@ public:
     explicit Part();
 
     /**
-     * \brief Inizializes with an integer value.
+     * \brief Inizializes a part with value.
      *
      * The value data is copied using the proper endianess format,
      * ready to be sent over the network.
@@ -218,11 +221,78 @@ public:
 
 private:
     /**
+     * Type used for size initialization.
+     * \see Part(msg_size_t)
+     */
+    struct msg_init_size_t
+    {};
+    static constexpr msg_init_size_t msg_init_size = msg_init_size_t{};
+
+    /**
+     * \brief Inizializes a part with a buffer of the specified \c size.
+     *
+     * This method calls \c zmq_msg_init_size.
+     *
+     * \param[in] size Size of this part.
+     *
+     * \exception ZMQPartCreateFailed The part could not be created.
+     */
+    explicit Part(msg_init_size_t, size_t size);
+
+    /**
+     * \return This part's internal buffer.
+     */
+    char* buffer() noexcept;
+
+    /**
      * \brief Releases resources for this part.
      *
      * This method calls \c zmq_msg_close.
      */
-    inline void close() noexcept;
+    void close() noexcept;
+
+    /**
+     * \brief Copies an integral type value to a destination buffer, with endianess conversion.
+     * \param[in] dest Destination buffer.
+     * \param[in] value Value to copy.
+     * \see void memcpyWithEndian(void*, const void*, size_t);
+     */
+    template<typename T>
+    static std::enable_if_t<std::is_integral_v<std::decay_t<T>> && std::is_unsigned_v<std::decay_t<T>>, void>
+    memcpyWithEndian(void* dest, T&& value)
+    {
+        memcpyWithEndian(dest, &value, sizeof(T));
+    }
+
+    /**
+     * \brief Extracts an integral type value from a source buffer, with endianess conversion.
+     * \param[in] source Source buffer.
+     * \return The extracted value.
+     * \see void memcpyWithEndian(void*, const void*, size_t);
+     */
+    template<typename T>
+    static std::enable_if_t<std::is_integral_v<std::decay_t<T>> && std::is_unsigned_v<std::decay_t<T>>, T>
+    memcpyWithEndian(const void* source)
+    {
+        T value;
+        memcpyWithEndian(&value, source, sizeof(T));
+        return value;
+    }
+    ///@}
+
+    /**
+     * \brief Copies memory to/from internal buffer, with proper endianess.
+     *
+     * If the native endianess matches the sending one, then data is copied
+     * as is without any conversion.
+     *
+     * \param[in] dest Destination buffer.
+     * \param[in] source Source buffer.
+     * \param[in] size Size of buffer.
+     *
+     * \see buffer()
+     */
+    static void memcpyWithEndian(void* dest, const void* source, size_t size);
 
 
 private:

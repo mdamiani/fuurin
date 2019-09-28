@@ -78,6 +78,7 @@ DECL_ERROR(ZMQSocketRecvFailed)
 DECL_ERROR(ZMQPartCreateFailed)
 DECL_ERROR(ZMQPartMoveFailed)
 DECL_ERROR(ZMQPartCopyFailed)
+DECL_ERROR(ZMQPartAccessFailed)
 DECL_ERROR(ZMQPollerCreateFailed)
 DECL_ERROR(ZMQPollerWaitFailed)
 

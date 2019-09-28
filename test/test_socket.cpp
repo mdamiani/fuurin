@@ -16,6 +16,7 @@
 
 #include "fuurin/zmqcontext.h"
 #include "fuurin/zmqpart.h"
+#include "fuurin/zmqpartmulti.h"
 #include "fuurin/zmqsocket.h"
 #include "fuurin/zmqpoller.h"
 
@@ -26,6 +27,7 @@
 #include <memory>
 #include <type_traits>
 #include <sstream>
+#include <limits>
 
 
 using namespace std::literals;
@@ -173,6 +175,148 @@ BOOST_AUTO_TEST_CASE(partOstream)
     os << m;
 
     BOOST_TEST(os.str() == "696A6B");
+}
+
+
+BOOST_AUTO_TEST_CASE(partMultiEmpty)
+{
+    Part a = PartMulti::pack<>();
+    std::tuple<> t = PartMulti::unpack<>(a);
+
+    BOOST_TEST(a.size() == size_t(0));
+    BOOST_TEST(std::tuple_size_v<decltype(t)> == size_t(0));
+    BOOST_TEST(a == Part());
+}
+
+
+BOOST_AUTO_TEST_CASE(partMultiEmptyString)
+{
+    Part a = PartMulti::pack<std::string>("");
+    std::tuple<std::string> t = PartMulti::unpack<std::string>(a);
+
+    BOOST_TEST(a.size() == sizeof(PartMulti::string_length_t));
+    BOOST_TEST(std::tuple_size_v<decltype(t)> == size_t(1));
+    BOOST_TEST(std::get<0>(t) == std::string());
+}
+
+
+BOOST_AUTO_TEST_CASE_TEMPLATE(partMultiIntType, T, partIntTypes)
+{
+    T val = T(1) << (sizeof(T) * 8 - 1);
+    Part a = PartMulti::pack(val);
+    std::tuple<T> t = PartMulti::unpack<T>(a);
+
+    BOOST_TEST(a.size() == sizeof(T));
+    BOOST_TEST(std::tuple_size_v<decltype(t)> == size_t(1));
+    BOOST_TEST(std::get<0>(t) == val);
+}
+
+
+typedef boost::mpl::list<std::string_view, std::string, Part> partMultiStringTypes;
+
+BOOST_AUTO_TEST_CASE_TEMPLATE(partMultiStringType, T, partMultiStringTypes)
+{
+    const auto val = "testdata"sv;
+    Part a = PartMulti::pack(T{val});
+    std::tuple<T> t = PartMulti::unpack<T>(a);
+
+    BOOST_TEST(a.size() == val.size() + sizeof(PartMulti::string_length_t));
+    BOOST_TEST(std::tuple_size_v<decltype(t)> == size_t(1));
+    BOOST_TEST(std::get<0>(t).size() == val.size());
+    BOOST_TEST(std::memcmp(std::get<0>(t).data(), val.data(), val.size()) == 0);
+}
+
+
+BOOST_AUTO_TEST_CASE(partMultiMore)
+{
+    Part a = PartMulti::pack(uint32_t(3), uint32_t(14),
+        "123123"sv, "string"s, Part(uint64_t(12345)));
+
+    std::tuple<uint32_t, uint32_t, std::string_view, std::string, Part> t =
+        PartMulti::unpack<uint32_t, uint32_t, std::string_view, std::string, Part>(a);
+
+    BOOST_TEST(a.size() == size_t(40));
+    BOOST_TEST(std::tuple_size_v<decltype(t)> == size_t(5));
+    BOOST_TEST(std::get<0>(t) == uint32_t(3));
+    BOOST_TEST(std::get<1>(t) == uint32_t(14));
+    BOOST_TEST(std::get<2>(t) == "123123"sv);
+    BOOST_TEST(std::get<3>(t) == "string"s);
+    BOOST_TEST(std::get<4>(t).toUint64() == uint64_t(12345));
+}
+
+
+BOOST_AUTO_TEST_CASE(partMultiRecursive)
+{
+    Part a = PartMulti::pack(10u, 20u);
+    Part b = PartMulti::pack(30u, a);
+
+    BOOST_TEST(a.size() == sizeof(unsigned) * 2);
+    BOOST_TEST(b.size() == sizeof(unsigned) + sizeof(PartMulti::string_length_t) + a.size());
+
+    std::tuple<unsigned, Part> tb = PartMulti::unpack<unsigned, Part>(b);
+
+    BOOST_TEST(std::tuple_size_v<decltype(tb)> == size_t(2));
+    BOOST_TEST(std::get<0>(tb) == 30u);
+
+    std::tuple<unsigned, unsigned> ta = PartMulti::unpack<unsigned, unsigned>(std::get<1>(tb));
+
+    BOOST_TEST(std::tuple_size_v<decltype(ta)> == size_t(2));
+    BOOST_TEST(std::get<0>(ta) == 10u);
+    BOOST_TEST(std::get<1>(ta) == 20u);
+}
+
+
+BOOST_AUTO_TEST_CASE(partMultiUnpackIntErr)
+{
+    Part a = PartMulti::pack<uint16_t>(1);
+    BOOST_REQUIRE_THROW(PartMulti::unpack<uint32_t>(a),
+        fuurin::err::ZMQPartAccessFailed);
+}
+
+
+BOOST_AUTO_TEST_CASE(partMultiUnpackStringErr)
+{
+    // size access error.
+    Part a = PartMulti::pack<uint16_t>(1);
+    BOOST_REQUIRE_THROW(PartMulti::unpack<std::string>(a),
+        fuurin::err::ZMQPartAccessFailed);
+
+    // contensts access error.
+    Part b = PartMulti::pack<PartMulti::string_length_t>(1);
+    BOOST_REQUIRE_THROW(PartMulti::unpack<std::string>(b),
+        fuurin::err::ZMQPartAccessFailed);
+}
+
+
+namespace fuurin {
+namespace zmq {
+class TestPartMulti
+{
+public:
+    template<typename... Args>
+    static void pack(Part* pm, Args&&... args)
+    {
+        PartMulti::pack2(*pm, 0, args...);
+    }
+};
+} // namespace zmq
+} // namespace fuurin
+
+
+BOOST_AUTO_TEST_CASE(partMultiPackIntErr)
+{
+    Part a = PartMulti::pack<uint16_t>(0);
+    BOOST_REQUIRE_THROW(TestPartMulti::pack<uint32_t>(&a, uint32_t(1)),
+        fuurin::err::ZMQPartCreateFailed);
+}
+
+
+BOOST_AUTO_TEST_CASE(partMultiPackStringErr)
+{
+    // size access error.
+    Part a = PartMulti::pack<uint16_t>(0);
+    BOOST_REQUIRE_THROW(TestPartMulti::pack<std::string>(&a, ""),
+        fuurin::err::ZMQPartCreateFailed);
 }
 
 
