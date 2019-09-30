@@ -52,7 +52,7 @@ Arg::Val::Val(Ref<Arg>* v) noexcept
 Arg::Arg() noexcept
     : type_(Type::Invalid)
     , alloc_(Alloc::None)
-    , key_(nullptr)
+    , key_(std::string_view())
     , val_(0)
 {
 }
