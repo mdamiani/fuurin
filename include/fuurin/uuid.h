@@ -8,33 +8,20 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-#ifndef FUURIN_TOPIC_H
-#define FUURIN_TOPIC_H
-
-#include "fuurin/uuid.h"
-#include "fuurin/zmqpart.h"
+#ifndef FUURIN_UUID_H
+#define FUURIN_UUID_H
 
 #include <array>
-#include <string>
 
 
 namespace fuurin {
 
-class Topic
+// TODO: to be implemented.
+struct Uuid
 {
-public:
-    using name_t = std::array<char, 16>;
-    Topic(){};
-
-
-private:
-    Uuid broker_;
-    Uuid worker_;
-    uint64_t seqn_;
-    name_t name_;
-    zmq::Part data_;
+    std::array<uint8_t, 16> data;
 };
 
 } // namespace fuurin
 
-#endif // FUURIN_TOPIC_H
+#endif // FUURIN_UUID_H
