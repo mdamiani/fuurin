@@ -30,7 +30,19 @@
 #include <limits>
 
 
+namespace std {
+namespace chrono {
+inline std::ostream& operator<<(std::ostream& os, const std::chrono::milliseconds& millis)
+{
+    os << millis.count();
+    return os;
+}
+} // namespace chrono
+} // namespace std
+
+
 using namespace std::literals;
+using namespace std::chrono_literals;
 
 using namespace fuurin::zmq;
 namespace utf = boost::unit_test;
@@ -555,7 +567,7 @@ BOOST_AUTO_TEST_CASE(transferMultiPart)
 }
 
 
-void testWaitForEvents(Socket* socket, PollerEvents::Type type, int timeout, bool expected)
+void testWaitForEvents(Socket* socket, PollerEvents::Type type, std::chrono::milliseconds timeout, bool expected)
 {
     Poller poll(type, socket);
     poll.setTimeout(timeout);
@@ -581,10 +593,10 @@ void testWaitForEvents(Socket* socket, PollerEvents::Type type, int timeout, boo
 
 BOOST_DATA_TEST_CASE(waitForEventOne,
     bdata::make({
-        std::make_tuple('w', PollerEvents::Type::Write, 250, true),
-        std::make_tuple('w', PollerEvents::Type::Read, 250, false),
-        std::make_tuple('r', PollerEvents::Type::Write, 250, true),
-        std::make_tuple('r', PollerEvents::Type::Read, 2500, true),
+        std::make_tuple('w', PollerEvents::Type::Write, 250ms, true),
+        std::make_tuple('w', PollerEvents::Type::Read, 250ms, false),
+        std::make_tuple('r', PollerEvents::Type::Write, 250ms, true),
+        std::make_tuple('r', PollerEvents::Type::Read, 2500ms, true),
     }),
     type, event, timeout, expected)
 {
@@ -634,7 +646,7 @@ BOOST_AUTO_TEST_CASE(waitForEventMore)
     s3->send(Part(uint8_t(2)));
 
     Poller poll(PollerEvents::Type::Read, s2.get(), s4.get());
-    poll.setTimeout(2500);
+    poll.setTimeout(2500ms);
 
     const auto events = poll.wait();
 
@@ -666,11 +678,11 @@ BOOST_AUTO_TEST_CASE(waitForEventMore)
 
 BOOST_DATA_TEST_CASE(publishMessage,
     bdata::make({
-        std::make_tuple("filt1"s, "filt1"s, 100, 50, true),
-        std::make_tuple("filt1"s, ""s, 100, 50, true),
-        std::make_tuple(""s, ""s, 100, 50, true),
-        std::make_tuple(""s, "filt2"s, 100, 10, false),
-        std::make_tuple("filt1"s, "filt2"s, 100, 10, false),
+        std::make_tuple("filt1"s, "filt1"s, 100ms, 50, true),
+        std::make_tuple("filt1"s, ""s, 100ms, 50, true),
+        std::make_tuple(""s, ""s, 100ms, 50, true),
+        std::make_tuple(""s, "filt2"s, 100ms, 10, false),
+        std::make_tuple("filt1"s, "filt2"s, 100ms, 10, false),
     }),
     pubFilt, subFilt, timeout, count, expected)
 {

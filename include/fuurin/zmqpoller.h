@@ -13,6 +13,7 @@
 
 #include <array>
 #include <iterator>
+#include <chrono>
 
 
 struct zmq_poller_event_t;
@@ -71,12 +72,13 @@ private:
      * \param[in] ptr ZMQ poller.
      * \param[out] events Array to store events.
      * \param[in] size Size of the array of events.
-     * \param[in] timeout Timeout to wait for (-1 will disable timeout).
+     * \param[in] timeout Timeout to wait for (a negative value will disable timeout).
      *
      * \exception ZMQPollerWaitFailed Polling could not be performed.
      * \return Number of returned \c events, or 0 in case it timed out.
      */
-    static size_t waitForEvents(void* ptr, zmq_poller_event_t events[], size_t size, int timeout = -1);
+    static size_t waitForEvents(void* ptr, zmq_poller_event_t events[], size_t size,
+        std::chrono::milliseconds timeout = std::chrono::milliseconds(-1));
 };
 
 } // namespace internal
@@ -230,7 +232,7 @@ public:
         , ptr_(internal::PollerImpl::createPoller(&sockets_[0], Count,
               ev == PollerEvents::Type::Read, ev == PollerEvents::Type::Write))
         , type_(ev)
-        , timeout_(-1)
+        , timeout_(std::chrono::milliseconds(-1))
     {
     }
 
@@ -263,22 +265,23 @@ public:
     /**
      * \brief Sets the timeout of a \ref wait() operation.
      *
-     * \param[in] ms Timeout in milliseconds,
-     *      any negative value will disable timeout.
+     * \param[in] tmeo Timeout value, any negative value will disable timeout.
      *
      * \see timeout()
      * \see wait()
      */
-    inline void setTimeout(int ms) noexcept
+    inline void setTimeout(std::chrono::milliseconds tmeo) noexcept
     {
-        timeout_ = ms >= 0 ? ms : -1;
+        timeout_ = tmeo.count() >= 0 ? tmeo : std::chrono::milliseconds(-1);
     }
 
     /**
      * \return The current timeout in milliseconds,
-     *      or -1 in case of no timeout.
+     *      or -1ms in case of no timeout.
+     *
+     * \see setTimeout(std::chrono::milliseconds)
      */
-    inline int timeout() const noexcept
+    inline std::chrono::milliseconds timeout() const noexcept
     {
         return timeout_;
     }
@@ -296,7 +299,7 @@ public:
      * \return An iterable \ref PollerEvents object over the subset of ready sockets.
      *      This subset can be empty if \ref timeout() has expired and sockets are not ready.
      *
-     * \see setTimeout(int)
+     * \see setTimeout(std::chrono::milliseconds)
      * \see PollerImpl::waitForEvents
      */
     inline PollerEvents wait()
@@ -308,10 +311,10 @@ public:
 
 
 private:
-    Array sockets_;           ///< Array of monitored sockets.
-    void* ptr_;               ///< Pointer to ZMQ poller object.
-    PollerEvents::Type type_; ///< Type of events to wait for.
-    int timeout_;             ///< Timeout to wait for.
+    Array sockets_;                     ///< Array of monitored sockets.
+    void* ptr_;                         ///< Pointer to ZMQ poller object.
+    PollerEvents::Type type_;           ///< Type of events to wait for.
+    std::chrono::milliseconds timeout_; ///< Timeout to wait for.
 
     /**
      * \brief This is the backing array to hold a bare \c zmq_poller_event_t array type.

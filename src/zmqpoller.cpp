@@ -75,11 +75,12 @@ void PollerImpl::destroyPoller(void** ptr) noexcept
 }
 
 
-size_t PollerImpl::waitForEvents(void* ptr, zmq_poller_event_t events[], size_t size, int timeout)
+size_t PollerImpl::waitForEvents(void* ptr, zmq_poller_event_t events[], size_t size, std::chrono::milliseconds timeout)
 {
+    const auto millis = timeout.count() >= 0 ? timeout.count() : -1;
     int rc;
     do {
-        rc = zmq_poller_wait_all(ptr, events, size, timeout);
+        rc = zmq_poller_wait_all(ptr, events, size, millis);
     } while (rc == -1 && zmq_errno() == EINTR);
 
     if (rc == -1) {
