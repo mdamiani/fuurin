@@ -41,19 +41,22 @@ std::string format(const char* format, ...);
         Logger::level(std::forward<Loc>(c), arr, sizeof...(Args)); \
     }
 BOOST_PP_SEQ_FOR_EACH(LOG_LEVEL, _, (debug)(info)(warn)(error)(fatal))
-#undef LOG
+#undef LOG_LEVEL
+
+
+} // namespace log
+} // namespace fuurin
+
 
 #ifndef NDEBUG
-#define LOG_DEBUG(...) debug({__FILE__, __LINE__}, __VA_ARGS__)
+#define LOG_DEBUG(...) fuurin::log::debug({__FILE__, __LINE__}, __VA_ARGS__)
 #else
 #define LOG_DEBUG(...)
 #endif
 
-#define LOG_INFO(...) info({__FILE__, __LINE__}, __VA_ARGS__)
-#define LOG_WARN(...) warn({__FILE__, __LINE__}, __VA_ARGS__)
-#define LOG_ERROR(...) error({__FILE__, __LINE__}, __VA_ARGS__)
-#define LOG_FATAL(...) fatal({__FILE__, __LINE__}, __VA_ARGS__)
-} // namespace log
-} // namespace fuurin
+#define LOG_INFO(...) fuurin::log::info({__FILE__, __LINE__}, __VA_ARGS__)
+#define LOG_WARN(...) fuurin::log::warn({__FILE__, __LINE__}, __VA_ARGS__)
+#define LOG_ERROR(...) fuurin::log::error({__FILE__, __LINE__}, __VA_ARGS__)
+#define LOG_FATAL(...) fuurin::log::fatal({__FILE__, __LINE__}, __VA_ARGS__)
 
 #endif // LOG_H

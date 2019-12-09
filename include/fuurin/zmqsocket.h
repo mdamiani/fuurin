@@ -67,7 +67,7 @@ public:
      * \param[in] ctx A valid ZMQ context.
      * \param[in] type Type of ZMQ socket.
      */
-    explicit Socket(Context* ctx, Type type);
+    explicit Socket(Context* ctx, Type type) noexcept;
 
     /**
      * \brief Destroys (and closes) this socket.
@@ -149,20 +149,18 @@ public:
      *   - Set ZMQ_LINGER property.
      *   - Set ZMQ_SUBSCRIBE property.
      *
-     * Finally the socket is connected or bound to the passed endpoints.
+     * Finally the socket is connected or bound to the set endpoints.
      * In case of exceptions, socket is not open (exception safety).
-     *
-     * \param[in] action Either \c connect or \c bind.
-     * \param[in] endpoints List of endpoints to connect or bind to.
      *
      * \exception ZMQSocketCreateFailed Socket could not be created, or it is not closed.
      * \exception ZMQSocketOptionSetFailed Socket options could not be set.
      * \exception ZMQSocketConnectFailed Socket could not be connected to one endpoint.
      * \exception ZMQSocketBindFailed Socket could not be bound to one endpoint.
      *
+     * \see setEndpoints
+     * \see openEndpoints()
      * \see connect(std::string)
      * \see bind(std::string, int)
-     * \see openEndpoints()
      * \see open()
      * \see close()
      * \see setOption()

@@ -62,7 +62,7 @@ int zmqSocketType(Socket::Type type)
 } // namespace
 
 
-Socket::Socket(Context* ctx, Type type)
+Socket::Socket(Context* ctx, Type type) noexcept
     : ctx_(ctx)
     , type_(type)
     , ptr_(nullptr)

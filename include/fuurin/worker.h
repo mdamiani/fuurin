@@ -11,19 +11,47 @@
 #ifndef FUURIN_WORKER_H
 #define FUURIN_WORKER_H
 
-#include "fuurin/topic.h"
+#include <memory>
+#include <future>
+#include <atomic>
 
 
 namespace fuurin {
 
+namespace zmq {
+class Context;
+class Socket;
+} // namespace zmq
+
 
 class Worker
 {
+public:
     Worker();
-    ~Worker() noexcept;
+    virtual ~Worker() noexcept;
 
-    void connect();
-    void close() noexcept;
+    std::future<void> start();
+    bool stop() noexcept;
+    bool isRunning() const noexcept;
+
+
+private:
+    enum Command : uint8_t
+    {
+        Stop,
+    };
+
+
+private:
+    void run(uint8_t token);
+
+
+private:
+    std::unique_ptr<zmq::Context> zctx_;
+    std::unique_ptr<zmq::Socket> zcmds_;
+    std::unique_ptr<zmq::Socket> zcmdr_;
+    std::atomic<bool> running_;
+    uint8_t token_;
 };
 
 } // namespace fuurin

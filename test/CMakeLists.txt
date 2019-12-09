@@ -48,3 +48,4 @@ endfunction (AddTest)
 
 AddTest(test_common)
 AddTest(test_socket)
+AddTest(test_worker)
