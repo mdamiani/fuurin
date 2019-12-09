@@ -11,16 +11,31 @@
 #ifndef TYPES_H
 #define TYPES_H
 
-#include <cstddef>
-#include <cstdint>
-#include <vector>
-#include <string>
+#include <type_traits>
+#include <chrono>
+#include <limits>
+
 
 #define UNUSED(x) (void)(x)
 
+
 namespace fuurin {
-using ByteArray = std::vector<uint8_t>;
-using String = std::string;
+namespace zmq {
+
+template<typename T>
+std::enable_if_t<std::is_integral_v<std::decay_t<T>>, T>
+getMillis(std::chrono::milliseconds val)
+{
+    if (val.count() < 0) {
+        return -1;
+    } else if (val.count() > std::numeric_limits<T>::max()) {
+        return std::numeric_limits<T>::max();
+    } else {
+        return static_cast<T>(val.count());
+    }
+}
+
+} // namespace zmq
 } // namespace fuurin
 
 #endif // TYPES_H

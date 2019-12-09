@@ -13,6 +13,7 @@
 #include "fuurin/zmqpart.h"
 #include "fuurin/errors.h"
 #include "failure.h"
+#include "types.h"
 #include "log.h"
 
 #include <zmq.h>
@@ -65,7 +66,7 @@ Socket::Socket(Context* ctx, Type type)
     : ctx_(ctx)
     , type_(type)
     , ptr_(nullptr)
-    , linger_(0)
+    , linger_(0ms)
 {
 }
 
@@ -88,13 +89,13 @@ Socket::Type Socket::type() const noexcept
 }
 
 
-void Socket::setLinger(int value) noexcept
+void Socket::setLinger(std::chrono::milliseconds value) noexcept
 {
     linger_ = value;
 }
 
 
-int Socket::linger() const noexcept
+std::chrono::milliseconds Socket::linger() const noexcept
 {
     return linger_;
 }
@@ -263,7 +264,7 @@ void Socket::open(std::function<void(std::string)> action)
     };
 
     // Configure socket.
-    setOption(ZMQ_LINGER, linger_);
+    setOption(ZMQ_LINGER, getMillis<int>(linger_));
 
     for (const auto& s : subscriptions_)
         setOption(ZMQ_SUBSCRIBE, s);

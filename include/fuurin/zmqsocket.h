@@ -12,6 +12,7 @@
 #define ZMQSOCKET_H
 
 #include <string>
+#include <chrono>
 #include <list>
 #include <functional>
 #include <type_traits>
@@ -97,16 +98,16 @@ public:
      * \brief Sets a \c ZMQ_LINGER value to this socket.
      * The socket linger value is actually applied at connection/bind time.
      *
-     * \param[in] value Linger value.
+     * \param[in] value Linger value, a negative value sets an infinite wait.
      * \see linger()
      */
-    void setLinger(int value) noexcept;
+    void setLinger(std::chrono::milliseconds value) noexcept;
 
     /**
      * \return The linger value.
-     * \see setLinger()
+     * \see setLinger(std::chrono::milliseconds)
      */
-    int linger() const noexcept;
+    std::chrono::milliseconds linger() const noexcept;
 
     /**
      * \brief Sets a \c ZMQ_SUBSCRIBE filter to this socket.
@@ -375,7 +376,7 @@ private:
     const Type type_;    ///< ZMQ type of socket.
     void* ptr_;          ///< ZMQ socket.
 
-    int linger_;                           ///< Linger value.
+    std::chrono::milliseconds linger_;     ///< Linger value.
     std::list<std::string> subscriptions_; ///< List of subscriptions.
     std::list<std::string> endpoints_;     ///< List of endpoints to connect/bind.
     std::list<std::string> openEndpoints_; ///< List of connected/bound endpoints.

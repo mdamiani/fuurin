@@ -12,6 +12,7 @@
 #include "fuurin/zmqsocket.h"
 #include "fuurin/errors.h"
 #include "failure.h"
+#include "types.h"
 #include "log.h"
 
 #include <zmq.h>
@@ -77,10 +78,9 @@ void PollerImpl::destroyPoller(void** ptr) noexcept
 
 size_t PollerImpl::waitForEvents(void* ptr, zmq_poller_event_t events[], size_t size, std::chrono::milliseconds timeout)
 {
-    const auto millis = timeout.count() >= 0 ? timeout.count() : -1;
     int rc;
     do {
-        rc = zmq_poller_wait_all(ptr, events, size, millis);
+        rc = zmq_poller_wait_all(ptr, events, size, getMillis<long>(timeout));
     } while (rc == -1 && zmq_errno() == EINTR);
 
     if (rc == -1) {
