@@ -9,3 +9,19 @@
  */
 
 #include "fuurin/broker.h"
+
+
+namespace fuurin {
+
+
+Broker::Broker()
+{
+}
+
+
+Broker::~Broker() noexcept
+{
+}
+
+
+} // namespace fuurin

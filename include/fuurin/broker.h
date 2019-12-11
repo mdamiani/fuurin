@@ -11,20 +11,31 @@
 #ifndef FUURIN_BROKER_H
 #define FUURIN_BROKER_H
 
-#include "fuurin/topic.h"
+#include "fuurin/runner.h"
 
 
 namespace fuurin {
 
 
-class Broker
+/**
+ * \brief Broker is the server interface to implement a storage broker.
+ *
+ * This class is not thread-safe.
+ */
+class Broker : public Runner
 {
+public:
+    /**
+     * \brief Initializes this broker.
+     */
     Broker();
-    ~Broker() noexcept;
 
-    void bind();
-    void close() noexcept;
+    /**
+     * \brief Destroys this broker.
+     */
+    virtual ~Broker() noexcept;
 };
+
 
 } // namespace fuurin
 

@@ -14,6 +14,7 @@
 #include <boost/mpl/list.hpp>
 #include <benchmark/benchmark.h>
 
+#include "fuurin/broker.h"
 #include "fuurin/worker.h"
 
 
@@ -21,7 +22,8 @@ using namespace fuurin;
 namespace utf = boost::unit_test;
 
 
-BOOST_AUTO_TEST_CASE(workerStart)
+typedef boost::mpl::list<Broker, Worker> runnerTypes;
+BOOST_AUTO_TEST_CASE_TEMPLATE(workerStart, T, runnerTypes)
 {
     Worker w;
     BOOST_TEST(!w.isRunning());
@@ -41,14 +43,16 @@ BOOST_AUTO_TEST_CASE(workerStart)
 }
 
 
-static void BM_workerCreate(benchmark::State& state)
+static void BM_workerStart(benchmark::State& state)
 {
     for (auto _ : state) {
-        auto* w = new Worker;
-        delete w;
+        Worker w;
+        auto fut = w.start();
+        w.stop();
+        fut.get();
     }
 }
-BENCHMARK(BM_workerCreate);
+BENCHMARK(BM_workerStart);
 
 
 BOOST_AUTO_TEST_CASE(bench, *utf::disabled())

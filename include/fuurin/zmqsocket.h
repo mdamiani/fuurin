@@ -34,7 +34,7 @@ class PollerImpl;
  * \brief This class wraps a ZMQ socket.
  * This class is not tread-safe.
  */
-class Socket final
+class Socket
 {
     template<typename...>
     friend class Poller;
