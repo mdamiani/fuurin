@@ -198,6 +198,67 @@ private:
 
 
 /**
+ * \brief This interface wraps the waiting primitive upon one or more \ref Socket.
+ *
+ * This interface is implemented by the actual \ref Poller class.
+ */
+class PollerWait
+{
+public:
+    /// Constructor.
+    PollerWait();
+
+    /// Destructor.
+    virtual ~PollerWait() noexcept;
+
+    /**
+     * Disable copy.
+     */
+    ///{@
+    PollerWait(const PollerWait&) = delete;
+    PollerWait& operator=(const PollerWait&) = delete;
+    ///@}
+
+    /**
+     * \brief Sets the timeout of a \ref wait() operation.
+     *
+     * \param[in] tmeo Timeout value, any negative value will disable timeout.
+     *
+     * \see timeout()
+     * \see wait()
+     */
+    virtual void setTimeout(std::chrono::milliseconds tmeo) noexcept = 0;
+
+    /**
+     * \return The current timeout in milliseconds,
+     *      or a negative value (-1ms) if timeout is disabled.
+     *
+     * \see setTimeout(std::chrono::milliseconds)
+     * \see wait()
+     */
+    virtual std::chrono::milliseconds timeout() const noexcept = 0;
+
+    /**
+     * \brief Waits for an event on multiple \ref Socket objects.
+     * This method will block forever until at least one socket is ready,
+     * or it will return after \ref timeout() has expired.
+     *
+     * Returned \ref PollerEvents and \ref PollerIterator structures
+     * are valid until this object is alive and until the next call
+     * to this method.
+     *
+     * \exception ZMQPollerWaitFailed Polling could not be performed.
+     * \return An iterable \ref PollerEvents object over the subset of ready sockets.
+     *      This subset can be empty if \ref timeout() has expired and sockets are not ready.
+     *
+     * \see setTimeout(std::chrono::milliseconds)
+     * \see PollerWait::wait()
+     */
+    virtual PollerEvents wait() = 0;
+};
+
+
+/**
  * \brief This class takes one or more \ref Socket objects and performs polling.
  *
  * Sockets must be valid and open.
@@ -205,7 +266,7 @@ private:
  * hence the poller must be destroyed.
  */
 template<typename... Args>
-class Poller final
+class Poller final : public PollerWait
 {
     friend class internal::PollerImpl;
 
@@ -275,42 +336,34 @@ public:
      *
      * \param[in] tmeo Timeout value, any negative value will disable timeout.
      *
-     * \see timeout()
-     * \see wait()
+     * \see PollerWait::setTimeout
      */
-    inline void setTimeout(std::chrono::milliseconds tmeo) noexcept
+    inline void setTimeout(std::chrono::milliseconds tmeo) noexcept override
     {
         timeout_ = tmeo.count() >= 0 ? tmeo : std::chrono::milliseconds(-1);
     }
 
     /**
      * \return The current timeout in milliseconds,
-     *      or -1ms in case of no timeout.
+     *      or a negative value (-1ms) if timeout is disabled.
      *
-     * \see setTimeout(std::chrono::milliseconds)
+     * \see PollerWait::timeout()
      */
-    inline std::chrono::milliseconds timeout() const noexcept
+    inline std::chrono::milliseconds timeout() const noexcept override
     {
         return timeout_;
     }
 
     /**
      * \brief Waits for an event on multiple \ref Socket objects.
-     * This function will block until at least one socket is ready,
-     * or it will return after the configured \ref timeout().
-     *
-     * Returned \ref PollerEvents and \ref PollerIterator structures
-     * are valid until this object is alive and until the next call
-     * to this method.
      *
      * \exception ZMQPollerWaitFailed Polling could not be performed.
      * \return An iterable \ref PollerEvents object over the subset of ready sockets.
-     *      This subset can be empty if \ref timeout() has expired and sockets are not ready.
      *
-     * \see setTimeout(std::chrono::milliseconds)
+     * \see PollerWait::wait()
      * \see PollerImpl::waitForEvents
      */
-    inline PollerEvents wait()
+    inline PollerEvents wait() override
     {
         return PollerEvents(type_, (zmq_poller_event_t*)raw_.events_,
             internal::PollerImpl::waitForEvents(ptr_,
@@ -326,7 +379,7 @@ private:
 
     /**
      * \brief This is the backing array to hold a bare \c zmq_poller_event_t array type.
-     * Size and alignment depends on values found in zmq.h header file.
+     * Size and alignment depend on values found in zmq.h header file.
      */
     struct alignas(void*) Raw
     {

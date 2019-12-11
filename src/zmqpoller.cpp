@@ -180,5 +180,8 @@ PollerIterator::value_type PollerIterator::operator*() const noexcept
 }
 
 
+PollerWait::PollerWait() = default;
+PollerWait::~PollerWait() noexcept = default;
+
 } // namespace zmq
 } // namespace fuurin
