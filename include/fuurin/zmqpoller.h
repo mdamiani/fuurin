@@ -247,6 +247,14 @@ public:
     }
 
     /**
+     * Disable copy.
+     */
+    ///{@
+    Poller(const Poller&) = delete;
+    Poller& operator=(const Poller&) = delete;
+    ///@}
+
+    /**
      * \return Array of sockets of this poller.
      */
     inline const Array& sockets() const noexcept
