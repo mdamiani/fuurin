@@ -23,7 +23,7 @@ namespace zmq {
 class Context;
 class Socket;
 class Part;
-class PollerWait;
+class PollerWaiter;
 } // namespace zmq
 
 
@@ -137,12 +137,12 @@ protected:
      * This notification shall be executed in the asynchronous task thread.
      *
      * \param[in] sock Inter-thread socket used by the main asynchronous task.
-     *      It shall be added to the list of sockets \ref zmq::PollerWait will wait for.
+     *      It shall be added to the list of sockets \ref zmq::PollerWaiter will wait for.
      *
      * \exception May throw exceptions.
      * \return A pointer to a newly created poller.
      */
-    virtual std::unique_ptr<zmq::PollerWait> createPoller(zmq::Socket* sock);
+    virtual std::unique_ptr<zmq::PollerWaiter> createPoller(zmq::Socket* sock);
 
     /**
      * \brief Notifies whenever any operation request was received by the asynchrnous task.

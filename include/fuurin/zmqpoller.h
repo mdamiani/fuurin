@@ -202,21 +202,21 @@ private:
  *
  * This interface is implemented by the actual \ref Poller class.
  */
-class PollerWait
+class PollerWaiter
 {
 public:
     /// Constructor.
-    PollerWait();
+    PollerWaiter();
 
     /// Destructor.
-    virtual ~PollerWait() noexcept;
+    virtual ~PollerWaiter() noexcept;
 
     /**
      * Disable copy.
      */
     ///{@
-    PollerWait(const PollerWait&) = delete;
-    PollerWait& operator=(const PollerWait&) = delete;
+    PollerWaiter(const PollerWaiter&) = delete;
+    PollerWaiter& operator=(const PollerWaiter&) = delete;
     ///@}
 
     /**
@@ -252,7 +252,7 @@ public:
      *      This subset can be empty if \ref timeout() has expired and sockets are not ready.
      *
      * \see setTimeout(std::chrono::milliseconds)
-     * \see PollerWait::wait()
+     * \see PollerWaiter::wait()
      */
     virtual PollerEvents wait() = 0;
 };
@@ -266,7 +266,7 @@ public:
  * hence the poller must be destroyed.
  */
 template<typename... Args>
-class Poller final : public PollerWait
+class Poller final : public PollerWaiter
 {
     friend class internal::PollerImpl;
 
@@ -336,7 +336,7 @@ public:
      *
      * \param[in] tmeo Timeout value, any negative value will disable timeout.
      *
-     * \see PollerWait::setTimeout
+     * \see PollerWaiter::setTimeout
      */
     inline void setTimeout(std::chrono::milliseconds tmeo) noexcept override
     {
@@ -347,7 +347,7 @@ public:
      * \return The current timeout in milliseconds,
      *      or a negative value (-1ms) if timeout is disabled.
      *
-     * \see PollerWait::timeout()
+     * \see PollerWaiter::timeout()
      */
     inline std::chrono::milliseconds timeout() const noexcept override
     {
@@ -360,7 +360,7 @@ public:
      * \exception ZMQPollerWaitFailed Polling could not be performed.
      * \return An iterable \ref PollerEvents object over the subset of ready sockets.
      *
-     * \see PollerWait::wait()
+     * \see PollerWaiter::wait()
      * \see PollerImpl::waitForEvents
      */
     inline PollerEvents wait() override

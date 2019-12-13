@@ -110,9 +110,9 @@ bool Runner::stop() noexcept
 }
 
 
-std::unique_ptr<zmq::PollerWait> Runner::createPoller(zmq::Socket* sock)
+std::unique_ptr<zmq::PollerWaiter> Runner::createPoller(zmq::Socket* sock)
 {
-    return std::unique_ptr<zmq::PollerWait>(new zmq::Poller(zmq::PollerEvents::Type::Read, sock));
+    return std::unique_ptr<zmq::PollerWaiter>(new zmq::Poller(zmq::PollerEvents::Type::Read, sock));
 }
 
 
