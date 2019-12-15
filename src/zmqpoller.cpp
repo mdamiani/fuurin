@@ -18,13 +18,15 @@
 #include <zmq.h>
 #include <boost/scope_exit.hpp>
 
+#include <algorithm>
+
 
 namespace fuurin {
 namespace zmq {
 namespace internal {
 
 
-void* PollerImpl::createPoller(Socket* array[], size_t size, bool read, bool write)
+void* PollerImpl::createPoller(PollerObserver* obs, Socket* array[], size_t size, bool read, bool write)
 {
     // assert raw backing array
     static_assert(sizeof(Poller<Socket*>::Raw) >= sizeof(zmq_poller_event_t));
@@ -38,29 +40,20 @@ void* PollerImpl::createPoller(Socket* array[], size_t size, bool read, bool wri
     }
 
     bool commit = false;
-    BOOST_SCOPE_EXIT(&ptr, &commit)
+    BOOST_SCOPE_EXIT(&ptr, &commit, obs, array, size)
     {
         if (!commit)
-            destroyPoller(&ptr);
+            destroyPoller(&ptr, obs, array, size);
     };
-
-    const short events = (ZMQ_POLLIN * !!read) | (ZMQ_POLLOUT * !!write);
 
     // add sockets
     for (size_t i = 0; i < size; ++i) {
         Socket* const s = array[i];
-        ASSERT(s != nullptr, "poller was given a null socket");
 
-        if (!s->isOpen()) {
-            throw ERROR(ZMQPollerCreateFailed, "socket is not open",
-                log::Arg{"endpoint"sv, !s->endpoints().empty() ? s->endpoints().front() : ""});
-        }
+        s->registerPoller(obs);
 
-        const int rc = zmq_poller_add(ptr, s->ptr_, s, events);
-        if (rc == -1) {
-            throw ERROR(ZMQPollerCreateFailed, "could not add socket",
-                log::Arg{"reason"sv, log::ec_t{zmq_errno()}});
-        }
+        if (s->isOpen())
+            addSocket(ptr, s, read, write);
     }
 
     commit = true;
@@ -68,8 +61,72 @@ void* PollerImpl::createPoller(Socket* array[], size_t size, bool read, bool wri
 }
 
 
-void PollerImpl::destroyPoller(void** ptr) noexcept
+void PollerImpl::addSocket(void* ptr, Socket* s, bool read, bool write)
 {
+    ASSERT(s != nullptr, "poller was given a null socket");
+    const short events = (ZMQ_POLLIN * !!read) | (ZMQ_POLLOUT * !!write);
+
+    if (!s->isOpen()) {
+        throw ERROR(ZMQPollerAddSocketFailed, "socket is not open",
+            log::Arg{"endpoint"sv, !s->endpoints().empty() ? s->endpoints().front() : ""});
+    }
+
+    const int rc = zmq_poller_add(ptr, s->ptr_, s, events);
+    if (rc == -1) {
+        throw ERROR(ZMQPollerAddSocketFailed, "could not add socket",
+            log::Arg{"reason"sv, log::ec_t{zmq_errno()}});
+    }
+}
+
+
+void PollerImpl::delSocket(void* ptr, Socket* s)
+{
+    ASSERT(s != nullptr, "poller was given a null socket");
+
+    if (!s->isOpen()) {
+        throw ERROR(ZMQPollerDelSocketFailed, "socket is not open",
+            log::Arg{"endpoint"sv, !s->endpoints().empty() ? s->endpoints().front() : ""});
+    }
+
+    const int rc = zmq_poller_remove(ptr, s->ptr_);
+    if (rc == -1) {
+        throw ERROR(ZMQPollerDelSocketFailed, "could not remove socket",
+            log::Arg{"reason"sv, log::ec_t{zmq_errno()}});
+    }
+}
+
+
+void PollerImpl::updateSocket(void* ptr, Socket* array[], size_t size, Socket* s, bool read, bool write)
+{
+    const bool found = (std::find(array, array + size, s) != array + size);
+
+    if (read || write) {
+        if (!found) {
+            throw ERROR(ZMQPollerAddSocketFailed, "could not add socket",
+                log::Arg{"reason"sv, "socket not being polled"sv});
+        }
+        addSocket(ptr, s, read, write);
+    } else {
+        if (!found) {
+            throw ERROR(ZMQPollerDelSocketFailed, "could not remove socket",
+                log::Arg{"reason"sv, "socket not being polled"sv});
+        }
+        delSocket(ptr, s);
+    }
+}
+
+
+void PollerImpl::destroyPoller(void** ptr, PollerObserver* obs, Socket* array[], size_t size) noexcept
+{
+    for (size_t i = 0; i < size; ++i) {
+        Socket* const s = array[i];
+        try {
+            s->unregisterPoller(obs);
+        } catch (...) {
+            ASSERT(false, "failed to unregister poller observer");
+        }
+    }
+
     // destroy poller (thus remove any previously added sockets)
     const int rc = zmq_poller_destroy(ptr);
     ASSERT(rc != -1, "zmq_poller_destroy failed");
@@ -182,6 +239,9 @@ PollerIterator::value_type PollerIterator::operator*() const noexcept
 
 PollerWaiter::PollerWaiter() = default;
 PollerWaiter::~PollerWaiter() noexcept = default;
+
+PollerObserver::PollerObserver() = default;
+PollerObserver::~PollerObserver() noexcept = default;
 
 } // namespace zmq
 } // namespace fuurin

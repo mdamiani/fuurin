@@ -11,6 +11,7 @@
 #include "fuurin/zmqsocket.h"
 #include "fuurin/zmqcontext.h"
 #include "fuurin/zmqpart.h"
+#include "fuurin/zmqpoller.h"
 #include "fuurin/errors.h"
 #include "failure.h"
 #include "types.h"
@@ -23,6 +24,7 @@
 #include <type_traits>
 #include <chrono>
 #include <thread>
+#include <algorithm>
 
 
 namespace fuurin {
@@ -276,6 +278,10 @@ void Socket::open(std::function<void(std::string)> action)
         openEndpoints_.push_back(lastEndp);
     }
 
+    // Notify observers
+    for (auto* poller : observers_)
+        poller->updateOnOpen(this);
+
     commit = true;
 }
 
@@ -286,13 +292,16 @@ void Socket::close() noexcept
         return;
 
     try {
+        for (auto* poller : observers_)
+            poller->updateOnClose(this);
+
         const int rc = zmq_close(ptr_);
         ASSERT(rc == 0, "zmq_close failed");
 
         openEndpoints_.clear();
         ptr_ = nullptr;
     } catch (...) {
-        ASSERT(false, "zmq_close threw exception");
+        ASSERT(false, "socket close threw exception");
     }
 }
 
@@ -413,6 +422,27 @@ int Socket::recvMessageMore(Part* part)
 int Socket::recvMessageLast(Part* part)
 {
     return recvMessagePart(ptr_, 0, &part->msg_);
+}
+
+
+void Socket::registerPoller(PollerObserver* poller)
+{
+    if (std::find(observers_.begin(), observers_.end(), poller) != observers_.end())
+        return;
+
+    observers_.push_back(poller);
+}
+
+
+void Socket::unregisterPoller(PollerObserver* poller)
+{
+    observers_.erase(std::remove(observers_.begin(), observers_.end(), poller), observers_.end());
+}
+
+
+size_t Socket::pollersCount() const noexcept
+{
+    return observers_.size();
 }
 
 } // namespace zmq

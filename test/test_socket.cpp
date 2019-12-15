@@ -676,6 +676,58 @@ BOOST_AUTO_TEST_CASE(waitForEventMore)
 }
 
 
+BOOST_AUTO_TEST_CASE(waitForEventOpen)
+{
+    auto ctx = std::make_shared<Context>();
+    auto s1 = std::make_shared<Socket>(ctx.get(), Socket::Type::PAIR);
+    auto s2 = std::make_shared<Socket>(ctx.get(), Socket::Type::PAIR);
+
+    s1->setEndpoints({"inproc://transfer1"});
+    s2->setEndpoints({"inproc://transfer1"});
+
+    // Create poller on closed sockets
+    auto poll1 = std::shared_ptr<PollerWaiter>(new Poller(PollerEvents::Type::Read, s2.get()));
+    auto poll2 = std::shared_ptr<PollerWaiter>(new Poller(PollerEvents::Type::Read, s2.get()));
+    poll1->setTimeout(500ms);
+    poll2->setTimeout(500ms);
+
+    BOOST_TEST(int(s2->pollersCount()) == 2);
+    BOOST_TEST(poll1->wait().empty());
+    BOOST_TEST(poll2->wait().empty());
+
+    // Connect sockets
+    s1->connect();
+    s2->bind();
+
+    s1->send(Part(uint8_t(10)));
+    BOOST_TEST(!poll1->wait().empty());
+    BOOST_TEST(!poll2->wait().empty());
+
+    // Remove one poller
+    poll1.reset();
+    BOOST_TEST(int(s2->pollersCount()) == 1);
+    BOOST_TEST(!poll2->wait().empty());
+
+    // Close sockets
+    s1->close();
+    s2->close();
+    BOOST_TEST(int(s2->pollersCount()) == 1);
+    BOOST_TEST(poll2->wait().empty());
+
+    // Reconnect sockets
+    s1->connect();
+    s2->bind();
+    s1->send(Part(uint8_t(10)));
+    BOOST_TEST(!poll2->wait().empty());
+
+    s1->close();
+    s2->close();
+
+    poll2.reset();
+    BOOST_TEST(int(s2->pollersCount()) == 0);
+}
+
+
 BOOST_DATA_TEST_CASE(publishMessage,
     bdata::make({
         std::make_tuple("filt1"s, "filt1"s, 100ms, 50, true),

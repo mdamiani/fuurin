@@ -80,6 +80,8 @@ DECL_ERROR(ZMQPartMoveFailed)
 DECL_ERROR(ZMQPartCopyFailed)
 DECL_ERROR(ZMQPartAccessFailed)
 DECL_ERROR(ZMQPollerCreateFailed)
+DECL_ERROR(ZMQPollerAddSocketFailed)
+DECL_ERROR(ZMQPollerDelSocketFailed)
 DECL_ERROR(ZMQPollerWaitFailed)
 
 #undef DECL_ERROR

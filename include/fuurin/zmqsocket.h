@@ -24,6 +24,7 @@ namespace zmq {
 
 class Context;
 class Part;
+class PollerObserver;
 
 namespace internal {
 class PollerImpl;
@@ -265,6 +266,11 @@ public:
     }
     ///@}
 
+    /**
+     * \return The list of registered pollers.
+     */
+    size_t pollersCount() const noexcept;
+
 
 private:
     /**
@@ -368,6 +374,16 @@ private:
     int recvMessageLast(Part* part);
     ///@}
 
+    /**
+     * \brief Registers/unregisters a poller observer for this socket.
+     *
+     * \param[in] poller Poller of this socket.
+     */
+    ///{@
+    void registerPoller(PollerObserver* poller);
+    void unregisterPoller(PollerObserver* poller);
+    ///@}
+
 
 private:
     Context* const ctx_; ///< ZMQ context this socket belongs to.
@@ -378,6 +394,7 @@ private:
     std::list<std::string> subscriptions_; ///< List of subscriptions.
     std::list<std::string> endpoints_;     ///< List of endpoints to connect/bind.
     std::list<std::string> openEndpoints_; ///< List of connected/bound endpoints.
+    std::list<PollerObserver*> observers_; ///< List of poller observers.
 };
 } // namespace zmq
 } // namespace fuurin
