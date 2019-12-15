@@ -38,5 +38,13 @@ Context::~Context() noexcept
 
     ASSERT(rc == 0, "zmq_ctx_term failed");
 }
+
+
+void* Context::zmqPointer() const noexcept
+{
+    return ptr_;
+}
+
+
 } // namespace zmq
 } // namespace fuurin

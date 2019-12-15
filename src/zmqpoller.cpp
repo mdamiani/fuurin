@@ -71,7 +71,7 @@ void PollerImpl::addSocket(void* ptr, Socket* s, bool read, bool write)
             log::Arg{"endpoint"sv, !s->endpoints().empty() ? s->endpoints().front() : ""});
     }
 
-    const int rc = zmq_poller_add(ptr, s->ptr_, s, events);
+    const int rc = zmq_poller_add(ptr, s->zmqPointer(), s, events);
     if (rc == -1) {
         throw ERROR(ZMQPollerAddSocketFailed, "could not add socket",
             log::Arg{"reason"sv, log::ec_t{zmq_errno()}});
@@ -88,7 +88,7 @@ void PollerImpl::delSocket(void* ptr, Socket* s)
             log::Arg{"endpoint"sv, !s->endpoints().empty() ? s->endpoints().front() : ""});
     }
 
-    const int rc = zmq_poller_remove(ptr, s->ptr_);
+    const int rc = zmq_poller_remove(ptr, s->zmqPointer());
     if (rc == -1) {
         throw ERROR(ZMQPollerDelSocketFailed, "could not remove socket",
             log::Arg{"reason"sv, log::ec_t{zmq_errno()}});

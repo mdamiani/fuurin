@@ -22,8 +22,6 @@ namespace zmq {
  */
 class Context final
 {
-    friend class Socket;
-
 public:
     /**
      * \brief Initializes a ZMQ context.
@@ -45,6 +43,11 @@ public:
     Context(const Context&) = delete;
     Context& operator=(const Context&) = delete;
     ///@}
+
+    /**
+     * \return The underlying raw ZMQ pointer.
+     */
+    void* zmqPointer() const noexcept;
 
 
 private:

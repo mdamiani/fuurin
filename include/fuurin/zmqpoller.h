@@ -26,7 +26,6 @@ class Socket;
 template<typename...>
 class Poller;
 class PollerObserver;
-class PollerEvents;
 class PollerIterator;
 
 
@@ -310,8 +309,6 @@ public:
  */
 class PollerObserver
 {
-    friend class Socket;
-
 public:
     /// Constructor.
     PollerObserver();
@@ -328,13 +325,17 @@ public:
     ///@}
 
 
-protected:
+public:
+    // TODO: make observer inteface loose coupled and make remove these public methods.
     /**
      * \brief Updates the state of the specified \ref Socket.
      *
      * Observer gets notified by any socket when its state changes.
      * The state of a socket changes upong a call to \ref Socket::connect(),
      * \ref Socket::bind() or \ref Socket::close().
+     *
+     * This method is intended to be automatically called by a \ref Socket
+     * whenever its connection status changes.
      *
      * \param[in] sock Socket whose state changed.
      *
@@ -351,9 +352,12 @@ protected:
 /**
  * \brief This class takes one or more \ref Socket objects and performs polling.
  *
- * Sockets must be valid. This poller is registered as observer of every passed socket.
- * Every socket is automatically added to the poller whenever is open and removed
- * when it's closed.
+ * This poller and every passed sockets must belong and operate on
+ * the SAME execution thread, otherwise the behavior is undefined.
+ *
+ * Sockets must be valid. This poller is registered as observer of
+ * every passed socket, which is automatically added to the poller
+ * on open and removed on close.
  */
 template<typename... Args>
 class Poller final : public PollerWaiter, public PollerObserver

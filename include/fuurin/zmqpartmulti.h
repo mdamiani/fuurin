@@ -38,7 +38,7 @@ namespace zmq {
  * This class cannot be instantiated, it is just a helper namespace to
  * manipulate \ref Part objects.
  */
-class PartMulti final
+class PartMulti final : private Part
 {
 public:
     /// Type to store the length of a string part.
@@ -123,7 +123,7 @@ private:
     static size_t pack2(Part& pm, size_t pos, T&& part)
     {
         const size_t sz = tsize(std::forward<T>(part));
-        char* const buf = &pm.buffer()[pos];
+        char* const buf = &pm.data()[pos];
 
         if (accessOutOfBoundary(pm, pos, sz))
             throwCreateError("access out of bounds");

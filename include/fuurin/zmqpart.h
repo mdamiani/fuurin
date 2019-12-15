@@ -44,11 +44,8 @@ namespace zmq {
  *
  * Data is stored with the proper sending/receiving endianess.
  */
-class Part final
+class Part
 {
-    friend class Socket;
-    friend class PartMulti;
-
 public:
     /**
      * \brief Initializes an empty part.
@@ -94,6 +91,25 @@ public:
     explicit Part(const char* data, size_t size);
 
     /**
+     * Type used for size initialization.
+     * \see Part(msg_init_size_t, size_t)
+     */
+    struct msg_init_size_t
+    {};
+    static constexpr msg_init_size_t msg_init_size = msg_init_size_t{};
+
+    /**
+     * \brief Inizializes a part with a buffer of the specified \c size.
+     *
+     * This method calls \c zmq_msg_init_size.
+     *
+     * \param[in] size Size of this part.
+     *
+     * \exception ZMQPartCreateFailed The part could not be created.
+     */
+    explicit Part(msg_init_size_t, size_t size);
+
+    /**
      * \brief Constructs a part by hard copying another one.
      * \param[in] other Another part.
      *
@@ -133,6 +149,11 @@ public:
     Part& move(Part& other);
     Part& move(Part&& other);
     ///@}
+
+    /**
+     * \return The underlying raw ZMQ pointer.
+     */
+    zmq_msg_t* zmqPointer() const noexcept;
 
     /**
      * \brief Creates a copy or share data from an \c other part.
@@ -176,11 +197,14 @@ public:
     Part& operator=(const Part& other);
 
     /**
-     * \return The internal stored data, possibly with a different endianess format.
+     * \return The internal stored data, potentially with a different endianess format.
      * \see size()
      * \see empty()
      */
+    ///{@
     const char* data() const noexcept;
+    char* data() noexcept;
+    ///@}
 
     /**
      * \return The size of \ref data.
@@ -219,38 +243,7 @@ public:
     std::string_view toString() const;
 
 
-private:
-    /**
-     * Type used for size initialization.
-     * \see Part(msg_size_t)
-     */
-    struct msg_init_size_t
-    {};
-    static constexpr msg_init_size_t msg_init_size = msg_init_size_t{};
-
-    /**
-     * \brief Inizializes a part with a buffer of the specified \c size.
-     *
-     * This method calls \c zmq_msg_init_size.
-     *
-     * \param[in] size Size of this part.
-     *
-     * \exception ZMQPartCreateFailed The part could not be created.
-     */
-    explicit Part(msg_init_size_t, size_t size);
-
-    /**
-     * \return This part's internal buffer.
-     */
-    char* buffer() noexcept;
-
-    /**
-     * \brief Releases resources for this part.
-     *
-     * This method calls \c zmq_msg_close.
-     */
-    void close() noexcept;
-
+protected:
     /**
      * \brief Copies an integral type value to a destination buffer, with endianess conversion.
      * \param[in] dest Destination buffer.
@@ -293,6 +286,15 @@ private:
      * \see buffer()
      */
     static void memcpyWithEndian(void* dest, const void* source, size_t size);
+
+
+private:
+    /**
+     * \brief Releases resources for this part.
+     *
+     * This method calls \c zmq_msg_close.
+     */
+    void close() noexcept;
 
 
 private:

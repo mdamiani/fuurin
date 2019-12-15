@@ -172,6 +172,12 @@ Part::~Part() noexcept
 }
 
 
+zmq_msg_t* Part::zmqPointer() const noexcept
+{
+    return &msg_;
+}
+
+
 void Part::close() noexcept
 {
     const int rc = zmq_msg_close(&msg_);
@@ -229,7 +235,7 @@ Part& Part::operator=(const Part& other)
 }
 
 
-char* Part::buffer() noexcept
+char* Part::data() noexcept
 {
     return static_cast<char*>(zmq_msg_data(&msg_));
 }

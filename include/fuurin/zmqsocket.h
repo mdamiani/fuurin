@@ -26,10 +26,6 @@ class Context;
 class Part;
 class PollerObserver;
 
-namespace internal {
-class PollerImpl;
-}
-
 
 /**
  * \brief This class wraps a ZMQ socket.
@@ -37,12 +33,6 @@ class PollerImpl;
  */
 class Socket
 {
-    template<typename...>
-    friend class Poller;
-
-    friend class internal::PollerImpl;
-
-
 public:
     /// Type of ZMQ socket.
     enum Type
@@ -84,6 +74,11 @@ public:
     Socket(const Socket&) = delete;
     Socket& operator=(const Socket&) = delete;
     ///@}
+
+    /**
+     * \return The underlying raw ZMQ pointer.
+     */
+    void* zmqPointer() const noexcept;
 
     /**
      * \return The \ref Context this socket belongs to.
@@ -272,6 +267,22 @@ public:
     size_t pollersCount() const noexcept;
 
 
+public:
+    // TODO: make observer inteface loose coupled and make remove these public methods.
+    /**
+     * \brief Registers/unregisters a poller observer for this socket.
+     *
+     * This method is intended to be automatically called by a \ref PollerObserver
+     * when it is passed a \ref Socket to poll.
+     *
+     * \param[in] poller Poller of this socket.
+     */
+    ///{@
+    void registerPoller(PollerObserver* poller);
+    void unregisterPoller(PollerObserver* poller);
+    ///@}
+
+
 private:
     /**
      * \brief Opens a ZMQ socket.
@@ -372,16 +383,6 @@ private:
     ///{@
     int recvMessageMore(Part* part);
     int recvMessageLast(Part* part);
-    ///@}
-
-    /**
-     * \brief Registers/unregisters a poller observer for this socket.
-     *
-     * \param[in] poller Poller of this socket.
-     */
-    ///{@
-    void registerPoller(PollerObserver* poller);
-    void unregisterPoller(PollerObserver* poller);
     ///@}
 
 

@@ -79,6 +79,12 @@ Socket::~Socket() noexcept
 }
 
 
+void* Socket::zmqPointer() const noexcept
+{
+    return ptr_;
+}
+
+
 Context* Socket::context() const noexcept
 {
     return ctx_;
@@ -254,7 +260,7 @@ void Socket::open(std::function<void(std::string)> action)
     bool commit = false;
 
     // Create socket.
-    ptr_ = zmq_socket(ctx_->ptr_, zmqSocketType(type_));
+    ptr_ = zmq_socket(ctx_->zmqPointer(), zmqSocketType(type_));
     if (ptr_ == nullptr) {
         throw ERROR(ZMQSocketCreateFailed, "could not create socket",
             log::Arg{"reason"sv, log::ec_t{zmq_errno()}});
@@ -403,25 +409,25 @@ inline int recvMessagePart(void* socket, int flags, zmq_msg_t* msg)
 
 int Socket::sendMessageMore(Part* part)
 {
-    return sendMessagePart(ptr_, ZMQ_SNDMORE, &part->msg_);
+    return sendMessagePart(ptr_, ZMQ_SNDMORE, part->zmqPointer());
 }
 
 
 int Socket::sendMessageLast(Part* part)
 {
-    return sendMessagePart(ptr_, 0, &part->msg_);
+    return sendMessagePart(ptr_, 0, part->zmqPointer());
 }
 
 
 int Socket::recvMessageMore(Part* part)
 {
-    return recvMessagePart(ptr_, 0, &part->msg_);
+    return recvMessagePart(ptr_, 0, part->zmqPointer());
 }
 
 
 int Socket::recvMessageLast(Part* part)
 {
-    return recvMessagePart(ptr_, 0, &part->msg_);
+    return recvMessagePart(ptr_, 0, part->zmqPointer());
 }
 
 
