@@ -67,6 +67,18 @@ void moveMsg(zmq_msg_t* dst, zmq_msg_t* src)
     if (rc == -1)
         throw ERROR(ZMQPartMoveFailed, "could not move message part");
 }
+
+
+void setRoutingID(zmq_msg_t* msg, uint32_t id)
+{
+    namespace log = fuurin::log;
+
+    const int rc = zmq_msg_set_routing_id(msg, id);
+    if (rc == -1) {
+        throw ERROR(ZMQPartRoutingIDFailed, "could not set routing id",
+            log::Arg{"reason"sv, log::ec_t{zmq_errno()}});
+    }
+}
 } // namespace
 
 
@@ -156,6 +168,8 @@ Part::Part(const Part& other)
     : Part(msg_init_size, other.size())
 {
     std::memcpy(zmq_msg_data(&msg_), other.data(), other.size());
+    if (const uint32_t id = other.routingID(); id != 0)
+        ::setRoutingID(&msg_, id);
 }
 
 
@@ -227,6 +241,8 @@ Part& Part::operator=(const Part& other)
     zmq_msg_t tmp;
     initMessageSize(&tmp, other.size());
     std::memcpy(zmq_msg_data(&tmp), other.data(), other.size());
+    if (const uint32_t id = other.routingID(); id != 0)
+        ::setRoutingID(&tmp, id);
 
     close();
     msg_ = tmp;
@@ -256,6 +272,25 @@ size_t Part::size() const noexcept
 bool Part::empty() const noexcept
 {
     return size() == 0u;
+}
+
+
+Part& Part::withRoutingID(uint32_t id)
+{
+    setRoutingID(id);
+    return *this;
+}
+
+
+void Part::setRoutingID(uint32_t id)
+{
+    ::setRoutingID(&msg_, id);
+}
+
+
+uint32_t Part::routingID() const noexcept
+{
+    return zmq_msg_routing_id(&msg_);
 }
 
 

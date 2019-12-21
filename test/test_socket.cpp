@@ -773,6 +773,41 @@ BOOST_DATA_TEST_CASE(publishMessage,
 }
 
 
+BOOST_AUTO_TEST_CASE(socketClientServer)
+{
+    auto ctx = std::make_shared<Context>();
+    auto s1 = std::make_shared<Socket>(ctx.get(), Socket::Type::CLIENT);
+    auto s2 = std::make_shared<Socket>(ctx.get(), Socket::Type::SERVER);
+
+    s1->setEndpoints({"inproc://transfer1"});
+    s2->setEndpoints({"inproc://transfer1"});
+
+    s1->connect();
+    s2->bind();
+
+    s1->send(Part(uint8_t(8)));
+    Part x;
+    s2->recv(&x);
+    BOOST_TEST(x.toUint8() == 8);
+    uint32_t id = x.routingID();
+
+    Part y1 = Part("hello"sv).withRoutingID(id);
+    Part y2;
+    y2 = y1;
+    BOOST_TEST(y1.routingID() == id);
+    BOOST_TEST(y2.routingID() == id);
+
+    s2->send(y2);
+    Part z;
+    BOOST_TEST(z.routingID() == 0u);
+    s1->recv(&z);
+    BOOST_TEST(z.toString() == "hello"sv);
+
+    s1->close();
+    s2->close();
+}
+
+
 static void BM_TransferSinglePartSmall(benchmark::State& state)
 {
     const auto [ctx, s1, s2] = transferSetup(Socket::Type::PAIR, Socket::Type::PAIR);

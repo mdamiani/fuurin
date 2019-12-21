@@ -221,6 +221,44 @@ public:
     bool empty() const noexcept;
 
     /**
+     * \brief Sets the routing ID property to this part.
+     *
+     * \param[in] id The routing ID value.
+     *
+     * \return A reference to this part.
+     * \exception ZMQPartRoutingIDFailed The routing ID could not be set.
+     *
+     * \see setRoutingID(uint32_t)
+     * \see routingID()
+     */
+    Part& withRoutingID(uint32_t id);
+
+    /**
+     * \brief Sets the routing ID property to this part.
+     *
+     * This method calls \c zmq_msg_set_routing_id.
+     *
+     * \param[in] id The routing ID value.
+     * \exception ZMQPartRoutingIDFailed The routing ID could not be set.
+     *
+     * \see withRoutingID(uint32_t)
+     * \see routingID()
+     */
+    void setRoutingID(uint32_t id);
+
+    /**
+     * \brief Returns the routing ID of this part.
+     *
+     * This method calls \c zmq_msg_routing_id.
+     *
+     * \return The routing ID or 0 if it was not set.
+     *
+     * \see withRoutingID(uint32_t)
+     * \see setRoutingID(uint32_t)
+     */
+    uint32_t routingID() const noexcept;
+
+    /**
      * \return Converts internal data to the requested integer type.
      *         It returns 0 if the requested integer size doesn't
      *         match the internal data \ref size().
