@@ -79,6 +79,32 @@ void setRoutingID(zmq_msg_t* msg, uint32_t id)
             log::Arg{"reason"sv, log::ec_t{zmq_errno()}});
     }
 }
+
+
+void setGroup(zmq_msg_t* msg, const char* group)
+{
+    namespace log = fuurin::log;
+
+    if (!group) {
+        throw ERROR(ZMQPartGroupFailed, "could not set group",
+            log::Arg{"reason"sv, "group is null"sv});
+    }
+
+    const auto length = ::strnlen(group, ZMQ_GROUP_MAX_LENGTH + 1);
+    if (length > ZMQ_GROUP_MAX_LENGTH) {
+        throw ERROR(ZMQPartGroupFailed, "could not set group",
+            log::Arg{
+                log::Arg{"reason"sv, "group too long"sv},
+                log::Arg{"length"sv, ZMQ_GROUP_MAX_LENGTH},
+            });
+    }
+
+    const int rc = zmq_msg_set_group(msg, group);
+    if (rc == -1) {
+        throw ERROR(ZMQPartGroupFailed, "could not set group",
+            log::Arg{"reason"sv, log::ec_t{zmq_errno()}});
+    }
+}
 } // namespace
 
 
@@ -170,6 +196,8 @@ Part::Part(const Part& other)
     std::memcpy(zmq_msg_data(&msg_), other.data(), other.size());
     if (const uint32_t id = other.routingID(); id != 0)
         ::setRoutingID(&msg_, id);
+    if (other.group()[0] != '\0')
+        ::setGroup(&msg_, other.group());
 }
 
 
@@ -243,6 +271,8 @@ Part& Part::operator=(const Part& other)
     std::memcpy(zmq_msg_data(&tmp), other.data(), other.size());
     if (const uint32_t id = other.routingID(); id != 0)
         ::setRoutingID(&tmp, id);
+    if (other.group()[0] != '\0')
+        ::setGroup(&tmp, other.group());
 
     close();
     msg_ = tmp;
@@ -291,6 +321,25 @@ void Part::setRoutingID(uint32_t id)
 uint32_t Part::routingID() const noexcept
 {
     return zmq_msg_routing_id(&msg_);
+}
+
+
+Part& Part::withGroup(const char* group)
+{
+    setGroup(group);
+    return *this;
+}
+
+
+void Part::setGroup(const char* group)
+{
+    ::setGroup(&msg_, group);
+}
+
+
+const char* Part::group() const noexcept
+{
+    return zmq_msg_group(&msg_);
 }
 
 

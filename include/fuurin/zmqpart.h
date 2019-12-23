@@ -259,6 +259,44 @@ public:
     uint32_t routingID() const noexcept;
 
     /**
+     * \brief Sets the group property to this part.
+     *
+     * \param[in] group A null terminated string, no more than \c ZMQ_GROUP_MAX_LENGTH.
+     *
+     * \return A reference to this part.
+     * \exception ZMQPartGroupFailed The group could not be set.
+     *
+     * \see setGroup(const char *)
+     * \see group()
+     */
+    Part& withGroup(const char* group);
+
+    /**
+     * \brief Sets the group property to this part.
+     *
+     * This method calls \c zmq_msg_set_group.
+     *
+     * \param[in] group A null terminated string, no more than \c ZMQ_GROUP_MAX_LENGTH.
+     * \exception ZMQPartGroupFailed The group could not be set.
+     *
+     * \see withGroup(const char*)
+     * \see group()
+     */
+    void setGroup(const char* group);
+
+    /**
+     * \brief Returns the group of this part.
+     *
+     * This method calls \c zmq_msg_group.
+     *
+     * \return A null terminated string, no more than \c ZMQ_GROUP_MAX_LENGTH.
+     *
+     * \see withGroup(const char*)
+     * \see setGroup(const char*)
+     */
+    const char* group() const noexcept;
+
+    /**
      * \return Converts internal data to the requested integer type.
      *         It returns 0 if the requested integer size doesn't
      *         match the internal data \ref size().

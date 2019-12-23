@@ -805,6 +805,45 @@ BOOST_AUTO_TEST_CASE(socketClientServer)
 
     s1->close();
     s2->close();
+
+    Part p;
+    BOOST_REQUIRE_THROW(p.setRoutingID(0),
+        fuurin::err::ZMQPartRoutingIDFailed);
+}
+
+
+BOOST_AUTO_TEST_CASE(partGroup)
+{
+    char long_group[ZMQ_GROUP_MAX_LENGTH + 2];
+    ::memset(long_group, 'A', sizeof(long_group));
+    long_group[sizeof(long_group) - 1] = '\0';
+
+    char empty_group[1];
+    empty_group[0] = '\0';
+
+    Part a;
+    BOOST_TEST(a.group() != nullptr);
+    BOOST_TEST(::strnlen(a.group(), ZMQ_GROUP_MAX_LENGTH) == 0u);
+
+    BOOST_REQUIRE_THROW(a.setGroup(long_group),
+        fuurin::err::ZMQPartGroupFailed);
+
+    BOOST_REQUIRE_THROW(a.setGroup(nullptr),
+        fuurin::err::ZMQPartGroupFailed);
+
+    BOOST_TEST(::strnlen(a.group(), ZMQ_GROUP_MAX_LENGTH) == 0u);
+
+    a.setGroup("test group");
+    BOOST_TEST(::strncmp(a.group(), "test group", ZMQ_GROUP_MAX_LENGTH) == 0);
+
+    Part b = a;
+    Part c;
+    c = b;
+    BOOST_TEST(::strncmp(b.group(), "test group", ZMQ_GROUP_MAX_LENGTH) == 0);
+    BOOST_TEST(::strncmp(c.group(), "test group", ZMQ_GROUP_MAX_LENGTH) == 0);
+
+    a.setGroup(empty_group);
+    BOOST_TEST(::strnlen(a.group(), ZMQ_GROUP_MAX_LENGTH) == 0u);
 }
 
 
