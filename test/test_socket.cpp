@@ -774,42 +774,50 @@ BOOST_DATA_TEST_CASE(publishMessage,
 }
 
 
+BOOST_AUTO_TEST_CASE(partRoutingID)
+{
+    Part a;
+    BOOST_TEST(a.routingID() == 0u);
+
+    a.setRoutingID(10);
+    BOOST_TEST(a.routingID() == 10u);
+
+    BOOST_REQUIRE_THROW(a.setRoutingID(0),
+        fuurin::err::ZMQPartRoutingIDFailed);
+
+    BOOST_TEST(a.routingID() == 10u);
+
+    Part b = a;
+    Part c;
+    c = a;
+
+    BOOST_TEST(b.routingID() == 10u);
+    BOOST_TEST(c.routingID() == 10u);
+}
+
+
 BOOST_AUTO_TEST_CASE(socketClientServer)
 {
-    auto ctx = std::make_shared<Context>();
-    auto s1 = std::make_shared<Socket>(ctx.get(), Socket::Type::CLIENT);
-    auto s2 = std::make_shared<Socket>(ctx.get(), Socket::Type::SERVER);
+    Context ctx;
+    Socket s1(&ctx, Socket::Type::CLIENT);
+    Socket s2(&ctx, Socket::Type::SERVER);
 
-    s1->setEndpoints({"inproc://transfer1"});
-    s2->setEndpoints({"inproc://transfer1"});
+    s1.setEndpoints({"inproc://transfer1"});
+    s2.setEndpoints({"inproc://transfer1"});
 
-    s1->connect();
-    s2->bind();
+    s1.connect();
+    s2.bind();
 
-    s1->send(Part(uint8_t(8)));
+    s1.send(Part(uint8_t(8)));
     Part x;
-    s2->recv(&x);
+    s2.recv(&x);
     BOOST_TEST(x.toUint8() == 8);
-    uint32_t id = x.routingID();
 
-    Part y1 = Part("hello"sv).withRoutingID(id);
-    Part y2;
-    y2 = y1;
-    BOOST_TEST(y1.routingID() == id);
-    BOOST_TEST(y2.routingID() == id);
-
-    s2->send(y2);
-    Part z;
-    BOOST_TEST(z.routingID() == 0u);
-    s1->recv(&z);
-    BOOST_TEST(z.toString() == "hello"sv);
-
-    s1->close();
-    s2->close();
-
-    Part p;
-    BOOST_REQUIRE_THROW(p.setRoutingID(0),
-        fuurin::err::ZMQPartRoutingIDFailed);
+    s2.send(Part("hello"sv).withRoutingID(x.routingID()));
+    Part y;
+    s1.recv(&y);
+    BOOST_TEST(y.routingID() == 0u);
+    BOOST_TEST(y.toString() == "hello"sv);
 }
 
 
@@ -850,35 +858,32 @@ BOOST_AUTO_TEST_CASE(partGroup)
 
 BOOST_AUTO_TEST_CASE(socketRadioDish)
 {
-    auto ctx = std::make_shared<Context>();
-    auto s1 = std::make_shared<Socket>(ctx.get(), Socket::Type::RADIO);
-    auto s2 = std::make_shared<Socket>(ctx.get(), Socket::Type::DISH);
+    Context ctx;
+    Socket s1(&ctx, Socket::Type::RADIO);
+    Socket s2(&ctx, Socket::Type::DISH);
 
-    s1->setEndpoints({"inproc://transfer1"});
-    s2->setEndpoints({"inproc://transfer1"});
+    s1.setEndpoints({"inproc://transfer1"});
+    s2.setEndpoints({"inproc://transfer1"});
 
-    s2->setGroups({"Movies", "TV"});
+    s2.setGroups({"Movies", "TV"});
 
-    s1->connect();
-    s2->bind();
+    s1.connect();
+    s2.bind();
 
     std::this_thread::sleep_for(500ms);
 
-    BOOST_TEST(s1->send(Part("Friends"sv).withGroup("TV")) == 7);
-    BOOST_TEST(s1->send(Part("Godfather"sv).withGroup("Movies")) == 9);
+    BOOST_TEST(s1.send(Part("Friends"sv).withGroup("TV")) == 7);
+    BOOST_TEST(s1.send(Part("Godfather"sv).withGroup("Movies")) == 9);
 
     Part r;
 
-    BOOST_TEST(s2->recv(&r) == 7);
+    BOOST_TEST(s2.recv(&r) == 7);
     BOOST_TEST(r.toString() == "Friends"s);
     BOOST_TEST("TV"s == r.group());
 
-    BOOST_TEST(s2->recv(&r) == 9);
+    BOOST_TEST(s2.recv(&r) == 9);
     BOOST_TEST(r.toString() == "Godfather"s);
     BOOST_TEST("Movies"s == r.group());
-
-    s1->close();
-    s2->close();
 }
 
 
