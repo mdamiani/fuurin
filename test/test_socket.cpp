@@ -28,6 +28,7 @@
 #include <type_traits>
 #include <sstream>
 #include <limits>
+#include <thread>
 
 
 namespace std {
@@ -844,6 +845,40 @@ BOOST_AUTO_TEST_CASE(partGroup)
 
     a.setGroup(empty_group);
     BOOST_TEST(::strnlen(a.group(), ZMQ_GROUP_MAX_LENGTH) == 0u);
+}
+
+
+BOOST_AUTO_TEST_CASE(socketRadioDish)
+{
+    auto ctx = std::make_shared<Context>();
+    auto s1 = std::make_shared<Socket>(ctx.get(), Socket::Type::RADIO);
+    auto s2 = std::make_shared<Socket>(ctx.get(), Socket::Type::DISH);
+
+    s1->setEndpoints({"inproc://transfer1"});
+    s2->setEndpoints({"inproc://transfer1"});
+
+    s2->setGroups({"Movies", "TV"});
+
+    s1->connect();
+    s2->bind();
+
+    std::this_thread::sleep_for(500ms);
+
+    BOOST_TEST(s1->send(Part("Friends"sv).withGroup("TV")) == 7);
+    BOOST_TEST(s1->send(Part("Godfather"sv).withGroup("Movies")) == 9);
+
+    Part r;
+
+    BOOST_TEST(s2->recv(&r) == 7);
+    BOOST_TEST(r.toString() == "Friends"s);
+    BOOST_TEST("TV"s == r.group());
+
+    BOOST_TEST(s2->recv(&r) == 9);
+    BOOST_TEST(r.toString() == "Godfather"s);
+    BOOST_TEST("Movies"s == r.group());
+
+    s1->close();
+    s2->close();
 }
 
 

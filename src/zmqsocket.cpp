@@ -56,6 +56,10 @@ int zmqSocketType(Socket::Type type)
         return ZMQ_SERVER;
     case Socket::Type::CLIENT:
         return ZMQ_CLIENT;
+    case Socket::Type::RADIO:
+        return ZMQ_RADIO;
+    case Socket::Type::DISH:
+        return ZMQ_DISH;
     }
 
     ASSERT(false, "invalid socket type");
@@ -118,6 +122,18 @@ void Socket::setSubscriptions(const std::list<std::string>& filters)
 const std::list<std::string>& Socket::subscriptions() const
 {
     return subscriptions_;
+}
+
+
+void Socket::setGroups(const std::list<std::string>& groups)
+{
+    groups_ = groups;
+}
+
+
+const std::list<std::string>& Socket::groups() const
+{
+    return groups_;
 }
 
 
@@ -276,6 +292,9 @@ void Socket::open(std::function<void(std::string)> action)
 
     for (const auto& s : subscriptions_)
         setOption(ZMQ_SUBSCRIBE, s);
+
+    for (const auto& s : groups_)
+        join(s);
 
     // Connect or bind socket.
     for (const auto& endp : endpoints_) {
@@ -449,6 +468,19 @@ void Socket::unregisterPoller(PollerObserver* poller)
 size_t Socket::pollersCount() const noexcept
 {
     return observers_.size();
+}
+
+
+void Socket::join(const std::string& group)
+{
+    const int rc = zmq_join(ptr_, group.c_str());
+    if (rc == -1) {
+        throw ERROR(ZMQSocketGroupFailed, "could not join group",
+            log::Arg{
+                log::Arg{"reason"sv, log::ec_t{zmq_errno()}},
+                log::Arg{"group"sv, group},
+            });
+    }
 }
 
 } // namespace zmq

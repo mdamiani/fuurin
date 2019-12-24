@@ -48,6 +48,8 @@ public:
         PUSH,
         SERVER,
         CLIENT,
+        RADIO,
+        DISH,
     };
 
 
@@ -121,6 +123,22 @@ public:
     const std::list<std::string>& subscriptions() const;
 
     /**
+     * \brief Sets the list of groups to join.
+     * Groups are joined at connect/bind time.
+     * It shall be set to a \ref Type::DISH socket.
+     *
+     * \param[in] groups List of groups to join.
+     * \see groups()
+     */
+    void setGroups(const std::list<std::string>& groups);
+
+    /**
+     * \return The list of groups to join.
+     * \see setGroups(const std::list<std::string>&)
+     */
+    const std::list<std::string>& groups() const;
+
+    /**
      * \brief Sets the list of endpoints to connect or bind to.
      *
      * \param[in] endpoints Socket endpoints (must be compatible with its \ref type()).
@@ -150,6 +168,7 @@ public:
      *
      * \exception ZMQSocketCreateFailed Socket could not be created, or it is not closed.
      * \exception ZMQSocketOptionSetFailed Socket options could not be set.
+     * \exception ZMQSocketGroupFailed Socket could not be joined to group.
      * \exception ZMQSocketConnectFailed Socket could not be connected to one endpoint.
      * \exception ZMQSocketBindFailed Socket could not be bound to one endpoint.
      *
@@ -160,6 +179,7 @@ public:
      * \see open()
      * \see close()
      * \see setOption()
+     * \see join()
      * \see isOpen()
      */
     ///{@
@@ -385,6 +405,18 @@ private:
     int recvMessageLast(Part* part);
     ///@}
 
+    /**
+     * \brief Joins a RADIO/DISH group.
+     *
+     * It shall be called on a \ref Type::DISH socket.
+     * This method calls \c zmq_join.
+     *
+     * \param[in] group Group to join.
+     *
+     * \exception ZMQSocketGroupFailed The group could not be joined.
+     */
+    void join(const std::string& group);
+
 
 private:
     Context* const ctx_; ///< ZMQ context this socket belongs to.
@@ -393,6 +425,7 @@ private:
 
     std::chrono::milliseconds linger_;     ///< Linger value.
     std::list<std::string> subscriptions_; ///< List of subscriptions.
+    std::list<std::string> groups_;        ///< List of groups.
     std::list<std::string> endpoints_;     ///< List of endpoints to connect/bind.
     std::list<std::string> openEndpoints_; ///< List of connected/bound endpoints.
     std::list<PollerObserver*> observers_; ///< List of poller observers.
