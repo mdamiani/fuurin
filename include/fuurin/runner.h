@@ -15,6 +15,8 @@
 #include <future>
 #include <atomic>
 #include <tuple>
+#include <chrono>
+#include <optional>
 
 
 namespace fuurin {
@@ -72,7 +74,7 @@ public:
      *
      * \see stop()
      * \see isRunning()
-     * \see run(token_type_t)
+     * \see run()
      */
     std::future<void> start();
 
@@ -88,7 +90,7 @@ public:
      * \see start()
      * \see isRunning()
      * \see sendOperation(oper_type_t)
-     * \see run(token_type_t)
+     * \see run()
      */
     bool stop() noexcept;
 
@@ -99,7 +101,7 @@ public:
      *
      * \see start()
      * \see stop()
-     * \see run(token_type_t)
+     * \see run()
      */
     bool isRunning() const noexcept;
 
@@ -180,6 +182,28 @@ protected:
     void sendOperation(oper_type_t oper, zmq::Part& payload) noexcept;
     ///@}
 
+    /**
+     * \brief Sends an event notification to the main thread.
+     *
+     * This method shall be called from the asynchronous task thread.
+     * The event is send over the inter-thread radio socket.
+     *
+     * \param[in] ev The event to be notified.
+     */
+    void sendEvent(zmq::Part& ev);
+
+    /**
+     * \brief Waits for events from the asynchronous task.
+     *
+     * This method shall be called from the main thread.
+     * This method is thread-safe.
+     *
+     * \return The (optionally) received event.
+     *
+     * \see recvEvent()
+     */
+    std::optional<zmq::Part> waitForEvent(std::chrono::milliseconds timeout = std::chrono::milliseconds(-1));
+
 
 private:
     /**
@@ -191,9 +215,30 @@ private:
      * Receive of operation shall not fail, i.e. no exceptions must be thrown
      * by the inter-thread socket, otherwise a fatal error is raised.
      *
-     * \see run(token_type_t)
+     * In case the received operation's token doesn't match the current one,
+     * then the returned values are marked as invalid.
+     *
+     * \return A tuple with the type of operation, the payload and
+     *      whether they are valid or not.
+     *
+     * \see run()
      */
-    std::tuple<token_type_t, oper_type_t, zmq::Part> recvOperation() noexcept;
+    std::tuple<oper_type_t, zmq::Part, bool> recvOperation() noexcept;
+
+    /**
+     * \brief Receives an event notification from the asynchronous task.
+     *
+     * This method shall be called from the main thread.
+     * The event is received from the inter-thread dish socket.
+     *
+     * In case the received event's token doesn't match the current one,
+     * then the returned value is marked as invalid.
+     *
+     * \return A tuple with the event and whether it's valid or not.
+     *
+     * \see waitForEvent
+     */
+    std::tuple<zmq::Part, bool> recvEvent();
 
     /**
      * \brief Main body of the asynchronous task.
@@ -212,15 +257,17 @@ private:
      * \see socketReady(zmq::Socket*)
      * \see recvOperation()
      */
-    void run(token_type_t token);
+    void run();
 
 
 private:
     std::unique_ptr<zmq::Context> zctx_; ///< ZMQ context.
     std::unique_ptr<zmq::Socket> zops_;  ///< Inter-thread sending socket.
     std::unique_ptr<zmq::Socket> zopr_;  ///< Inter-thread receiving socket.
+    std::unique_ptr<zmq::Socket> zevs_;  ///< Inter-thread events notifications.
+    std::unique_ptr<zmq::Socket> zevr_;  ///< Inter-thread events reception.
     std::atomic<bool> running_;          ///< Whether the task is running.
-    token_type_t token_;                 ///< Current execution token for the task.
+    std::atomic<token_type_t> token_;    ///< Current execution token for the task.
 };
 
 } // namespace fuurin

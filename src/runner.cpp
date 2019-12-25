@@ -13,9 +13,13 @@
 #include "fuurin/zmqsocket.h"
 #include "fuurin/zmqpoller.h"
 #include "fuurin/zmqpart.h"
+#include "fuurin/zmqpartmulti.h"
 #include "log.h"
 
 #include <boost/scope_exit.hpp>
+
+
+#define GROUP_EVENTS "EVN"
 
 
 namespace fuurin {
@@ -24,14 +28,27 @@ Runner::Runner()
     : zctx_(std::make_unique<zmq::Context>())
     , zops_(std::make_unique<zmq::Socket>(zctx_.get(), zmq::Socket::PAIR))
     , zopr_(std::make_unique<zmq::Socket>(zctx_.get(), zmq::Socket::PAIR))
+    , zevs_(std::make_unique<zmq::Socket>(zctx_.get(), zmq::Socket::RADIO))
+    , zevr_(std::make_unique<zmq::Socket>(zctx_.get(), zmq::Socket::DISH))
     , running_(false)
     , token_(0)
 {
     zops_->setEndpoints({"inproc://runner-loop"});
     zopr_->setEndpoints({"inproc://runner-loop"});
 
+    zevs_->setEndpoints({"inproc://runner-events"});
+    zevr_->setEndpoints({"inproc://runner-events"});
+
+    zevr_->setGroups({GROUP_EVENTS});
+
     zopr_->bind();
     zops_->connect();
+
+    zevs_->bind();
+    zevr_->connect();
+
+    // TODO: check whether RADIO/DISH over inproc has the slow join behavior,
+    //       in order to avoid missing notifications.
 }
 
 
@@ -62,14 +79,14 @@ std::future<void> Runner::start()
             running_ = false;
     };
 
-    auto ret = std::async(std::launch::async, &Runner::run, this, token_);
+    auto ret = std::async(std::launch::async, &Runner::run, this);
 
     commit = true;
     return ret;
 }
 
 
-void Runner::run(token_type_t token)
+void Runner::run()
 {
     BOOST_SCOPE_EXIT(this)
     {
@@ -85,10 +102,10 @@ void Runner::run(token_type_t token)
                 continue;
             }
 
-            auto [tok, oper, payload] = recvOperation();
+            auto [oper, payload, valid] = recvOperation();
 
             // filter out old operations
-            if (tok != token)
+            if (!valid)
                 continue;
 
             operationReady(oper, payload);
@@ -107,6 +124,21 @@ bool Runner::stop() noexcept
 
     sendOperation(Operation::Stop);
     return true;
+}
+
+
+std::optional<zmq::Part> Runner::waitForEvent(std::chrono::milliseconds timeout)
+{
+    zmq::Poller poll(zmq::PollerEvents::Read, zevr_.get());
+    poll.setTimeout(timeout);
+    if (poll.wait().empty())
+        return {};
+
+    auto [ev, valid] = recvEvent();
+    if (!valid)
+        return {};
+
+    return std::move(ev);
 }
 
 
@@ -144,7 +176,7 @@ void Runner::sendOperation(oper_type_t oper, zmq::Part& payload) noexcept
 }
 
 
-std::tuple<Runner::token_type_t, Runner::oper_type_t, zmq::Part> Runner::recvOperation() noexcept
+std::tuple<Runner::oper_type_t, zmq::Part, bool> Runner::recvOperation() noexcept
 {
     zmq::Part tok, oper, payload;
 
@@ -155,8 +187,23 @@ std::tuple<Runner::token_type_t, Runner::oper_type_t, zmq::Part> Runner::recvOpe
             log::Arg{std::string_view(e.what())});
     }
 
-    return std::make_tuple(tok.toUint8(), oper.toUint8(), std::move(payload));
+    return std::make_tuple(oper.toUint8(), std::move(payload), tok.toUint8() == token_);
 }
 
+
+void Runner::sendEvent(zmq::Part& ev)
+{
+    zevs_->send(zmq::PartMulti::pack(token_.load(), zmq::Part().move(ev)).withGroup(GROUP_EVENTS));
+}
+
+
+std::tuple<zmq::Part, bool> Runner::recvEvent()
+{
+    zmq::Part r;
+    zevr_->recv(&r);
+    auto [tok, ev] = zmq::PartMulti::unpack<token_type_t, zmq::Part>(r);
+
+    return std::make_tuple(std::move(ev), tok == token_);
+}
 
 } // namespace fuurin
