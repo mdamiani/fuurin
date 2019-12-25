@@ -179,7 +179,7 @@ protected:
      */
     ///{@
     void sendOperation(oper_type_t oper) noexcept;
-    void sendOperation(oper_type_t oper, zmq::Part& payload) noexcept;
+    void sendOperation(oper_type_t oper, zmq::Part&& payload) noexcept;
     ///@}
 
     /**
@@ -190,7 +190,7 @@ protected:
      *
      * \param[in] ev The event to be notified.
      */
-    void sendEvent(zmq::Part& ev);
+    void sendEvent(zmq::Part&& ev);
 
     /**
      * \brief Waits for events from the asynchronous task.

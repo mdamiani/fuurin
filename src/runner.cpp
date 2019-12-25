@@ -160,12 +160,11 @@ void Runner::socketReady(zmq::Socket*)
 
 void Runner::sendOperation(oper_type_t oper) noexcept
 {
-    zmq::Part empty;
-    sendOperation(oper, empty);
+    sendOperation(oper, zmq::Part());
 }
 
 
-void Runner::sendOperation(oper_type_t oper, zmq::Part& payload) noexcept
+void Runner::sendOperation(oper_type_t oper, zmq::Part&& payload) noexcept
 {
     try {
         zops_->send(zmq::Part(token_), zmq::Part(oper), payload);
@@ -191,9 +190,9 @@ std::tuple<Runner::oper_type_t, zmq::Part, bool> Runner::recvOperation() noexcep
 }
 
 
-void Runner::sendEvent(zmq::Part& ev)
+void Runner::sendEvent(zmq::Part&& ev)
 {
-    zevs_->send(zmq::PartMulti::pack(token_.load(), zmq::Part().move(ev)).withGroup(GROUP_EVENTS));
+    zevs_->send(zmq::PartMulti::pack(token_.load(), ev).withGroup(GROUP_EVENTS));
 }
 
 
