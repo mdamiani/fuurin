@@ -70,6 +70,45 @@ BOOST_AUTO_TEST_CASE(simpleStore)
 }
 
 
+BOOST_AUTO_TEST_CASE(waitForEventThreadSafe)
+{
+    Worker w;
+    Broker b;
+
+    auto wf = w.start();
+    auto bf = b.start();
+
+    const auto recvEvent = [&w]() {
+        int cnt = 0;
+        for (;;) {
+            const auto ev = w.waitForEvent(1500ms);
+            if (!ev.has_value())
+                break;
+            ++cnt;
+        }
+        return cnt;
+    };
+
+    const int iterations = 100;
+
+    for (int i = 0; i < iterations; ++i)
+        w.store(zmq::Part("hello"sv));
+
+    auto f1 = std::async(std::launch::async, recvEvent);
+    auto f2 = std::async(std::launch::async, recvEvent);
+
+    const int cnt1 = f1.get();
+    const int cnt2 = f2.get();
+
+    BOOST_TEST(cnt1 != 0);
+    BOOST_TEST(cnt2 != 0);
+    BOOST_TEST(cnt1 + cnt2 == iterations);
+
+    w.stop();
+    b.stop();
+}
+
+
 static void BM_workerStart(benchmark::State& state)
 {
     for (auto _ : state) {
