@@ -687,8 +687,8 @@ BOOST_AUTO_TEST_CASE(waitForEventOpen)
     s2->setEndpoints({"inproc://transfer1"});
 
     // Create poller on closed sockets
-    auto poll1 = std::shared_ptr<PollerWaiter>(new Poller(PollerEvents::Type::Read, s2.get()));
-    auto poll2 = std::shared_ptr<PollerWaiter>(new Poller(PollerEvents::Type::Read, s2.get()));
+    auto poll1 = std::shared_ptr<PollerWaiter>(new PollerAuto(PollerEvents::Type::Read, s2.get()));
+    auto poll2 = std::shared_ptr<PollerWaiter>(new PollerAuto(PollerEvents::Type::Read, s2.get()));
     poll1->setTimeout(500ms);
     poll2->setTimeout(500ms);
 
@@ -726,6 +726,16 @@ BOOST_AUTO_TEST_CASE(waitForEventOpen)
 
     poll2.reset();
     BOOST_TEST(int(s2->pollersCount()) == 0);
+}
+
+
+BOOST_AUTO_TEST_CASE(pollerOpenSockets)
+{
+    Context ctx;
+    Socket s(&ctx, Socket::Type::PAIR);
+
+    BOOST_REQUIRE_THROW(Poller{PollerEvents::Type::Read, &s},
+        fuurin::err::ZMQPollerAddSocketFailed);
 }
 
 

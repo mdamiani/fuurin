@@ -14,6 +14,7 @@
 #include <array>
 #include <iterator>
 #include <chrono>
+#include <type_traits>
 
 
 struct zmq_poller_event_t;
@@ -25,6 +26,8 @@ namespace zmq {
 class Socket;
 template<typename...>
 class Poller;
+template<typename...>
+class PollerAuto;
 class PollerObserver;
 class PollerIterator;
 
@@ -38,14 +41,16 @@ class PollerImpl final
 {
     template<typename...>
     friend class fuurin::zmq::Poller;
+    template<typename...>
+    friend class fuurin::zmq::PollerAuto;
 
 private:
     /**
      * \brief Initializes poller and adds open sockets.
      *
-     * The poller is added as observer to every socket.
+     * The poller is added as observer to every socket, if \c obs is not nullptr.
      *
-     * \param[in] obs The poller observer.
+     * \param[in] obs The poller observer, or nullptr.
      * \param[in] array Array of sockets.
      * \param[in] size Size of the array.
      * \param[in] read Whether to wait for a read event.
@@ -99,13 +104,16 @@ private:
     /**
      * \brief Destroys the poller and removes sockets.
      *
-     * The poller is removed as observer from every socket.
+     * The poller is removed as observer from every socket, if \c obs is not nullptr.
      *
      * \param[in] poller A valid ZMQ poller.
+     * \param[in] obs The poller observer, or nullptr.
+     * \param[in] array Array of sockets.
+     * \param[in] size Size of the array.
      *
      * \see createPoller(PollerObserver*, Socket*[], size_t, bool, bool)
      */
-    static void destroyPoller(void** poller, PollerObserver*, Socket* array[], size_t size) noexcept;
+    static void destroyPoller(void** poller, PollerObserver* obs, Socket* array[], size_t size) noexcept;
 
     /**
      * \brief Waits for events from sockets.
@@ -302,7 +310,7 @@ public:
 
 
 /**
- * \brief This interface wraps the observer behavior a poller upon a socket.
+ * \brief This interface wraps the observer behavior of a poller upon a socket.
  *
  * Whenever the state of a socket has changed, the poller gets notified through
  * this interface.
@@ -352,15 +360,14 @@ public:
 /**
  * \brief This class takes one or more \ref Socket objects and performs polling.
  *
- * This poller and every passed sockets must belong and operate on
- * the SAME execution thread, otherwise the behavior is undefined.
+ * Sockets must be valid and already open.
  *
- * Sockets must be valid. This poller is registered as observer of
- * every passed socket, which is automatically added to the poller
- * on open and removed on close.
+ * This poller and every passed sockets must belong and operate on
+ * the SAME execution thread, otherwise the behavior is undefined,
+ * unless sockets are thread-safe (e.g. Client/Server or Radio/Dish).
  */
 template<typename... Args>
-class Poller final : public PollerWaiter, public PollerObserver
+class Poller : public PollerWaiter
 {
     friend class internal::PollerImpl;
 
@@ -369,12 +376,44 @@ public:
     using Array = std::array<Socket*, Count>;        ///< Poller array type.
 
 
+protected:
+    /**
+     * \brief Creates the poller and adds the specified sockets.
+     *
+     * When a \ref PollerObserver is registered as observer of every passed socket,
+     * they are automatically added/removed to the polling list upon their open/close.
+     *
+     * If \ref PollerObserver is not specified, then every socket must be already open.
+     *
+     * \param[in] ev Type of event to poll.
+     * \param[in] obs Whether to observe the passed socket for open/close events, otherwhise \c nullptr.
+     * \param[in] args Sockets to poll for events.
+     *
+     * \exception ZMQPollerCreateFailed The poller could not be created.
+     * \exception ZMQPollerAddSocketFailed Any open socket could not be added to the poller.
+     *
+     * \see PollerImpl::createPoller(PollerObserver*, Socket*[], size_t, bool, bool)
+     * \see sockets()
+     */
+    Poller(PollerEvents::Type ev, PollerObserver* obs, Args*... args)
+        : sockets_({args...})
+        , ptr_(internal::PollerImpl::createPoller(obs, &sockets_[0], Count,
+              ev == PollerEvents::Type::Read, ev == PollerEvents::Type::Write))
+        , type_(ev)
+        , obs_(obs)
+        , timeout_(std::chrono::milliseconds(-1))
+    {
+        constexpr bool check_type = (std::is_convertible_v<Args*, Socket*> && ...);
+        static_assert(check_type, "Poller arguments must be of type fuurin::zmq::Socket*");
+    }
+
+
 public:
     /**
      * \brief Creates the poller and adds the specified sockets.
      *
      * \param[in] ev Type of event to poll.
-     * \param[in] args Sockets to poll for events.
+     * \param[in] args Sockets to poll for events, they must be already open.
      *      Every socket must be valid and open.
      *
      * \exception ZMQPollerCreateFailed The poller could not be created.
@@ -384,11 +423,7 @@ public:
      * \see sockets()
      */
     Poller(PollerEvents::Type ev, Args*... args)
-        : sockets_({args...})
-        , ptr_(internal::PollerImpl::createPoller(this, &sockets_[0], Count,
-              ev == PollerEvents::Type::Read, ev == PollerEvents::Type::Write))
-        , type_(ev)
-        , timeout_(std::chrono::milliseconds(-1))
+        : Poller(ev, nullptr, args...)
     {
     }
 
@@ -397,9 +432,9 @@ public:
      *
      * \see PollerImpl::destroyPoller(void**, PollerObserver*, Socket**, size_t)
      */
-    ~Poller() noexcept
+    virtual ~Poller() noexcept
     {
-        internal::PollerImpl::destroyPoller(&ptr_, this, &sockets_[0], Count);
+        internal::PollerImpl::destroyPoller(&ptr_, obs_, &sockets_[0], Count);
     }
 
     /**
@@ -411,9 +446,25 @@ public:
     ///@}
 
     /**
+     * \return The underlying raw ZMQ pointer.
+     */
+    inline void* zmqPointer() const noexcept
+    {
+        return ptr_;
+    }
+
+    /**
      * \return Array of sockets of this poller.
      */
     inline const Array& sockets() const noexcept
+    {
+        return sockets_;
+    }
+
+    /**
+     * \return Array of sockets of this poller.
+     */
+    inline Array& sockets() noexcept
     {
         return sockets_;
     }
@@ -450,27 +501,6 @@ public:
     }
 
     /**
-     * \brief Adds the observed socket to this poller.
-     *
-     * \see PollerObserver::updateOnOpen
-     */
-    void updateOnOpen(Socket* sock) override
-    {
-        internal::PollerImpl::updateSocket(ptr_, &sockets_[0], Count, sock,
-            type_ == PollerEvents::Type::Read, type_ == PollerEvents::Type::Write);
-    }
-
-    /**
-     * \brief Removes the observed socket from this poller.
-     *
-     * \see PollerObserver::updateOnClose
-     */
-    void updateOnClose(Socket* sock) override
-    {
-        internal::PollerImpl::updateSocket(ptr_, &sockets_[0], Count, sock, false, false);
-    }
-
-    /**
      * \brief Waits for an event on multiple \ref Socket objects.
      *
      * \exception ZMQPollerWaitFailed Polling could not be performed.
@@ -491,6 +521,7 @@ private:
     Array sockets_;                     ///< Array of monitored sockets.
     void* ptr_;                         ///< Pointer to ZMQ poller object.
     PollerEvents::Type type_;           ///< Type of events to wait for.
+    PollerObserver* obs_;               ///< PollerObserver object.
     std::chrono::milliseconds timeout_; ///< Timeout to wait for.
 
     /**
@@ -503,6 +534,72 @@ private:
     } raw_;
 };
 
+
+/**
+ * \brief Poller that monitors updates of sockets' state.
+ *
+ * This poller and every passed sockets must belong and operate on
+ * the SAME execution thread, otherwise the behavior is undefined.
+ *
+ * \see Poller
+ * \see PollerObserver
+ */
+template<typename... Args>
+class PollerAuto : public Poller<Args...>, public PollerObserver
+{
+public:
+    /**
+     * \brief Initializes the poller and registers itself as a \ref PollerObserver for sockets.
+     *
+     * \see Poller::Poller(PollerEvents::Type ev, Args*... args)
+     */
+    PollerAuto(PollerEvents::Type ev, Args*... args)
+        : Poller<Args...>(ev, this, args...)
+    {
+    }
+
+    /**
+     * \brief Destroys the poller and unregisters itself as a \ref PollerObserver from sockets.
+     */
+    virtual ~PollerAuto()
+    {
+    }
+
+    /**
+     * Disable copy.
+     */
+    ///{@
+    PollerAuto(const PollerAuto&) = delete;
+    PollerAuto& operator=(const PollerAuto&) = delete;
+    ///@}
+
+    /**
+     * \brief Adds the observed socket to this poller.
+     *
+     * \see PollerObserver::updateOnOpen
+     * \see PollerImpl::updateSocket(void*, Socket**, size_t, Socket*, bool, bool)
+     */
+    void updateOnOpen(Socket* sock) override
+    {
+        internal::PollerImpl::updateSocket(Poller<Args...>::zmqPointer(),
+            &Poller<Args...>::sockets()[0], Poller<Args...>::Count,
+            sock, Poller<Args...>::type() == PollerEvents::Type::Read,
+            Poller<Args...>::type() == PollerEvents::Type::Write);
+    }
+
+    /**
+     * \brief Removes the observed socket from this poller.
+     *
+     * \see PollerObserver::updateOnClose
+     * \see PollerImpl::updateSocket(void*, Socket**, size_t, Socket*, bool, bool)
+     */
+    void updateOnClose(Socket* sock) override
+    {
+        internal::PollerImpl::updateSocket(Poller<Args...>::zmqPointer(),
+            &Poller<Args...>::sockets()[0], Poller<Args...>::Count,
+            sock, false, false);
+    }
+};
 
 } // namespace zmq
 } // namespace fuurin

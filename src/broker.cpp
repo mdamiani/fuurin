@@ -33,7 +33,7 @@ std::unique_ptr<zmq::PollerWaiter> Broker::createPoller(zmq::Socket* sock)
     zstore_->setEndpoints({"ipc:///tmp/broker_storage"});
     zstore_->bind();
 
-    auto poll = new zmq::Poller(zmq::PollerEvents::Type::Read, sock, zstore_.get());
+    auto poll = new zmq::PollerAuto(zmq::PollerEvents::Type::Read, sock, zstore_.get());
     return std::unique_ptr<zmq::PollerWaiter>(poll);
 }
 

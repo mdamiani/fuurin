@@ -50,9 +50,10 @@ void* PollerImpl::createPoller(PollerObserver* obs, Socket* array[], size_t size
     for (size_t i = 0; i < size; ++i) {
         Socket* const s = array[i];
 
-        s->registerPoller(obs);
+        if (obs)
+            s->registerPoller(obs);
 
-        if (s->isOpen())
+        if (!obs || s->isOpen())
             addSocket(ptr, s, read, write);
     }
 
@@ -118,12 +119,14 @@ void PollerImpl::updateSocket(void* ptr, Socket* array[], size_t size, Socket* s
 
 void PollerImpl::destroyPoller(void** ptr, PollerObserver* obs, Socket* array[], size_t size) noexcept
 {
-    for (size_t i = 0; i < size; ++i) {
-        Socket* const s = array[i];
-        try {
-            s->unregisterPoller(obs);
-        } catch (...) {
-            ASSERT(false, "failed to unregister poller observer");
+    if (obs) {
+        for (size_t i = 0; i < size; ++i) {
+            Socket* const s = array[i];
+            try {
+                s->unregisterPoller(obs);
+            } catch (...) {
+                ASSERT(false, "failed to unregister poller observer");
+            }
         }
     }
 
