@@ -13,6 +13,8 @@
 
 #include "fuurin/runner.h"
 
+#include <memory>
+
 
 namespace fuurin {
 
@@ -34,6 +36,39 @@ public:
      * \brief Destroys this worker.
      */
     virtual ~Worker() noexcept;
+
+
+    /**
+     * \brief Stores data to the broker.
+     *
+     * \exception Error The worker task is not running.
+     *
+     * \see isRunning()
+     */
+    void store(zmq::Part&& data);
+
+
+protected:
+    /**
+     * \brief Worker operations.
+     */
+    enum Operation : oper_type_t
+    {
+        Store = Runner::Operation::OPER_COUNT,
+    };
+
+
+protected:
+    virtual std::unique_ptr<zmq::PollerWaiter> createPoller(zmq::Socket* sock) override;
+    virtual void operationReady(oper_type_t oper, zmq::Part& payload) override;
+    virtual void socketReady(zmq::Socket* sock) override;
+
+public:
+    std::optional<zmq::Part> waitForEvent(std::chrono::milliseconds timeout = std::chrono::milliseconds(-1));
+
+
+protected:
+    std::unique_ptr<zmq::Socket> zstore_; ///< ZMQ socket to store data.
 };
 
 

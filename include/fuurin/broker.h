@@ -13,6 +13,8 @@
 
 #include "fuurin/runner.h"
 
+#include <memory>
+
 
 namespace fuurin {
 
@@ -34,6 +36,15 @@ public:
      * \brief Destroys this broker.
      */
     virtual ~Broker() noexcept;
+
+
+protected:
+    virtual std::unique_ptr<zmq::PollerWaiter> createPoller(zmq::Socket* sock) override;
+    virtual void socketReady(zmq::Socket* sock) override;
+
+
+protected:
+    std::unique_ptr<zmq::Socket> zstore_; ///< ZMQ socket to store data.
 };
 
 

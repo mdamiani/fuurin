@@ -148,7 +148,7 @@ std::unique_ptr<zmq::PollerWaiter> Runner::createPoller(zmq::Socket* sock)
 }
 
 
-void Runner::operationReady(oper_type_t, const zmq::Part&)
+void Runner::operationReady(oper_type_t, zmq::Part&)
 {
 }
 
@@ -169,7 +169,7 @@ void Runner::sendOperation(oper_type_t oper, zmq::Part&& payload) noexcept
     try {
         zops_->send(zmq::Part(token_), zmq::Part(oper), payload);
     } catch (const std::exception& e) {
-        LOG_FATAL(log::Arg{"Runner operation send failure"sv},
+        LOG_FATAL(log::Arg{"runner"sv}, log::Arg{"operation send threw exception"sv},
             log::Arg{std::string_view(e.what())});
     }
 }
@@ -182,7 +182,7 @@ std::tuple<Runner::oper_type_t, zmq::Part, bool> Runner::recvOperation() noexcep
     try {
         zopr_->recv(&tok, &oper, &payload);
     } catch (const std::exception& e) {
-        LOG_FATAL(log::Arg{"Runner operation recv failure"sv},
+        LOG_FATAL(log::Arg{"runner"sv}, log::Arg{"operation recv threw exception"sv},
             log::Arg{std::string_view(e.what())});
     }
 
@@ -204,5 +204,12 @@ std::tuple<zmq::Part, bool> Runner::recvEvent()
 
     return std::make_tuple(std::move(ev), tok == token_);
 }
+
+
+zmq::Context* Runner::zmqContext() const noexcept
+{
+    return zctx_.get();
+}
+
 
 } // namespace fuurin

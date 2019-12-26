@@ -131,6 +131,11 @@ protected:
 
 protected:
     /**
+     * \brief Returns the ZMQ context to create ZMQ sockets.
+     */
+    zmq::Context* zmqContext() const noexcept;
+
+    /**
      * \brief Creates the poller to be used in the main asynchronous task.
      *
      * Concrete classes shall override this virtual method to create a poller in order to
@@ -154,7 +159,7 @@ protected:
      * Concrete classes shall override this virtual method in order to
      * handle and define any other specific tasks than \ref Operation::Stop.
      */
-    virtual void operationReady(oper_type_t oper, const zmq::Part& payload);
+    virtual void operationReady(oper_type_t oper, zmq::Part& payload);
 
     /**
      * \brief Notifies whenever any socket being polled is ready to be read by the asynchronous task.
@@ -253,7 +258,7 @@ private:
      * \exception Throws exceptions in case of unexpected errors.
      *
      * \see createPoller(zmq::Socket*)
-     * \see operationReady(oper_type_t, const zmq::Part&)
+     * \see operationReady(oper_type_t, zmq::Part&)
      * \see socketReady(zmq::Socket*)
      * \see recvOperation()
      */

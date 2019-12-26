@@ -16,10 +16,17 @@
 
 #include "fuurin/broker.h"
 #include "fuurin/worker.h"
+#include "fuurin/zmqpart.h"
+
+#include <string_view>
+#include <chrono>
 
 
 using namespace fuurin;
 namespace utf = boost::unit_test;
+
+using namespace std::literals::string_view_literals;
+using namespace std::literals::chrono_literals;
 
 
 typedef boost::mpl::list<Broker, Worker> runnerTypes;
@@ -40,6 +47,26 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(workerStart, T, runnerTypes)
         BOOST_TEST(!w.isRunning());
         BOOST_TEST(!w.stop());
     }
+}
+
+
+BOOST_AUTO_TEST_CASE(simpleStore)
+{
+    Worker w;
+    Broker b;
+
+    auto wf = w.start();
+    auto bf = b.start();
+
+    w.store(zmq::Part("hello"sv));
+
+    const auto ev = w.waitForEvent(5s);
+
+    BOOST_TEST(ev.has_value());
+    BOOST_TEST(ev.value().toString() == "hello"sv);
+
+    w.stop();
+    b.stop();
 }
 
 
