@@ -37,7 +37,9 @@ class Handler
 {
 public:
     /**
-     * \brief Logging function.
+     * \brief Logging method.
+     *
+     * This method shall be thread-safe.
      *
      * \param[in] loc Location of the log message.
      * \param[in] args Arguments of the log message.
@@ -65,6 +67,8 @@ class StandardHandler : public Handler
 {
     /**
      * \brief Logging function which prints the content to stdout/stderr.
+     *
+     * This method is thread-safe.
      */
     ///{@
     void debug(const Loc&, const Arg[], size_t) const override;
@@ -85,6 +89,8 @@ class SilentHandler : public Handler
 {
     /**
      * \brief Logging function which discards the content.
+     *
+     * This method is thread-safe.
      */
     ///{@
     void debug(const Loc&, const Arg[], size_t) const override;
