@@ -58,7 +58,7 @@ BOOST_AUTO_TEST_CASE(simpleStore)
     auto wf = w.start();
     auto bf = b.start();
 
-    w.store(zmq::Part("hello"sv));
+    w.store(zmq::Part{"hello"sv});
 
     const auto ev = w.waitForEvent(5s);
 
@@ -92,7 +92,7 @@ BOOST_AUTO_TEST_CASE(waitForEventThreadSafe)
     const int iterations = 100;
 
     for (int i = 0; i < iterations; ++i)
-        w.store(zmq::Part("hello"sv));
+        w.store(zmq::Part{"hello"sv});
 
     auto f1 = std::async(std::launch::async, recvEvent);
     auto f2 = std::async(std::launch::async, recvEvent);

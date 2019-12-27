@@ -144,7 +144,7 @@ std::optional<zmq::Part> Runner::waitForEvent(std::chrono::milliseconds timeout)
 
 std::unique_ptr<zmq::PollerWaiter> Runner::createPoller(zmq::Socket* sock)
 {
-    return std::unique_ptr<zmq::PollerWaiter>(new zmq::PollerAuto{zmq::PollerEvents::Type::Read, sock});
+    return std::unique_ptr<zmq::PollerWaiter>{new zmq::PollerAuto{zmq::PollerEvents::Type::Read, sock}};
 }
 
 
@@ -167,7 +167,7 @@ void Runner::sendOperation(oper_type_t oper) noexcept
 void Runner::sendOperation(oper_type_t oper, zmq::Part&& payload) noexcept
 {
     try {
-        zops_->send(zmq::Part(token_), zmq::Part(oper), payload);
+        zops_->send(zmq::Part{token_}, zmq::Part{oper}, payload);
     } catch (const std::exception& e) {
         LOG_FATAL(log::Arg{"runner"sv}, log::Arg{"operation send threw exception"sv},
             log::Arg{std::string_view(e.what())});

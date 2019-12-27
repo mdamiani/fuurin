@@ -52,8 +52,8 @@ namespace bdata = utf::data;
 
 BOOST_AUTO_TEST_CASE(partCreateCopy)
 {
-    Part p1(uint64_t(12345));
-    Part p2(p1);
+    Part p1{uint64_t(12345)};
+    Part p2{p1};
 
     BOOST_TEST(!p1.empty());
     BOOST_TEST(!p2.empty());
@@ -64,7 +64,7 @@ BOOST_AUTO_TEST_CASE(partCreateCopy)
 
 BOOST_AUTO_TEST_CASE(partCreateMove)
 {
-    Part p1(Part(uint64_t(12345)));
+    Part p1{Part(uint64_t(12345))};
     BOOST_TEST(!p1.empty());
     BOOST_TEST(p1.toUint64() == 12345ull);
 
@@ -78,10 +78,10 @@ BOOST_AUTO_TEST_CASE(partCreateMove)
 
 BOOST_AUTO_TEST_CASE(partCopyShare)
 {
-    Part p1(Part(std::string(4096, 'a')));
+    Part p1{Part(std::string(4096, 'a'))};
     Part p2;
     p2.share(p1);
-    Part p3(p2);
+    Part p3{p2};
 
     BOOST_TEST(!p1.empty());
     BOOST_TEST(!p2.empty());
@@ -95,8 +95,8 @@ BOOST_AUTO_TEST_CASE(partCopyShare)
 
 BOOST_AUTO_TEST_CASE(partAssignment)
 {
-    Part p1(Part(std::string(4096, 'a')));
-    Part p2(Part(uint64_t(12345)));
+    Part p1{Part(std::string(4096, 'a'))};
+    Part p2{Part(uint64_t(12345))};
 
     BOOST_TEST(!p1.empty());
     BOOST_TEST(!p2.empty());
@@ -134,7 +134,7 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(partEndianessInt, T, partIntTypes)
         val |= uint64_t(networkDataBuf[i]) << (8 * i);
     }
 
-    const Part m(val);
+    const Part m{val};
 
     BOOST_TEST(m.size() == sizeof(T));
 
@@ -169,9 +169,9 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(partEndianessInt, T, partIntTypes)
 
 BOOST_AUTO_TEST_CASE(partEndianessArray)
 {
-    std::string val(networkDataBuf, networkDataBuf + sizeof(networkDataBuf));
+    std::string val{networkDataBuf, networkDataBuf + sizeof(networkDataBuf)};
 
-    const Part m(val.data(), val.size());
+    const Part m{val.data(), val.size()};
 
     BOOST_TEST(m.size() == val.size());
     BOOST_TEST(std::memcmp(m.data(), &val[0], sizeof(networkDataBuf)) == 0);
@@ -243,7 +243,7 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(partMultiStringType, T, partMultiStringTypes)
 BOOST_AUTO_TEST_CASE(partMultiMore)
 {
     Part a = PartMulti::pack(uint32_t(3), uint32_t(14),
-        "123123"sv, "string"s, Part(uint64_t(12345)));
+        "123123"sv, "string"s, Part{uint64_t(12345)});
 
     std::tuple<uint32_t, uint32_t, std::string_view, std::string, Part> t =
         PartMulti::unpack<uint32_t, uint32_t, std::string_view, std::string, Part>(a);
@@ -470,11 +470,11 @@ void testTransferSingle(const T& part)
     if constexpr (std::is_integral<T>::value) {
         sz = sizeof(part);
         data = (char*)&part;
-        m1.move(Part(part));
+        m1.move(Part{part});
     } else {
         sz = part.size();
         data = part.data();
-        m1.move(Part(part.data(), part.size()));
+        m1.move(Part{part.data(), part.size()});
     }
 
     const int rc1 = s1->send(m1);
@@ -643,8 +643,8 @@ BOOST_AUTO_TEST_CASE(waitForEventMore)
     BOOST_TEST(s3->isOpen());
     BOOST_TEST(s4->isOpen());
 
-    s1->send(Part(uint8_t(1)));
-    s3->send(Part(uint8_t(2)));
+    s1->send(Part{uint8_t(1)});
+    s3->send(Part{uint8_t(2)});
 
     Poller poll{PollerEvents::Type::Read, s2.get(), s4.get()};
     poll.setTimeout(2500ms);
@@ -700,7 +700,7 @@ BOOST_AUTO_TEST_CASE(waitForEventOpen)
     s1->connect();
     s2->bind();
 
-    s1->send(Part(uint8_t(10)));
+    s1->send(Part{uint8_t(10)});
     BOOST_TEST(!poll1->wait().empty());
     BOOST_TEST(!poll2->wait().empty());
 
@@ -718,7 +718,7 @@ BOOST_AUTO_TEST_CASE(waitForEventOpen)
     // Reconnect sockets
     s1->connect();
     s2->bind();
-    s1->send(Part(uint8_t(10)));
+    s1->send(Part{uint8_t(10)});
     BOOST_TEST(!poll2->wait().empty());
 
     s1->close();
@@ -732,7 +732,7 @@ BOOST_AUTO_TEST_CASE(waitForEventOpen)
 BOOST_AUTO_TEST_CASE(pollerOpenSockets)
 {
     Context ctx;
-    Socket s(&ctx, Socket::Type::PAIR);
+    Socket s{&ctx, Socket::Type::PAIR};
 
     BOOST_REQUIRE_THROW(Poller p(PollerEvents::Type::Read, &s),
         fuurin::err::ZMQPollerAddSocketFailed);
@@ -762,7 +762,7 @@ BOOST_DATA_TEST_CASE(publishMessage,
     bool ready = false;
 
     do {
-        const int ns = s1->send(Part(pubFilt));
+        const int ns = s1->send(Part{pubFilt});
         BOOST_TEST(ns == int(pubFilt.size()));
 
         ready = !poll.wait().empty();
@@ -809,8 +809,8 @@ BOOST_AUTO_TEST_CASE(partRoutingID)
 BOOST_AUTO_TEST_CASE(socketClientServer)
 {
     Context ctx;
-    Socket s1(&ctx, Socket::Type::CLIENT);
-    Socket s2(&ctx, Socket::Type::SERVER);
+    Socket s1{&ctx, Socket::Type::CLIENT};
+    Socket s2{&ctx, Socket::Type::SERVER};
 
     s1.setEndpoints({"inproc://transfer1"});
     s2.setEndpoints({"inproc://transfer1"});
@@ -818,12 +818,12 @@ BOOST_AUTO_TEST_CASE(socketClientServer)
     s1.connect();
     s2.bind();
 
-    s1.send(Part(uint8_t(8)));
+    s1.send(Part{uint8_t(8)});
     Part x;
     s2.recv(&x);
     BOOST_TEST(x.toUint8() == 8);
 
-    s2.send(Part("hello"sv).withRoutingID(x.routingID()));
+    s2.send(Part{"hello"sv}.withRoutingID(x.routingID()));
     Part y;
     s1.recv(&y);
     BOOST_TEST(y.routingID() == 0u);
@@ -869,8 +869,8 @@ BOOST_AUTO_TEST_CASE(partGroup)
 BOOST_AUTO_TEST_CASE(socketRadioDish)
 {
     Context ctx;
-    Socket s1(&ctx, Socket::Type::RADIO);
-    Socket s2(&ctx, Socket::Type::DISH);
+    Socket s1{&ctx, Socket::Type::RADIO};
+    Socket s2{&ctx, Socket::Type::DISH};
 
     s1.setEndpoints({"inproc://transfer1"});
     s2.setEndpoints({"inproc://transfer1"});
@@ -882,8 +882,8 @@ BOOST_AUTO_TEST_CASE(socketRadioDish)
 
     std::this_thread::sleep_for(500ms);
 
-    BOOST_TEST(s1.send(Part("Friends"sv).withGroup("TV")) == 7);
-    BOOST_TEST(s1.send(Part("Godfather"sv).withGroup("Movies")) == 9);
+    BOOST_TEST(s1.send(Part{"Friends"sv}.withGroup("TV")) == 7);
+    BOOST_TEST(s1.send(Part{"Godfather"sv}.withGroup("Movies")) == 9);
 
     Part r;
 
@@ -903,7 +903,7 @@ static void BM_TransferSinglePartSmall(benchmark::State& state)
     const auto part = uint64_t(11460521682733600767ull);
 
     for (auto _ : state) {
-        Part m1(part);
+        Part m1{part};
         s1->send(m1);
 
         Part m2;
@@ -920,7 +920,7 @@ static void BM_TransferSinglePartBig(benchmark::State& state)
     const auto part = std::string(2048, 'y');
 
     for (auto _ : state) {
-        Part m1(part.data(), part.size());
+        Part m1{part.data(), part.size()};
         s1->send(m1);
 
         Part m2;
@@ -951,8 +951,8 @@ static void BM_TransferMultiPart(benchmark::State& state)
     const auto v14 = std::string(2048, 'y');
 
     for (auto _ : state) {
-        Part p1(v1), p2(v2), p3(v3), p4(v4), p5(v5), p6(v6), p7(v7), p8(v8), p9(v9),
-            p10(v10), p11(v11), p12(v12), p13(v13), p14(v14);
+        Part p1{v1}, p2{v2}, p3{v3}, p4{v4}, p5{v5}, p6{v6}, p7{v7}, p8{v8}, p9{v9},
+            p10{v10}, p11{v11}, p12{v12}, p13{v13}, p14{v14};
         s1->send(p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14);
 
         Part r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14;
