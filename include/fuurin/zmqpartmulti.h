@@ -287,7 +287,7 @@ private:
      */
     static inline bool accessOutOfBoundary(const Part& pm, size_t pos, size_t sz)
     {
-        return !(pos >= 0 && pos <= pm.size() && pos + sz >= pos && pos + sz <= pm.size());
+        return !(pos <= pm.size() && pos + sz >= pos && pos + sz <= pm.size());
     }
 
 
