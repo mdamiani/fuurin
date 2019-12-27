@@ -734,7 +734,7 @@ BOOST_AUTO_TEST_CASE(pollerOpenSockets)
     Context ctx;
     Socket s(&ctx, Socket::Type::PAIR);
 
-    BOOST_REQUIRE_THROW(Poller{PollerEvents::Type::Read, &s},
+    BOOST_REQUIRE_THROW(Poller p(PollerEvents::Type::Read, &s),
         fuurin::err::ZMQPollerAddSocketFailed);
 }
 
