@@ -129,7 +129,7 @@ bool Runner::stop() noexcept
 
 std::optional<zmq::Part> Runner::waitForEvent(std::chrono::milliseconds timeout)
 {
-    zmq::Poller poll(zmq::PollerEvents::Read, zevr_.get());
+    zmq::Poller poll{zmq::PollerEvents::Read, zevr_.get()};
     poll.setTimeout(timeout);
     if (poll.wait().empty())
         return {};
@@ -144,7 +144,7 @@ std::optional<zmq::Part> Runner::waitForEvent(std::chrono::milliseconds timeout)
 
 std::unique_ptr<zmq::PollerWaiter> Runner::createPoller(zmq::Socket* sock)
 {
-    return std::unique_ptr<zmq::PollerWaiter>(new zmq::PollerAuto(zmq::PollerEvents::Type::Read, sock));
+    return std::unique_ptr<zmq::PollerWaiter>(new zmq::PollerAuto{zmq::PollerEvents::Type::Read, sock});
 }
 
 

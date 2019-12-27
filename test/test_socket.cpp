@@ -570,7 +570,7 @@ BOOST_AUTO_TEST_CASE(transferMultiPart)
 
 void testWaitForEvents(Socket* socket, PollerEvents::Type type, std::chrono::milliseconds timeout, bool expected)
 {
-    Poller poll(type, socket);
+    Poller poll{type, socket};
     poll.setTimeout(timeout);
 
     const auto events = poll.wait();
@@ -646,7 +646,7 @@ BOOST_AUTO_TEST_CASE(waitForEventMore)
     s1->send(Part(uint8_t(1)));
     s3->send(Part(uint8_t(2)));
 
-    Poller poll(PollerEvents::Type::Read, s2.get(), s4.get());
+    Poller poll{PollerEvents::Type::Read, s2.get(), s4.get()};
     poll.setTimeout(2500ms);
 
     const auto events = poll.wait();
@@ -687,8 +687,8 @@ BOOST_AUTO_TEST_CASE(waitForEventOpen)
     s2->setEndpoints({"inproc://transfer1"});
 
     // Create poller on closed sockets
-    auto poll1 = std::shared_ptr<PollerWaiter>(new PollerAuto(PollerEvents::Type::Read, s2.get()));
-    auto poll2 = std::shared_ptr<PollerWaiter>(new PollerAuto(PollerEvents::Type::Read, s2.get()));
+    auto poll1 = std::shared_ptr<PollerWaiter>(new PollerAuto{PollerEvents::Type::Read, s2.get()});
+    auto poll2 = std::shared_ptr<PollerWaiter>(new PollerAuto{PollerEvents::Type::Read, s2.get()});
     poll1->setTimeout(500ms);
     poll2->setTimeout(500ms);
 
@@ -755,7 +755,7 @@ BOOST_DATA_TEST_CASE(publishMessage,
     s2->close();
     s2->connect();
 
-    Poller poll(PollerEvents::Type::Read, s2.get());
+    Poller poll{PollerEvents::Type::Read, s2.get()};
     poll.setTimeout(timeout);
 
     int retry = 0;
