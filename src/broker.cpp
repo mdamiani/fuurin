@@ -17,6 +17,9 @@
 
 namespace fuurin {
 
+/**
+ * MAIN TASK
+ */
 
 Broker::Broker()
 {
@@ -26,6 +29,11 @@ Broker::Broker()
 Broker::~Broker() noexcept
 {
 }
+
+
+/**
+ * ASYNC TASK
+ */
 
 std::unique_ptr<zmq::PollerWaiter> Broker::createPoller(zmq::Socket* sock)
 {
@@ -53,6 +61,5 @@ void Broker::socketReady(zmq::Socket* sock)
 
     zstore_->send(payload);
 }
-
 
 } // namespace fuurin
