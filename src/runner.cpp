@@ -106,18 +106,18 @@ bool Runner::stop() noexcept
 }
 
 
-std::optional<zmq::Part> Runner::waitForEvent(std::chrono::milliseconds timeout)
+std::tuple<zmq::Part, Runner::EventRead> Runner::waitForEvent(std::chrono::milliseconds timeout)
 {
     zmq::Poller poll{zmq::PollerEvents::Read, zevr_.get()};
     poll.setTimeout(timeout);
     if (poll.wait().empty())
-        return {};
+        return std::make_tuple(zmq::Part{}, EventRead::Timeout);
 
     auto [ev, valid] = recvEvent();
     if (!valid)
-        return {};
+        return std::make_tuple(std::move(ev), EventRead::Discard);
 
-    return std::move(ev);
+    return std::make_tuple(std::move(ev), EventRead::Success);
 }
 
 

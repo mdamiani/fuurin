@@ -60,10 +60,11 @@ BOOST_AUTO_TEST_CASE(simpleStore)
 
     w.store(zmq::Part{"hello"sv});
 
-    const auto ev = w.waitForEvent(5s);
+    const auto [ev, ret] = w.waitForEvent(5s);
 
-    BOOST_TEST(ev.has_value());
-    BOOST_TEST(ev.value().toString() == "hello"sv);
+    BOOST_TEST(ret == Runner::EventRead::Success);
+    BOOST_TEST(!ev.empty());
+    BOOST_TEST(ev.toString() == "hello"sv);
 
     w.stop();
     b.stop();
@@ -81,8 +82,8 @@ BOOST_AUTO_TEST_CASE(waitForEventThreadSafe)
     const auto recvEvent = [&w]() {
         int cnt = 0;
         for (;;) {
-            const auto ev = w.waitForEvent(1500ms);
-            if (!ev.has_value())
+            const auto [ev, ret] = w.waitForEvent(1500ms);
+            if (ev.empty() || ret != Runner::EventRead::Success)
                 break;
             ++cnt;
         }
@@ -103,6 +104,56 @@ BOOST_AUTO_TEST_CASE(waitForEventThreadSafe)
     BOOST_TEST(cnt1 != 0);
     BOOST_TEST(cnt2 != 0);
     BOOST_TEST(cnt1 + cnt2 == iterations);
+
+    w.stop();
+    b.stop();
+}
+
+
+BOOST_AUTO_TEST_CASE(waitForEventDiscard)
+{
+    Worker w;
+    Broker b;
+
+    auto wf = w.start();
+    auto bf = b.start();
+
+    // produce some events
+    const int iterations = 3;
+    for (int i = 0; i < iterations; ++i)
+        w.store(zmq::Part{"hello1"sv});
+
+    // receive just one event
+    {
+        const auto [ev, ret] = w.waitForEvent(1500ms);
+        BOOST_TEST(ret == Runner::EventRead::Success);
+        BOOST_TEST(ev.toString() == "hello1"sv);
+    }
+
+    // wait for other events to be received
+    std::this_thread::sleep_for(1s);
+
+    // start a new session without reading events
+    w.stop();
+    wf.get();
+    wf = w.start();
+
+    // produce a new event
+    w.store(zmq::Part{"hello2"sv});
+
+    // discard old events
+    for (int i = 0; i < iterations - 1; ++i) {
+        const auto [ev, ret] = w.waitForEvent(1500ms);
+        BOOST_TEST(ret == Runner::EventRead::Discard);
+        BOOST_TEST(ev.toString() == "hello1"sv);
+    }
+
+    // receive new events
+    {
+        const auto [ev, ret] = w.waitForEvent(1500ms);
+        BOOST_TEST(ret == Runner::EventRead::Success);
+        BOOST_TEST(ev.toString() == "hello2"sv);
+    }
 
     w.stop();
     b.stop();

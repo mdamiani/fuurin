@@ -16,7 +16,6 @@
 #include <atomic>
 #include <tuple>
 #include <chrono>
-#include <optional>
 
 
 namespace fuurin {
@@ -39,6 +38,20 @@ class PollerWaiter;
  */
 class Runner
 {
+public:
+    /**
+     * \brief Type of event read.
+     *
+     * \see waitForEvent(std::chrono::milliseconds)
+     */
+    enum EventRead
+    {
+        Timeout, ///< The read operation timed out.
+        Success, ///< The read operation successfully returned an event.
+        Discard, ///< The read operation returned an old event.
+    };
+
+
 public:
     /**
      * \brief Initializes this runner.
@@ -207,7 +220,7 @@ protected:
      *
      * \see recvEvent()
      */
-    std::optional<zmq::Part> waitForEvent(std::chrono::milliseconds timeout = std::chrono::milliseconds(-1));
+    std::tuple<zmq::Part, Runner::EventRead> waitForEvent(std::chrono::milliseconds timeout = std::chrono::milliseconds(-1));
 
 
 private:
@@ -241,7 +254,7 @@ private:
      *
      * \return A tuple with the event and whether it's valid or not.
      *
-     * \see waitForEvent
+     * \see waitForEvent(std::chrono::milliseconds)
      */
     std::tuple<zmq::Part, bool> recvEvent();
 

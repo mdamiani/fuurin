@@ -49,13 +49,13 @@ void Worker::store(zmq::Part&& data)
 }
 
 
-std::optional<zmq::Part> Worker::waitForEvent(std::chrono::milliseconds timeout)
+std::tuple<zmq::Part, Runner::EventRead> Worker::waitForEvent(std::chrono::milliseconds timeout)
 {
     const auto ev = Runner::waitForEvent(timeout);
 
-    if (ev.has_value()) {
+    if (std::get<1>(ev) == EventRead::Success) {
         LOG_DEBUG(log::Arg{"worker"sv}, log::Arg{"event"sv, "recv"sv},
-            log::Arg{"size"sv, int(ev.value().size())});
+            log::Arg{"size"sv, int(std::get<0>(ev).size())});
     } else {
         LOG_DEBUG(log::Arg{"worker"sv}, log::Arg{"event"sv, "recv"sv},
             log::Arg{"size"sv, "n/a"sv});

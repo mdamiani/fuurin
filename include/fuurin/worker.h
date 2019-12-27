@@ -64,7 +64,7 @@ protected:
     virtual void socketReady(zmq::Socket* sock) override;
 
 public:
-    std::optional<zmq::Part> waitForEvent(std::chrono::milliseconds timeout = std::chrono::milliseconds(-1));
+    std::tuple<zmq::Part, Runner::EventRead> waitForEvent(std::chrono::milliseconds timeout = std::chrono::milliseconds(-1));
 
 
 protected:
