@@ -48,6 +48,23 @@ void Worker::store(zmq::Part&& data)
     sendOperation(Operation::Store, std::forward<zmq::Part>(data));
 }
 
+
+std::optional<zmq::Part> Worker::waitForEvent(std::chrono::milliseconds timeout)
+{
+    const auto ev = Runner::waitForEvent(timeout);
+
+    if (ev.has_value()) {
+        LOG_DEBUG(log::Arg{"worker"sv}, log::Arg{"event"sv, "recv"sv},
+            log::Arg{"size"sv, int(ev.value().size())});
+    } else {
+        LOG_DEBUG(log::Arg{"worker"sv}, log::Arg{"event"sv, "recv"sv},
+            log::Arg{"size"sv, "n/a"sv});
+    }
+
+    return ev;
+}
+
+
 /**
  * ASYNC TASK
  */
@@ -94,22 +111,6 @@ void Worker::socketReady(zmq::Socket* sock)
     }
 
     sendEvent(std::move(payload));
-}
-
-
-std::optional<zmq::Part> Worker::waitForEvent(std::chrono::milliseconds timeout)
-{
-    const auto ev = Runner::waitForEvent(timeout);
-
-    if (ev.has_value()) {
-        LOG_DEBUG(log::Arg{"worker"sv}, log::Arg{"event"sv, "recv"sv},
-            log::Arg{"size"sv, int(ev.value().size())});
-    } else {
-        LOG_DEBUG(log::Arg{"worker"sv}, log::Arg{"event"sv, "recv"sv},
-            log::Arg{"size"sv, "n/a"sv});
-    }
-
-    return ev;
 }
 
 } // namespace fuurin
