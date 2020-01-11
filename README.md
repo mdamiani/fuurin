@@ -146,6 +146,7 @@ $> ./bin.v2/tools/bcp/.../bcp \
     boost/uuid/uuid_generators.hpp \
     boost/uuid/uuid_io.hpp \
     boost/uuid/uuid_hash.hpp \
+    boost/asio.hpp \
     /path/to/fuurin/folder
 ```
 
