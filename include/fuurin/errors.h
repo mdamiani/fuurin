@@ -35,6 +35,11 @@ public:
     explicit Error(const log::Loc& loc, const char* what, const log::Arg& arg = log::Arg{}) noexcept;
 
     /**
+     * \brief Destructor.
+     */
+    virtual ~Error() noexcept;
+
+    /**
      * \return Error explanatory string.
      */
     const char* what() const noexcept override;
@@ -70,16 +75,23 @@ DECL_ERROR(ZMQSocketConnectFailed)
 DECL_ERROR(ZMQSocketBindFailed)
 DECL_ERROR(ZMQSocketSendFailed)
 DECL_ERROR(ZMQSocketRecvFailed)
+DECL_ERROR(ZMQSocketGroupFailed)
 DECL_ERROR(ZMQPartCreateFailed)
 DECL_ERROR(ZMQPartMoveFailed)
 DECL_ERROR(ZMQPartCopyFailed)
+DECL_ERROR(ZMQPartAccessFailed)
+DECL_ERROR(ZMQPartRoutingIDFailed)
+DECL_ERROR(ZMQPartGroupFailed)
 DECL_ERROR(ZMQPollerCreateFailed)
+DECL_ERROR(ZMQPollerAddSocketFailed)
+DECL_ERROR(ZMQPollerDelSocketFailed)
 DECL_ERROR(ZMQPollerWaitFailed)
 
 #undef DECL_ERROR
 
 #define ERROR(type, reason, ...) \
     fuurin::err::type({__FILE__, __LINE__}, reason, ##__VA_ARGS__)
+
 } // namespace err
 } // namespace fuurin
 

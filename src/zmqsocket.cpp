@@ -1,8 +1,20 @@
+/**
+ * Copyright (c) Contributors as noted in the AUTHORS file.
+ *
+ * This Source Code Form is part of *fuurin* library.
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ */
+
 #include "fuurin/zmqsocket.h"
 #include "fuurin/zmqcontext.h"
 #include "fuurin/zmqpart.h"
+#include "fuurin/zmqpoller.h"
 #include "fuurin/errors.h"
 #include "failure.h"
+#include "types.h"
 #include "log.h"
 
 #include <zmq.h>
@@ -12,6 +24,7 @@
 #include <type_traits>
 #include <chrono>
 #include <thread>
+#include <algorithm>
 
 
 namespace fuurin {
@@ -43,6 +56,10 @@ int zmqSocketType(Socket::Type type)
         return ZMQ_SERVER;
     case Socket::Type::CLIENT:
         return ZMQ_CLIENT;
+    case Socket::Type::RADIO:
+        return ZMQ_RADIO;
+    case Socket::Type::DISH:
+        return ZMQ_DISH;
     }
 
     ASSERT(false, "invalid socket type");
@@ -51,11 +68,11 @@ int zmqSocketType(Socket::Type type)
 } // namespace
 
 
-Socket::Socket(Context* ctx, Type type)
+Socket::Socket(Context* ctx, Type type) noexcept
     : ctx_(ctx)
     , type_(type)
     , ptr_(nullptr)
-    , linger_(0)
+    , linger_(0ms)
 {
 }
 
@@ -63,6 +80,12 @@ Socket::Socket(Context* ctx, Type type)
 Socket::~Socket() noexcept
 {
     close();
+}
+
+
+void* Socket::zmqPointer() const noexcept
+{
+    return ptr_;
 }
 
 
@@ -78,13 +101,13 @@ Socket::Type Socket::type() const noexcept
 }
 
 
-void Socket::setLinger(int value) noexcept
+void Socket::setLinger(std::chrono::milliseconds value) noexcept
 {
     linger_ = value;
 }
 
 
-int Socket::linger() const noexcept
+std::chrono::milliseconds Socket::linger() const noexcept
 {
     return linger_;
 }
@@ -99,6 +122,18 @@ void Socket::setSubscriptions(const std::list<std::string>& filters)
 const std::list<std::string>& Socket::subscriptions() const
 {
     return subscriptions_;
+}
+
+
+void Socket::setGroups(const std::list<std::string>& groups)
+{
+    groups_ = groups;
+}
+
+
+const std::list<std::string>& Socket::groups() const
+{
+    return groups_;
 }
 
 
@@ -241,7 +276,7 @@ void Socket::open(std::function<void(std::string)> action)
     bool commit = false;
 
     // Create socket.
-    ptr_ = zmq_socket(ctx_->ptr_, zmqSocketType(type_));
+    ptr_ = zmq_socket(ctx_->zmqPointer(), zmqSocketType(type_));
     if (ptr_ == nullptr) {
         throw ERROR(ZMQSocketCreateFailed, "could not create socket",
             log::Arg{"reason"sv, log::ec_t{zmq_errno()}});
@@ -253,10 +288,13 @@ void Socket::open(std::function<void(std::string)> action)
     };
 
     // Configure socket.
-    setOption(ZMQ_LINGER, linger_);
+    setOption(ZMQ_LINGER, getMillis<int>(linger_));
 
     for (const auto& s : subscriptions_)
         setOption(ZMQ_SUBSCRIBE, s);
+
+    for (const auto& s : groups_)
+        join(s);
 
     // Connect or bind socket.
     for (const auto& endp : endpoints_) {
@@ -264,6 +302,10 @@ void Socket::open(std::function<void(std::string)> action)
         const auto& lastEndp = getOption<std::string>(ZMQ_LAST_ENDPOINT);
         openEndpoints_.push_back(lastEndp);
     }
+
+    // Notify observers
+    for (auto* poller : observers_)
+        poller->updateOnOpen(this);
 
     commit = true;
 }
@@ -275,13 +317,16 @@ void Socket::close() noexcept
         return;
 
     try {
+        for (auto* poller : observers_)
+            poller->updateOnClose(this);
+
         const int rc = zmq_close(ptr_);
         ASSERT(rc == 0, "zmq_close failed");
 
         openEndpoints_.clear();
         ptr_ = nullptr;
     } catch (...) {
-        ASSERT(false, "zmq_close threw exception");
+        ASSERT(false, "socket close threw exception");
     }
 }
 
@@ -383,25 +428,59 @@ inline int recvMessagePart(void* socket, int flags, zmq_msg_t* msg)
 
 int Socket::sendMessageMore(Part* part)
 {
-    return sendMessagePart(ptr_, ZMQ_SNDMORE, &part->msg_);
+    return sendMessagePart(ptr_, ZMQ_SNDMORE, part->zmqPointer());
 }
 
 
 int Socket::sendMessageLast(Part* part)
 {
-    return sendMessagePart(ptr_, 0, &part->msg_);
+    return sendMessagePart(ptr_, 0, part->zmqPointer());
 }
 
 
 int Socket::recvMessageMore(Part* part)
 {
-    return recvMessagePart(ptr_, 0, &part->msg_);
+    return recvMessagePart(ptr_, 0, part->zmqPointer());
 }
 
 
 int Socket::recvMessageLast(Part* part)
 {
-    return recvMessagePart(ptr_, 0, &part->msg_);
+    return recvMessagePart(ptr_, 0, part->zmqPointer());
+}
+
+
+void Socket::registerPoller(PollerObserver* poller)
+{
+    if (std::find(observers_.begin(), observers_.end(), poller) != observers_.end())
+        return;
+
+    observers_.push_back(poller);
+}
+
+
+void Socket::unregisterPoller(PollerObserver* poller)
+{
+    observers_.erase(std::remove(observers_.begin(), observers_.end(), poller), observers_.end());
+}
+
+
+size_t Socket::pollersCount() const noexcept
+{
+    return observers_.size();
+}
+
+
+void Socket::join(const std::string& group)
+{
+    const int rc = zmq_join(ptr_, group.c_str());
+    if (rc == -1) {
+        throw ERROR(ZMQSocketGroupFailed, "could not join group",
+            log::Arg{
+                log::Arg{"reason"sv, log::ec_t{zmq_errno()}},
+                log::Arg{"group"sv, group},
+            });
+    }
 }
 
 } // namespace zmq

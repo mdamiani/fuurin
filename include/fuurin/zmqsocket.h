@@ -12,6 +12,7 @@
 #define ZMQSOCKET_H
 
 #include <string>
+#include <chrono>
 #include <list>
 #include <functional>
 #include <type_traits>
@@ -23,24 +24,15 @@ namespace zmq {
 
 class Context;
 class Part;
-
-namespace internal {
-class PollerImpl;
-}
+class PollerObserver;
 
 
 /**
  * \brief This class wraps a ZMQ socket.
  * This class is not tread-safe.
  */
-class Socket final
+class Socket
 {
-    template<typename...>
-    friend class Poller;
-
-    friend class internal::PollerImpl;
-
-
 public:
     /// Type of ZMQ socket.
     enum Type
@@ -56,6 +48,8 @@ public:
         PUSH,
         SERVER,
         CLIENT,
+        RADIO,
+        DISH,
     };
 
 
@@ -66,7 +60,7 @@ public:
      * \param[in] ctx A valid ZMQ context.
      * \param[in] type Type of ZMQ socket.
      */
-    explicit Socket(Context* ctx, Type type);
+    explicit Socket(Context* ctx, Type type) noexcept;
 
     /**
      * \brief Destroys (and closes) this socket.
@@ -84,6 +78,11 @@ public:
     ///@}
 
     /**
+     * \return The underlying raw ZMQ pointer.
+     */
+    void* zmqPointer() const noexcept;
+
+    /**
      * \return The \ref Context this socket belongs to.
      */
     Context* context() const noexcept;
@@ -97,16 +96,16 @@ public:
      * \brief Sets a \c ZMQ_LINGER value to this socket.
      * The socket linger value is actually applied at connection/bind time.
      *
-     * \param[in] value Linger value.
+     * \param[in] value Linger value, a negative value sets an infinite wait.
      * \see linger()
      */
-    void setLinger(int value) noexcept;
+    void setLinger(std::chrono::milliseconds value) noexcept;
 
     /**
      * \return The linger value.
-     * \see setLinger()
+     * \see setLinger(std::chrono::milliseconds)
      */
-    int linger() const noexcept;
+    std::chrono::milliseconds linger() const noexcept;
 
     /**
      * \brief Sets a \c ZMQ_SUBSCRIBE filter to this socket.
@@ -122,6 +121,22 @@ public:
      * \see setSubscriptions()
      */
     const std::list<std::string>& subscriptions() const;
+
+    /**
+     * \brief Sets the list of groups to join.
+     * Groups are joined at connect/bind time.
+     * It shall be set to a \ref Type::DISH socket.
+     *
+     * \param[in] groups List of groups to join.
+     * \see groups()
+     */
+    void setGroups(const std::list<std::string>& groups);
+
+    /**
+     * \return The list of groups to join.
+     * \see setGroups(const std::list<std::string>&)
+     */
+    const std::list<std::string>& groups() const;
 
     /**
      * \brief Sets the list of endpoints to connect or bind to.
@@ -148,23 +163,23 @@ public:
      *   - Set ZMQ_LINGER property.
      *   - Set ZMQ_SUBSCRIBE property.
      *
-     * Finally the socket is connected or bound to the passed endpoints.
+     * Finally the socket is connected or bound to the set endpoints.
      * In case of exceptions, socket is not open (exception safety).
-     *
-     * \param[in] action Either \c connect or \c bind.
-     * \param[in] endpoints List of endpoints to connect or bind to.
      *
      * \exception ZMQSocketCreateFailed Socket could not be created, or it is not closed.
      * \exception ZMQSocketOptionSetFailed Socket options could not be set.
+     * \exception ZMQSocketGroupFailed Socket could not be joined to group.
      * \exception ZMQSocketConnectFailed Socket could not be connected to one endpoint.
      * \exception ZMQSocketBindFailed Socket could not be bound to one endpoint.
      *
+     * \see setEndpoints
+     * \see openEndpoints()
      * \see connect(std::string)
      * \see bind(std::string, int)
-     * \see openEndpoints()
      * \see open()
      * \see close()
      * \see setOption()
+     * \see join()
      * \see isOpen()
      */
     ///{@
@@ -225,14 +240,14 @@ public:
     ///{@
     template<typename T, typename... Args>
     std::enable_if_t<std::is_same_v<std::decay_t<T>, Part>, int>
-    sendMessage(T&& part, Args&&... args)
+    send(T&& part, Args&&... args)
     {
-        return sendMessageMore(&part) + sendMessage(args...);
+        return sendMessageMore(&part) + send(std::forward<Args>(args)...);
     }
 
     template<typename T>
     std::enable_if_t<std::is_same_v<std::decay_t<T>, Part>, int>
-    sendMessage(T&& part)
+    send(T&& part)
     {
         return sendMessageLast(&part);
     }
@@ -255,15 +270,36 @@ public:
      */
     ///{@
     template<typename... Args>
-    int recvMessage(Part* part, Args&&... args)
+    int recv(Part* part, Args&&... args)
     {
-        return recvMessageMore(part) + recvMessage(args...);
+        return recvMessageMore(part) + recv(std::forward<Args>(args)...);
     }
 
-    int recvMessage(Part* part)
+    int recv(Part* part)
     {
         return recvMessageLast(part);
     }
+    ///@}
+
+    /**
+     * \return The list of registered pollers.
+     */
+    size_t pollersCount() const noexcept;
+
+
+public:
+    // TODO: make observer inteface loose coupled and make remove these public methods.
+    /**
+     * \brief Registers/unregisters a poller observer for this socket.
+     *
+     * This method is intended to be automatically called by a \ref PollerObserver
+     * when it is passed a \ref Socket to poll.
+     *
+     * \param[in] poller Poller of this socket.
+     */
+    ///{@
+    void registerPoller(PollerObserver* poller);
+    void unregisterPoller(PollerObserver* poller);
     ///@}
 
 
@@ -369,16 +405,30 @@ private:
     int recvMessageLast(Part* part);
     ///@}
 
+    /**
+     * \brief Joins a RADIO/DISH group.
+     *
+     * It shall be called on a \ref Type::DISH socket.
+     * This method calls \c zmq_join.
+     *
+     * \param[in] group Group to join.
+     *
+     * \exception ZMQSocketGroupFailed The group could not be joined.
+     */
+    void join(const std::string& group);
+
 
 private:
     Context* const ctx_; ///< ZMQ context this socket belongs to.
     const Type type_;    ///< ZMQ type of socket.
     void* ptr_;          ///< ZMQ socket.
 
-    int linger_;                           ///< Linger value.
+    std::chrono::milliseconds linger_;     ///< Linger value.
     std::list<std::string> subscriptions_; ///< List of subscriptions.
+    std::list<std::string> groups_;        ///< List of groups.
     std::list<std::string> endpoints_;     ///< List of endpoints to connect/bind.
     std::list<std::string> openEndpoints_; ///< List of connected/bound endpoints.
+    std::list<PollerObserver*> observers_; ///< List of poller observers.
 };
 } // namespace zmq
 } // namespace fuurin

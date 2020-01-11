@@ -14,6 +14,7 @@
 #include <boost/preprocessor/seq/for_each.hpp>
 
 #include <iostream>
+#include <mutex>
 
 
 namespace fuurin {
@@ -51,10 +52,12 @@ inline void printargs(std::ostream& os, const Arg args[], size_t num)
 }
 
 
+std::mutex print_mutex;
 inline void println(std::ostream& os, const Arg args[], size_t num)
 {
+    std::lock_guard<std::mutex> guard(print_mutex);
     printargs(os, args, num);
-    os << std::endl;
+    os << "\n";
 }
 } // namespace
 

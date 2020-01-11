@@ -65,7 +65,7 @@ $> make DESTDIR=/home/user install
 Debian packages are generated through the following command:
 
 ```
-$> cmake -D BUILD_DEB_PACKAGE=1 /path/to/fuurin/folder
+$> cmake -D BUILD_DEB_PACKAGE=ON /path/to/fuurin/folder
 $> make
 $> (umask 022 && fakeroot make package)
 ```

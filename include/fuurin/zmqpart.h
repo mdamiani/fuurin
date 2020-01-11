@@ -15,6 +15,7 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <ostream>
 
 
@@ -38,14 +39,13 @@ namespace zmq {
  * \brief This class stores a ZMQ message part to be sent or received.
  *
  * Memory for storage is allocated following the same behaviour
- * of \c zmq_msg_init* functions.
+ * of \c zmq_msg_init* functions. The semantics are the same
+ * as exposed by \c zmq_msg_t (e.g. it is cleared after sending).
  *
  * Data is stored with the proper sending/receiving endianess.
  */
-class Part final
+class Part
 {
-    friend class Socket;
-
 public:
     /**
      * \brief Initializes an empty part.
@@ -55,7 +55,7 @@ public:
     explicit Part();
 
     /**
-     * \brief Inizializes with an integer value.
+     * \brief Inizializes a part with value.
      *
      * The value data is copied using the proper endianess format,
      * ready to be sent over the network.
@@ -85,13 +85,52 @@ public:
      *
      * \param[in] data Data to be stored in this part.
      * \param[in] size Size of the data.
+     *
+     * \exception ZMQPartCreateFailed The part could not be created.
      */
     explicit Part(const char* data, size_t size);
+
+    /**
+     * Type used for size initialization.
+     * \see Part(msg_init_size_t, size_t)
+     */
+    struct msg_init_size_t
+    {};
+    static constexpr msg_init_size_t msg_init_size = msg_init_size_t{};
+
+    /**
+     * \brief Inizializes a part with a buffer of the specified \c size.
+     *
+     * This method calls \c zmq_msg_init_size.
+     *
+     * \param[in] size Size of this part.
+     *
+     * \exception ZMQPartCreateFailed The part could not be created.
+     */
+    explicit Part(msg_init_size_t, size_t size);
+
+    /**
+     * \brief Constructs a part by hard copying another one.
+     * \param[in] other Another part.
+     *
+     * \exception ZMQPartCreateFailed The part could not be created.
+     */
+    Part(const Part& other);
+
+    /**
+     * \brief Constructs a part by moving from another one.
+     * \param[in] other Another part.
+     *
+     * \exception ZMQPartMoveFailed The part could not be moved.
+     */
+    Part(Part&& other);
 
     /**
      * \brief Releases resources for this part.
      *
      * This method calls \c zmq_msg_close.
+     *
+     * \see close()
      */
     ~Part() noexcept;
 
@@ -101,7 +140,7 @@ public:
      * It calls \c zmq_msg_move so the \c other part is cleared
      * and any previous contents of this part is released.
      *
-     * \param other Another part to move data from.
+     * \param[in] other Another part to move data from.
      * \return A reference to this part.
      *
      * \exception ZMQPartMoveFailed The part could not be moved.
@@ -112,17 +151,25 @@ public:
     ///@}
 
     /**
-     * \brief Creates a copy from an \c other part.
+     * \return The underlying raw ZMQ pointer.
+     */
+    zmq_msg_t* zmqPointer() const noexcept;
+
+    /**
+     * \brief Creates a copy or share data from an \c other part.
      *
      * It calls \c zmq_msg_copy, so this messages is cleared
      * if it contains any contents.
      *
-     * \param[in] other Another part to copy from.
+     * Modifying contents after calling this function can lead
+     * to undefined behaviour.
+     *
+     * \param[in] other Another part to copy/share from.
      * \return A reference to this part.
      *
-     * \exception ZMQPartCopyFailed The part could not be copied.
+     * \exception ZMQPartCopyFailed The part could not be copied/shared.
      */
-    Part& copy(const Part& other);
+    Part& share(const Part& other);
 
     /**
      * \brief Checks whether an \c other part is equal to this one.
@@ -135,11 +182,29 @@ public:
     ///@}
 
     /**
-     * \return The internal stored data, possibly with a different endianess format.
+     * \brief Assigns the contents of another part by hard copying it.
+     *
+     * Current contents is released before assignment and data
+     * is copied with memcpy.
+     *
+     * \param[in] other Another part.
+     * \return A reference to this part.
+     *
+     * \exception ZMQPartCreateFailed The part could not be copied.
+     *
+     * \see close()
+     */
+    Part& operator=(const Part& other);
+
+    /**
+     * \return The internal stored data, potentially with a different endianess format.
      * \see size()
      * \see empty()
      */
+    ///{@
     const char* data() const noexcept;
+    char* data() noexcept;
+    ///@}
 
     /**
      * \return The size of \ref data.
@@ -154,6 +219,82 @@ public:
      * \see size()
      */
     bool empty() const noexcept;
+
+    /**
+     * \brief Sets the routing ID property to this part.
+     *
+     * \param[in] id The routing ID value.
+     *
+     * \return A reference to this part.
+     * \exception ZMQPartRoutingIDFailed The routing ID could not be set.
+     *
+     * \see setRoutingID(uint32_t)
+     * \see routingID()
+     */
+    Part& withRoutingID(uint32_t id);
+
+    /**
+     * \brief Sets the routing ID property to this part.
+     *
+     * This method calls \c zmq_msg_set_routing_id.
+     *
+     * \param[in] id The routing ID value.
+     * \exception ZMQPartRoutingIDFailed The routing ID could not be set.
+     *
+     * \see withRoutingID(uint32_t)
+     * \see routingID()
+     */
+    void setRoutingID(uint32_t id);
+
+    /**
+     * \brief Returns the routing ID of this part.
+     *
+     * This method calls \c zmq_msg_routing_id.
+     *
+     * \return The routing ID or 0 if it was not set.
+     *
+     * \see withRoutingID(uint32_t)
+     * \see setRoutingID(uint32_t)
+     */
+    uint32_t routingID() const noexcept;
+
+    /**
+     * \brief Sets the group property to this part.
+     *
+     * \param[in] group A null terminated string, no more than \c ZMQ_GROUP_MAX_LENGTH.
+     *
+     * \return A reference to this part.
+     * \exception ZMQPartGroupFailed The group could not be set.
+     *
+     * \see setGroup(const char *)
+     * \see group()
+     */
+    Part& withGroup(const char* group);
+
+    /**
+     * \brief Sets the group property to this part.
+     *
+     * This method calls \c zmq_msg_set_group.
+     *
+     * \param[in] group A null terminated string, no more than \c ZMQ_GROUP_MAX_LENGTH.
+     * \exception ZMQPartGroupFailed The group could not be set.
+     *
+     * \see withGroup(const char*)
+     * \see group()
+     */
+    void setGroup(const char* group);
+
+    /**
+     * \brief Returns the group of this part.
+     *
+     * This method calls \c zmq_msg_group.
+     *
+     * \return A null terminated string, no more than \c ZMQ_GROUP_MAX_LENGTH.
+     *
+     * \see withGroup(const char*)
+     * \see setGroup(const char*)
+     */
+    const char* group() const noexcept;
 
     /**
      * \return Converts internal data to the requested integer type.
@@ -177,13 +318,59 @@ public:
      */
     std::string_view toString() const;
 
+
+protected:
     /**
-     * Disable copy.
+     * \brief Copies an integral type value to a destination buffer, with endianess conversion.
+     * \param[in] dest Destination buffer.
+     * \param[in] value Value to copy.
+     * \see void memcpyWithEndian(void*, const void*, size_t);
      */
-    ///{@
-    Part(const Part&) = delete;
-    Part& operator=(const Part&) = delete;
+    template<typename T>
+    static std::enable_if_t<std::is_integral_v<std::decay_t<T>> && std::is_unsigned_v<std::decay_t<T>>, void>
+    memcpyWithEndian(void* dest, T&& value)
+    {
+        memcpyWithEndian(dest, &value, sizeof(T));
+    }
+
+    /**
+     * \brief Extracts an integral type value from a source buffer, with endianess conversion.
+     * \param[in] source Source buffer.
+     * \return The extracted value.
+     * \see void memcpyWithEndian(void*, const void*, size_t);
+     */
+    template<typename T>
+    static std::enable_if_t<std::is_integral_v<std::decay_t<T>> && std::is_unsigned_v<std::decay_t<T>>, T>
+    memcpyWithEndian(const void* source)
+    {
+        T value;
+        memcpyWithEndian(&value, source, sizeof(T));
+        return value;
+    }
     ///@}
+
+    /**
+     * \brief Copies memory to/from internal buffer, with proper endianess.
+     *
+     * If the native endianess matches the sending one, then data is copied
+     * as is without any conversion.
+     *
+     * \param[in] dest Destination buffer.
+     * \param[in] source Source buffer.
+     * \param[in] size Size of buffer.
+     *
+     * \see buffer()
+     */
+    static void memcpyWithEndian(void* dest, const void* source, size_t size);
+
+
+private:
+    /**
+     * \brief Releases resources for this part.
+     *
+     * This method calls \c zmq_msg_close.
+     */
+    void close() noexcept;
 
 
 private:
