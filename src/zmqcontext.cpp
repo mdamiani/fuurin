@@ -11,24 +11,76 @@
 #include "fuurin/zmqcontext.h"
 #include "fuurin/errors.h"
 #include "failure.h"
+#include "log.h"
 
 #include <zmq.h>
+
+#include <boost/scope_exit.hpp>
+#include <boost/asio/io_context.hpp>
+#include <boost/asio/executor_work_guard.hpp>
 
 
 namespace fuurin {
 namespace zmq {
 
 
+struct Context::IOWork
+{
+    boost::asio::io_context io_;
+    boost::asio::executor_work_guard<boost::asio::io_context::executor_type>
+        work_ = boost::asio::make_work_guard(io_);
+
+    void run() noexcept
+    {
+        try {
+            io_.run();
+        } catch (...) {
+            LOG_FATAL(log::Arg{"Context::IOWork::run"sv},
+                log::Arg{"unexpected exception caught!"sv});
+        }
+    }
+
+    void stop() noexcept
+    {
+        try {
+            io_.stop();
+        } catch (...) {
+            LOG_FATAL(log::Arg{"Context::IOWork::stop"sv},
+                log::Arg{"unexpected exception caught!"sv});
+        }
+    }
+};
+
+
 Context::Context()
     : ptr_(zmq_ctx_new())
+    , iowork_(std::make_unique<IOWork>())
 {
     if (ptr_ == nullptr) {
-        throw ERROR(ZMQContextCreateFailed, "could not create context", log::Arg{log::ec_t{zmq_errno()}});
+        throw ERROR(ZMQContextCreateFailed, "could not create context",
+            log::Arg{log::ec_t{zmq_errno()}});
     }
+
+    bool commit = false;
+    BOOST_SCOPE_EXIT(this, &commit)
+    {
+        if (!commit)
+            terminate();
+    };
+
+    iocompl_ = std::async(std::launch::async, &IOWork::run, iowork_.get());
+    commit = true;
 }
 
 
 Context::~Context() noexcept
+{
+    iowork_->stop();
+    terminate();
+}
+
+
+void Context::terminate() noexcept
 {
     int rc;
 
