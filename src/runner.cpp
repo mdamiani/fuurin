@@ -164,7 +164,7 @@ void Runner::run()
     for (;;) {
         for (auto s : poll->wait()) {
             if (s != zopr_.get()) {
-                socketReady(s);
+                socketReady(static_cast<zmq::Socket*>(s));
                 continue;
             }
 

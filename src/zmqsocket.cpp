@@ -89,6 +89,15 @@ void* Socket::zmqPointer() const noexcept
 }
 
 
+std::string Socket::description() const
+{
+    if (endpoints().empty())
+        return std::string();
+
+    return endpoints().front();
+}
+
+
 Context* Socket::context() const noexcept
 {
     return ctx_;
@@ -447,27 +456,6 @@ int Socket::recvMessageMore(Part* part)
 int Socket::recvMessageLast(Part* part)
 {
     return recvMessagePart(ptr_, 0, part->zmqPointer());
-}
-
-
-void Socket::registerPoller(PollerObserver* poller)
-{
-    if (std::find(observers_.begin(), observers_.end(), poller) != observers_.end())
-        return;
-
-    observers_.push_back(poller);
-}
-
-
-void Socket::unregisterPoller(PollerObserver* poller)
-{
-    observers_.erase(std::remove(observers_.begin(), observers_.end(), poller), observers_.end());
-}
-
-
-size_t Socket::pollersCount() const noexcept
-{
-    return observers_.size();
 }
 
 

@@ -11,6 +11,8 @@
 #ifndef ZMQSOCKET_H
 #define ZMQSOCKET_H
 
+#include "fuurin/zmqpollable.h"
+
 #include <string>
 #include <chrono>
 #include <list>
@@ -31,7 +33,7 @@ class PollerObserver;
  * \brief This class wraps a ZMQ socket.
  * This class is not tread-safe.
  */
-class Socket
+class Socket : public Pollable
 {
 public:
     /// Type of ZMQ socket.
@@ -80,7 +82,12 @@ public:
     /**
      * \return The underlying raw ZMQ pointer.
      */
-    void* zmqPointer() const noexcept;
+    void* zmqPointer() const noexcept override;
+
+    /**
+     * \return The first endpoint as description or and empty string.
+     */
+    std::string description() const override;
 
     /**
      * \return The \ref Context this socket belongs to.
@@ -206,7 +213,7 @@ public:
      * \see bind()
      * \see close()
      */
-    bool isOpen() const noexcept;
+    bool isOpen() const noexcept override;
 
     /**
      * \return The list of connected or bound endpoints.
@@ -279,27 +286,6 @@ public:
     {
         return recvMessageLast(part);
     }
-    ///@}
-
-    /**
-     * \return The list of registered pollers.
-     */
-    size_t pollersCount() const noexcept;
-
-
-public:
-    // TODO: make observer inteface loose coupled and make remove these public methods.
-    /**
-     * \brief Registers/unregisters a poller observer for this socket.
-     *
-     * This method is intended to be automatically called by a \ref PollerObserver
-     * when it is passed a \ref Socket to poll.
-     *
-     * \param[in] poller Poller of this socket.
-     */
-    ///{@
-    void registerPoller(PollerObserver* poller);
-    void unregisterPoller(PollerObserver* poller);
     ///@}
 
 
@@ -428,7 +414,6 @@ private:
     std::list<std::string> groups_;        ///< List of groups.
     std::list<std::string> endpoints_;     ///< List of endpoints to connect/bind.
     std::list<std::string> openEndpoints_; ///< List of connected/bound endpoints.
-    std::list<PollerObserver*> observers_; ///< List of poller observers.
 };
 } // namespace zmq
 } // namespace fuurin
