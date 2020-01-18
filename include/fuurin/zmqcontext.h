@@ -15,6 +15,13 @@
 #include <future>
 
 
+namespace boost {
+namespace asio {
+class io_context;
+}
+} // namespace boost
+
+
 namespace fuurin {
 namespace zmq {
 
@@ -51,6 +58,11 @@ public:
      * \return The underlying raw ZMQ pointer.
      */
     void* zmqPointer() const noexcept;
+
+    /**
+     * \return The ASIO context.
+     */
+    boost::asio::io_context& ioContext() noexcept;
 
 
 private:

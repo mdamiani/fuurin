@@ -98,5 +98,10 @@ void* Context::zmqPointer() const noexcept
 }
 
 
+boost::asio::io_context& Context::ioContext() noexcept
+{
+    return iowork_->io_;
+}
+
 } // namespace zmq
 } // namespace fuurin
