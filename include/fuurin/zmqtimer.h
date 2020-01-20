@@ -15,6 +15,8 @@
 
 #include <memory>
 #include <string>
+#include <chrono>
+#include <future>
 
 
 namespace fuurin {
@@ -74,21 +76,90 @@ public:
      */
     virtual std::string description() const override;
 
-
-protected:
     /**
-     * \brief Triggers this timer.
-     * Any poller who is waiting for this timer will be woken up.
+     * \brief Sets the expiration interval.
+     * \param[in] value Interval. A negative value will cause a 0 interval to be set.
+     * \see interval()
      */
-    void trigger();
+    void setInterval(std::chrono::milliseconds value) noexcept;
+
+    /**
+     * \return The expiration interval.
+     * \see setInterval(std::chrono::milliseconds)
+     */
+    std::chrono::milliseconds interval() const noexcept;
+
+    /**
+     * \brief Sets whether this timer is periodic or single shot.
+     * Default value is \c false, so the timer is periodic.
+     * \param[in] value \c true for single shot timer.
+     * \see isSingleShot()
+     */
+    void setSingleShot(bool value) noexcept;
+
+    /**
+     * \return Whether the timer is single shot.
+     * \see setSingleShot(bool)
+     */
+    bool isSingleShot() const noexcept;
+
+    /**
+     * \brief Starts or restarts the timer.
+     * The timer will be scheduled to fire after \c interval() milliseconds.
+     * Every change to timer properties, like \ref interval() and \ref isSingleShot(),
+     * won't take effect until the next restart.
+     * \see stop()
+     * \see setInterval(std::chrono::milliseconds)
+     * \see setSingleShot(bool)
+     */
+    void start();
+
+    /**
+     * \brief Cancels the timer.
+     * \see start()
+     */
+    void stop();
+
+    /**
+     * \brief Consumes this timer once expired.
+     * In case the timer has not expired, it waits until its expiration.
+     * \see isExpired()
+     */
+    void consume();
+
+    /**
+     * \brief Check whether this timer has expired.
+     * A call to \ref consume() will reset the expiration state.
+     * \return \c true when the timer has expired.
+     * \see consume()
+     */
+    bool isExpired() const;
+
+    /**
+     * \brief Tells whether a timer is active.
+     * A periodic timer is active since it's \ref start()'ed until it is \ref stop()'ed.
+     * A \ref isSingleShot() timer automatically becomes inactive once it expires.
+     * \return Whether the timer is active.
+     * \see start()
+     * \see stop()
+     * \see setSingleShot(bool)
+     */
+    bool isActive();
 
 
 private:
     Context* const ctx_;     ///< ZMQ context of this timer.
     const std::string name_; ///< Timer description.
 
-    std::unique_ptr<Socket> trigger_;  ///< Writable end of this timer.
-    std::unique_ptr<Socket> receiver_; ///< Pollable end of this timer.
+    const std::unique_ptr<Socket> trigger_;  ///< Writable end of this timer.
+    const std::unique_ptr<Socket> receiver_; ///< Pollable end of this timer.
+
+    class IOSteadyTimer;                   ///< Wrapper for ASIO steady timer.
+    std::unique_ptr<IOSteadyTimer> timer_; ///< ASIO timer.
+    std::future<bool> cancelFuture_;       ///< Future to wait for the ASIO timer to cancel.
+
+    std::chrono::milliseconds interval_; ///< Timer expiration interval;
+    bool singleshot_;                    ///< Whether this time is single shot or not.
 };
 
 } // namespace zmq

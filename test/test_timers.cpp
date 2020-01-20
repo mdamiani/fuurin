@@ -21,6 +21,7 @@
 
 #include <string_view>
 #include <chrono>
+#include <thread>
 
 
 using namespace fuurin::zmq;
@@ -29,8 +30,17 @@ namespace utf = boost::unit_test;
 using namespace std::literals::string_view_literals;
 using namespace std::literals::chrono_literals;
 
+namespace std {
+namespace chrono {
+std::ostream& operator<<(std::ostream& os, const ::std::chrono::milliseconds& ns)
+{
+    return os << ns.count() << "ms";
+}
+} // namespace chrono
+} // namespace std
 
-BOOST_AUTO_TEST_CASE(socketTimer)
+
+BOOST_AUTO_TEST_CASE(timerCreate)
 {
     Context ctx;
 
@@ -42,5 +52,106 @@ BOOST_AUTO_TEST_CASE(socketTimer)
     BOOST_TEST(t.description() == "timer1");
     BOOST_TEST(t.isOpen());
 
+    t.setInterval(-1ms);
+    BOOST_TEST(t.interval() == 0ms);
+
+    t.setInterval(100ms);
+    BOOST_TEST(t.interval() == 100ms);
+
+    BOOST_TEST(!t.isSingleShot());
+    t.setSingleShot(true);
+    BOOST_TEST(t.isSingleShot());
+}
+
+
+BOOST_AUTO_TEST_CASE(timerSingleShot)
+{
+    Context ctx;
+    Timer t{&ctx, "timer1"};
+    t.setInterval(100ms);
+    t.setSingleShot(true);
+
     Poller poll{PollerEvents::Type::Read, &t};
+    poll.setTimeout(1s);
+
+    BOOST_TEST(!t.isActive());
+
+    t.start();
+
+    BOOST_TEST(t.isActive());
+
+    const auto events = poll.wait();
+    BOOST_TEST(!events.empty());
+    BOOST_TEST(events[0] == &t);
+    BOOST_TEST(t.isExpired());
+    BOOST_TEST(!t.isActive());
+
+    t.consume();
+    BOOST_TEST(!t.isExpired());
+
+    // no more ticks
+    BOOST_TEST(poll.wait().empty());
+
+    t.stop();
+    BOOST_TEST(!t.isActive());
+}
+
+
+BOOST_AUTO_TEST_CASE(timerStop)
+{
+    Context ctx;
+    Timer t{&ctx, "timer1"};
+    t.setInterval(5s);
+
+    BOOST_TEST(!t.isActive());
+    BOOST_TEST(!t.isExpired());
+
+    Poller poll{PollerEvents::Type::Read, &t};
+    poll.setTimeout(1s);
+
+    t.start();
+
+    BOOST_TEST(t.isActive());
+    BOOST_TEST(!t.isExpired());
+
+    std::this_thread::sleep_for(500ms);
+    t.stop();
+
+    BOOST_TEST(poll.wait().empty());
+
+    BOOST_TEST(!t.isActive());
+    BOOST_TEST(!t.isExpired());
+}
+
+
+BOOST_AUTO_TEST_CASE(timerInstant)
+{
+    Context ctx;
+    Timer t{&ctx, "timer1"};
+    t.setInterval(-1s); // force 0ms
+    t.setSingleShot(true);
+    t.start();
+    t.consume();
+    t.stop();
+    BOOST_TEST(!t.isExpired());
+    BOOST_TEST(!t.isActive());
+}
+
+
+BOOST_AUTO_TEST_CASE(timerRestart)
+{
+    Context ctx;
+    Timer t{&ctx, "timer1"};
+    t.setInterval(500ms);
+    t.start();
+
+    for (int i = 0; i < 10; ++i) {
+        std::this_thread::sleep_for(100ms);
+        t.start();
+    }
+
+    Poller poll{PollerEvents::Type::Read, &t};
+    poll.setTimeout(0ms);
+
+    BOOST_TEST(poll.wait().empty());
 }
