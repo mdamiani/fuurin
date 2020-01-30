@@ -73,6 +73,8 @@ Socket::Socket(Context* ctx, Type type) noexcept
     , type_(type)
     , ptr_(nullptr)
     , linger_(0ms)
+    , hwmsnd_(0)
+    , hwmrcv_(0)
 {
 }
 
@@ -119,6 +121,19 @@ void Socket::setLinger(std::chrono::milliseconds value) noexcept
 std::chrono::milliseconds Socket::linger() const noexcept
 {
     return linger_;
+}
+
+
+void Socket::setHighWaterMark(int snd, int rcv) noexcept
+{
+    hwmsnd_ = snd;
+    hwmrcv_ = rcv;
+}
+
+
+std::tuple<int, int> Socket::highWaterMark() const noexcept
+{
+    return std::make_tuple(hwmsnd_, hwmrcv_);
 }
 
 
@@ -298,6 +313,8 @@ void Socket::open(std::function<void(std::string)> action)
 
     // Configure socket.
     setOption(ZMQ_LINGER, getMillis<int>(linger_));
+    setOption(ZMQ_SNDHWM, hwmsnd_);
+    setOption(ZMQ_RCVHWM, hwmrcv_);
 
     for (const auto& s : subscriptions_)
         setOption(ZMQ_SUBSCRIBE, s);

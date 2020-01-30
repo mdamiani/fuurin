@@ -15,6 +15,7 @@
 
 #include <string>
 #include <chrono>
+#include <tuple>
 #include <list>
 #include <functional>
 #include <type_traits>
@@ -113,6 +114,27 @@ public:
      * \see setLinger(std::chrono::milliseconds)
      */
     std::chrono::milliseconds linger() const noexcept;
+
+    /**
+     * \brief Sets \c ZMQ_SNDHWM and \c ZMQ_RCVHWM values to this socket.
+     * The high water mark values are actually applied at connection/bind time.
+     *
+     * \remark A value of 0 means no limit.
+     *
+     * \param[in] snd High water mark value for outbound messages.
+     * \param[in] rcv High water mark value for inbound messages.
+     *
+     * \see highWaterMark()
+     */
+    void setHighWaterMark(int snd, int rcv) noexcept;
+
+    /**
+     * \brief Returns high water mark value for outbound and inbound messages.
+     * \return A pair of the form <ZMQ_SNDHWM, ZMQ_RCVHWM>.
+     *
+     * \see setHighWaterMark(int, int)
+     */
+    std::tuple<int, int> highWaterMark() const noexcept;
 
     /**
      * \brief Sets a \c ZMQ_SUBSCRIBE filter to this socket.
@@ -410,6 +432,8 @@ private:
     void* ptr_;          ///< ZMQ socket.
 
     std::chrono::milliseconds linger_;     ///< Linger value.
+    int hwmsnd_;                           ///< High water mark for outbound messages.
+    int hwmrcv_;                           ///< High water mark for inbound messages.
     std::list<std::string> subscriptions_; ///< List of subscriptions.
     std::list<std::string> groups_;        ///< List of groups.
     std::list<std::string> endpoints_;     ///< List of endpoints to connect/bind.

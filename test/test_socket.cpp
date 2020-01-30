@@ -39,6 +39,12 @@ inline std::ostream& operator<<(std::ostream& os, const std::chrono::millisecond
     return os;
 }
 } // namespace chrono
+
+inline std::ostream& operator<<(std::ostream& os, const std::tuple<int, int>& t)
+{
+    os << "<" << std::get<0>(t) << ", " << std::get<1>(t) << ">";
+    return os;
+}
 } // namespace std
 
 
@@ -781,6 +787,22 @@ BOOST_DATA_TEST_CASE(publishMessage,
     }
 
     transferTeardown({ctx, s1, s2});
+}
+
+
+BOOST_AUTO_TEST_CASE(socketProps)
+{
+    Context ctx;
+    Socket s{&ctx, Socket::Type::PAIR};
+
+    BOOST_TEST(s.linger() == 0s);
+    BOOST_TEST(s.highWaterMark() == std::make_tuple(0, 0));
+
+    s.setLinger(10s);
+    BOOST_TEST(s.linger() == 10s);
+
+    s.setHighWaterMark(1000, 2000);
+    BOOST_TEST(s.highWaterMark() == std::make_tuple(1000, 2000));
 }
 
 
