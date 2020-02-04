@@ -8,7 +8,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-#define BOOST_TEST_MODULE zmqlow
+#define BOOST_TEST_MODULE worker
 #include <boost/test/unit_test.hpp>
 #include <boost/test/data/test_case.hpp>
 #include <boost/mpl/list.hpp>
