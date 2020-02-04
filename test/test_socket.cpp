@@ -745,6 +745,54 @@ BOOST_AUTO_TEST_CASE(pollerOpenSockets)
 }
 
 
+BOOST_AUTO_TEST_CASE(pollerAutoOpenWithException)
+{
+    Context ctx;
+    Socket s{&ctx, Socket::Type::PAIR};
+    PollerAuto poll{PollerEvents::Type::Read, &s};
+
+    BOOST_REQUIRE_THROW(s.bind(), fuurin::err::ZMQSocketBindFailed);
+    BOOST_TEST(!s.isOpen());
+    BOOST_TEST(s.pollersCount() == 1u);
+}
+
+
+BOOST_AUTO_TEST_CASE(pollerAutoClosedSocket)
+{
+    Context ctx;
+    Socket s{&ctx, Socket::Type::PAIR};
+    PollerAuto poll{PollerEvents::Type::Read, &s};
+
+    s.setEndpoints({"inproc://transfer1"});
+    s.bind();
+    s.close();
+    BOOST_TEST(!s.isOpen());
+    BOOST_TEST(s.pollersCount() == 1u);
+}
+
+
+BOOST_AUTO_TEST_CASE(pollerAutoAddUnknownSocket)
+{
+    Context ctx;
+    Socket s{&ctx, Socket::Type::PAIR};
+    PollerAuto poll{PollerEvents::Type::Read, &s};
+
+    Socket s2{&ctx, Socket::Type::PAIR};
+    BOOST_REQUIRE_THROW(poll.updateOnOpen(&s2), fuurin::err::ZMQPollerAddSocketFailed);
+}
+
+
+BOOST_AUTO_TEST_CASE(pollerAutoDelUnknownSocket)
+{
+    Context ctx;
+    Socket s{&ctx, Socket::Type::PAIR};
+    PollerAuto poll{PollerEvents::Type::Read, &s};
+
+    Socket s2{&ctx, Socket::Type::PAIR};
+    BOOST_REQUIRE_NO_THROW(poll.updateOnClose(&s2));
+}
+
+
 BOOST_DATA_TEST_CASE(publishMessage,
     bdata::make({
         std::make_tuple("filt1"s, "filt1"s, 100ms, 50, true),

@@ -25,6 +25,13 @@ namespace fuurin {
 namespace zmq {
 namespace internal {
 
+namespace {
+inline std::string getSocketDescr(const Pollable& s)
+{
+    return !s.description().empty() ? s.description() : "n/a";
+}
+} // namespace
+
 
 void* PollerImpl::createPoller(PollerObserver* obs, Pollable* array[], size_t size, bool read, bool write)
 {
@@ -69,7 +76,7 @@ void PollerImpl::addSocket(void* ptr, Pollable* s, bool read, bool write)
 
     if (!s->isOpen()) {
         throw ERROR(ZMQPollerAddSocketFailed, "socket is not open",
-            log::Arg{"endpoint"sv, s->description()});
+            log::Arg{"endpoint"sv, getSocketDescr(*s)});
     }
 
     const int rc = zmq_poller_add(ptr, s->zmqPointer(), s, events);
@@ -80,19 +87,29 @@ void PollerImpl::addSocket(void* ptr, Pollable* s, bool read, bool write)
 }
 
 
-void PollerImpl::delSocket(void* ptr, Pollable* s)
+void PollerImpl::delSocket(void* ptr, Pollable* s) noexcept
 {
     ASSERT(s != nullptr, "poller was given a null socket");
 
     if (!s->isOpen()) {
-        throw ERROR(ZMQPollerDelSocketFailed, "socket is not open",
-            log::Arg{"endpoint"sv, s->description()});
+        LOG_FATAL(log::Arg{"fuurin::PollerAuto"sv, "could not remove socket"sv},
+            log::Arg{"reason"sv, "socket is not open"sv},
+            log::Arg{"endpoint"sv, getSocketDescr(*s)});
+        return;
     }
 
     const int rc = zmq_poller_remove(ptr, s->zmqPointer());
     if (rc == -1) {
-        throw ERROR(ZMQPollerDelSocketFailed, "could not remove socket",
-            log::Arg{"reason"sv, log::ec_t{zmq_errno()}});
+        /**
+         * If the socket was not present before, the return code is EINVAL.
+         * In this case, we can consider the operation to be succeed.
+         */
+        if (zmq_errno() != EINVAL) {
+            LOG_FATAL(log::Arg{"fuurin::PollerAuto"sv, "could not remove socket"sv},
+                log::Arg{"reason"sv, log::ec_t{zmq_errno()}},
+                log::Arg{"endpoint"sv, getSocketDescr(*s)});
+        }
+        return;
     }
 }
 
@@ -109,8 +126,10 @@ void PollerImpl::updateSocket(void* ptr, Pollable* array[], size_t size, Pollabl
         addSocket(ptr, s, read, write);
     } else {
         if (!found) {
-            throw ERROR(ZMQPollerDelSocketFailed, "could not remove socket",
-                log::Arg{"reason"sv, "socket not being polled"sv});
+            LOG_DEBUG(log::Arg{"fuurin::PollerAuto"sv, "could not remove socket"sv},
+                log::Arg{"reason"sv, "socket not found"sv},
+                log::Arg{"endpoint"sv, getSocketDescr(*s)});
+            return;
         }
         delSocket(ptr, s);
     }

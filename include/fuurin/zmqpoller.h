@@ -79,12 +79,13 @@ private:
     /**
      * \brief Removes a pollable socket from a ZMQ poller.
      *
+     * \remark Raises a fatal error if \c sock is not open,
+     *         or it could not be removed from ZMQ \c poller.
+     *
      * \param[in] poller A valid ZMQ poller.
      * \param[in] sock Socket to remove.
-     *
-     * \exception ZMQPollerDelSocketFailed Socket is not open or it could not be removed.
      */
-    static void delSocket(void* poller, Pollable* sock);
+    static void delSocket(void* poller, Pollable* sock) noexcept;
 
     /**
      * \brief Adds or removes a pollable socket from a ZMQ poller.
@@ -335,21 +336,24 @@ public:
 
 
 public:
-    // TODO: make observer inteface loose coupled and make remove these public methods.
+    // TODO: make observer inteface loose coupled and remove these public methods.
     /**
      * \brief Updates the state of the specified \ref Pollable socket.
      *
      * Observer gets notified by any socket when its state changes.
-     * The state of a socket changes upong a call to \ref Socket::connect(),
+     * The state of a socket changes upon a call to \ref Socket::connect(),
      * \ref Socket::bind() or \ref Socket::close().
      *
      * This method is intended to be automatically called by a \ref Socket
      * whenever its connection status changes.
      *
-     * \param[in] sock Socket whose state changed.
+     * This method must operate on an open socket.
+     *
+     * \param[in] sock Socket whose state changed, it must be open.
      *
      * \exception ZMQPollerAddSocketFailed When the passed \ref Socket could not be added to poller.
-     * \exception ZMQPollerDelSocketFailed When the passed \ref Socket could not be removed from poller.
+     *
+     * \see Socket::isOpen()
      */
     ///{@
     virtual void updateOnOpen(Pollable* sock) = 0;
@@ -590,6 +594,8 @@ public:
 
     /**
      * \brief Removes the observed socket from this poller.
+     *
+     * Socket must be open, otherwise a fatal error is raised.
      *
      * \see PollerObserver::updateOnClose
      * \see PollerImpl::updateSocket(void*, Pollable**, size_t, Pollable*, bool, bool)

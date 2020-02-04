@@ -323,10 +323,16 @@ void Socket::open(std::function<void(std::string)> action)
         join(s);
 
     // Connect or bind socket.
-    for (const auto& endp : endpoints_) {
-        action(endp);
-        const auto& lastEndp = getOption<std::string>(ZMQ_LAST_ENDPOINT);
-        openEndpoints_.push_back(lastEndp);
+    if (!endpoints_.empty()) {
+        for (const auto& endp : endpoints_) {
+            action(endp);
+            const auto& lastEndp = getOption<std::string>(ZMQ_LAST_ENDPOINT);
+            openEndpoints_.push_back(lastEndp);
+        }
+    } else {
+        // raise an error due to empty endpoint.
+        // TODO: any better method?
+        action(std::string());
     }
 
     // Notify observers
@@ -343,6 +349,16 @@ void Socket::close() noexcept
         return;
 
     try {
+        /**
+         * In case open() raises and exception,
+         * updateOnClose() is called on the overall
+         * list of sockets, in order to restore state.
+         * This implies that, for some sockets, the
+         * updateOnOpen() might not even called.
+         * For this reason, PollerImpl::delSocket(...)
+         * has to manage the deletion of a socket from
+         * poller which was not inserted before.
+         */
         for (auto* poller : observers_)
             poller->updateOnClose(this);
 
