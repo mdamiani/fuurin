@@ -243,8 +243,7 @@ void Timer::consume()
 
 bool Timer::isExpired() const
 {
-    Poller poll{PollerEvents::Type::Read, const_cast<Timer*>(this)};
-    poll.setTimeout(0ms);
+    Poller poll{PollerEvents::Type::Read, 0ms, const_cast<Timer*>(this)};
     return !poll.wait().empty();
 }
 

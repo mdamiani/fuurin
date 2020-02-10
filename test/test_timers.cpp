@@ -71,8 +71,7 @@ BOOST_AUTO_TEST_CASE(timerSingleShot)
     t.setInterval(100ms);
     t.setSingleShot(true);
 
-    Poller poll{PollerEvents::Type::Read, &t};
-    poll.setTimeout(1s);
+    Poller poll{PollerEvents::Type::Read, 1s, &t};
 
     BOOST_TEST(!t.isActive());
 
@@ -106,8 +105,7 @@ BOOST_AUTO_TEST_CASE(timerStop)
     BOOST_TEST(!t.isActive());
     BOOST_TEST(!t.isExpired());
 
-    Poller poll{PollerEvents::Type::Read, &t};
-    poll.setTimeout(1s);
+    Poller poll{PollerEvents::Type::Read, 1s, &t};
 
     t.start();
 
@@ -150,9 +148,7 @@ BOOST_AUTO_TEST_CASE(timerRestart)
         t.start();
     }
 
-    Poller poll{PollerEvents::Type::Read, &t};
-    poll.setTimeout(0ms);
-
+    Poller poll{PollerEvents::Type::Read, 0ms, &t};
     BOOST_TEST(poll.wait().empty());
 }
 
@@ -163,8 +159,7 @@ BOOST_AUTO_TEST_CASE(timerPeriodic)
     Timer t{&ctx, "timer1"};
     t.setInterval(1000ms);
 
-    Poller poll{PollerEvents::Type::Read, &t};
-    poll.setTimeout(3000ms);
+    Poller poll{PollerEvents::Type::Read, 3000ms, &t};
 
     t.start();
 
@@ -191,8 +186,7 @@ BOOST_AUTO_TEST_CASE(timerSingleConsume)
     Timer t{&ctx, "timer1"};
     t.setInterval(100ms);
 
-    Poller poll{PollerEvents::Type::Read, &t};
-    poll.setTimeout(0ms);
+    Poller poll{PollerEvents::Type::Read, 0ms, &t};
 
     t.start();
     std::this_thread::sleep_for(2s);

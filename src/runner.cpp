@@ -108,8 +108,8 @@ bool Runner::stop() noexcept
 
 std::tuple<zmq::Part, Runner::EventRead> Runner::waitForEvent(std::chrono::milliseconds timeout)
 {
-    zmq::Poller poll{zmq::PollerEvents::Read, zevr_.get()};
-    poll.setTimeout(timeout);
+    zmq::Poller poll{zmq::PollerEvents::Read, timeout, zevr_.get()};
+
     if (poll.wait().empty())
         return std::make_tuple(zmq::Part{}, EventRead::Timeout);
 

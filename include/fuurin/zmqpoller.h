@@ -412,6 +412,18 @@ protected:
         static_assert(check_type, "Poller arguments must be of type fuurin::zmq::Pollable*");
     }
 
+    /**
+     * \brief Creates a the poller with timeout.
+     * \param[in] tmeo Timeout value.
+     * \see Poller(PollerEvents::Type, PollerObserver*, Args*...)
+     * \see setTimeout(std::chrono::milliseconds)
+     */
+    Poller(PollerEvents::Type ev, std::chrono::milliseconds tmeo, PollerObserver* obs, Args*... args)
+        : Poller{ev, obs, args...}
+    {
+        setTimeout(tmeo);
+    }
+
 
 public:
     /**
@@ -429,6 +441,16 @@ public:
      */
     Poller(PollerEvents::Type ev, Args*... args)
         : Poller(ev, nullptr, args...)
+    {
+    }
+
+    /**
+     * \brief Creates the poller with timeout.
+     * \param[in] tmeo Timeout value.
+     * \see Poller(PollerEvents::Type, Args*...)
+     */
+    Poller(PollerEvents::Type ev, std::chrono::milliseconds tmeo, Args*... args)
+        : Poller(ev, tmeo, nullptr, args...)
     {
     }
 
@@ -556,10 +578,21 @@ public:
     /**
      * \brief Initializes the poller and registers itself as a \ref PollerObserver for sockets.
      *
-     * \see Poller::Poller(PollerEvents::Type ev, Args*... args)
+     * \see Poller::Poller(PollerEvents::Type, PollerObserver*, Args*... args)
      */
     PollerAuto(PollerEvents::Type ev, Args*... args)
         : Poller<Args...>(ev, this, args...)
+    {
+    }
+
+    /**
+     * \brief Initializes the poller with timeout and registers itself as a \ref PollerObserver for sockets.
+     *
+     * \see Poller::Poller(PollerEvents::Type, std::chrono::milliseconds, PollerObserver*, Args*... args)
+     * \see Poller::setTimeout(std::chrono::milliseconds)
+     */
+    PollerAuto(PollerEvents::Type ev, std::chrono::milliseconds tmeo, Args*... args)
+        : Poller<Args...>(ev, tmeo, this, args...)
     {
     }
 
