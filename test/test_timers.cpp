@@ -155,3 +155,56 @@ BOOST_AUTO_TEST_CASE(timerRestart)
 
     BOOST_TEST(poll.wait().empty());
 }
+
+
+BOOST_AUTO_TEST_CASE(timerPeriodic)
+{
+    Context ctx;
+    Timer t{&ctx, "timer1"};
+    t.setInterval(1000ms);
+
+    Poller poll{PollerEvents::Type::Read, &t};
+    poll.setTimeout(3000ms);
+
+    t.start();
+
+    for (int i = 0; i < 3; ++i) {
+        const auto begin = std::chrono::steady_clock::now();
+        const auto events = poll.wait();
+        BOOST_TEST(!events.empty());
+        const auto end = std::chrono::steady_clock::now();
+        if (events.empty())
+            break;
+
+        const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
+        BOOST_TEST(elapsed >= 500);
+        BOOST_TEST(elapsed <= 1500);
+
+        t.consume();
+    }
+}
+
+
+BOOST_AUTO_TEST_CASE(timerSingleConsume)
+{
+    Context ctx;
+    Timer t{&ctx, "timer1"};
+    t.setInterval(100ms);
+
+    Poller poll{PollerEvents::Type::Read, &t};
+    poll.setTimeout(0ms);
+
+    t.start();
+    std::this_thread::sleep_for(2s);
+    t.stop();
+
+    BOOST_TEST(t.isExpired());
+    BOOST_TEST(!t.isActive());
+    BOOST_TEST(!poll.wait().empty());
+
+    t.consume();
+
+    BOOST_TEST(!t.isExpired());
+    BOOST_TEST(!t.isActive());
+    BOOST_TEST(poll.wait().empty());
+}

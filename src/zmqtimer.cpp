@@ -69,7 +69,6 @@ public:
         if (timer->t.expires_at() == boost::asio::steady_timer::clock_type::time_point::min())
             return;
 
-        // TODO: set high water mark to 1
         // send notification
         timer->trigger->send(Part{uint8_t(1)});
 
@@ -130,8 +129,8 @@ private:
 Timer::Timer(Context* ctx, const std::string& name)
     : ctx_{ctx}
     , name_{name}
-    , trigger_{std::make_unique<zmq::Socket>(ctx, zmq::Socket::PAIR)}
-    , receiver_{std::make_unique<zmq::Socket>(ctx, zmq::Socket::PAIR)}
+    , trigger_{std::make_unique<zmq::Socket>(ctx, zmq::Socket::PUSH)}
+    , receiver_{std::make_unique<zmq::Socket>(ctx, zmq::Socket::PULL)}
     , interval_{0ms}
     , singleshot_{false}
 {
@@ -139,6 +138,9 @@ Timer::Timer(Context* ctx, const std::string& name)
 
     trigger_->setEndpoints({endpoint});
     receiver_->setEndpoints({endpoint});
+
+    trigger_->setConflate(true);
+    receiver_->setConflate(true);
 
     receiver_->bind();
     trigger_->connect();
