@@ -137,6 +137,18 @@ public:
     std::tuple<int, int> highWaterMark() const noexcept;
 
     /**
+     * \brief Sets \c ZMQ_CONFLATE option to this socket.
+     * \see conflate()
+     */
+    void setConflate(bool val) noexcept;
+
+    /**
+     * \return The option \c ZMQ_CONFLATE.
+     * \see setConflate(bool)
+     */
+    bool conflate() const noexcept;
+
+    /**
      * \brief Sets a \c ZMQ_SUBSCRIBE filter to this socket.
      * The socket subscriptions are actually applied at connection/bind time.
      *
@@ -434,6 +446,7 @@ private:
     std::chrono::milliseconds linger_;     ///< Linger value.
     int hwmsnd_;                           ///< High water mark for outbound messages.
     int hwmrcv_;                           ///< High water mark for inbound messages.
+    bool conflate_;                        ///< Conflate option.
     std::list<std::string> subscriptions_; ///< List of subscriptions.
     std::list<std::string> groups_;        ///< List of groups.
     std::list<std::string> endpoints_;     ///< List of endpoints to connect/bind.

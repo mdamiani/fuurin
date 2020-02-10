@@ -75,6 +75,7 @@ Socket::Socket(Context* ctx, Type type) noexcept
     , linger_(0ms)
     , hwmsnd_(0)
     , hwmrcv_(0)
+    , conflate_(false)
 {
 }
 
@@ -134,6 +135,18 @@ void Socket::setHighWaterMark(int snd, int rcv) noexcept
 std::tuple<int, int> Socket::highWaterMark() const noexcept
 {
     return std::make_tuple(hwmsnd_, hwmrcv_);
+}
+
+
+void Socket::setConflate(bool val) noexcept
+{
+    conflate_ = val;
+}
+
+
+bool Socket::conflate() const noexcept
+{
+    return conflate_;
 }
 
 
@@ -315,6 +328,7 @@ void Socket::open(std::function<void(std::string)> action)
     setOption(ZMQ_LINGER, getMillis<int>(linger_));
     setOption(ZMQ_SNDHWM, hwmsnd_);
     setOption(ZMQ_RCVHWM, hwmrcv_);
+    setOption(ZMQ_CONFLATE, conflate_ ? 1 : 0);
 
     for (const auto& s : subscriptions_)
         setOption(ZMQ_SUBSCRIBE, s);
