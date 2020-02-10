@@ -55,8 +55,14 @@ public:
         bool done = true;
         BOOST_SCOPE_EXIT(timer, &done)
         {
-            if (done)
-                timer->cancelPromise.set_value(true);
+            if (done) {
+                try {
+                    timer->cancelPromise.set_value(true);
+                } catch (const std::exception& e) {
+                    LOG_FATAL(log::Arg{"fuurin::Timer"sv, "timer already canceled"sv},
+                        log::Arg{"reason"sv, std::string(e.what())});
+                }
+            }
         };
 
         if (ec) {
