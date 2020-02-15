@@ -31,22 +31,39 @@ Broker::~Broker() noexcept
 }
 
 
+std::unique_ptr<Runner::Session> Broker::makeSession(std::function<void()> oncompl) const
+{
+    return std::make_unique<BrokerSession>(token_, oncompl, zctx_, zopr_, zevs_);
+}
+
+
 /**
  * ASYNC TASK
  */
 
-std::unique_ptr<zmq::PollerWaiter> Broker::createPoller(zmq::Socket* sock)
+Broker::BrokerSession::BrokerSession(token_type_t token, std::function<void()> oncompl,
+    const std::unique_ptr<zmq::Context>& zctx,
+    const std::unique_ptr<zmq::Socket>& zoper,
+    const std::unique_ptr<zmq::Socket>& zevent)
+    : Session(token, oncompl, zctx, zoper, zevent)
+    , zstore_{std::make_unique<zmq::Socket>(zctx.get(), zmq::Socket::SERVER)}
 {
-    zstore_ = std::make_unique<zmq::Socket>(zmqContext(), zmq::Socket::SERVER);
     zstore_->setEndpoints({"ipc:///tmp/broker_storage"});
     zstore_->bind();
+}
 
-    auto poll = new zmq::PollerAuto{zmq::PollerEvents::Type::Read, sock, zstore_.get()};
+
+Broker::BrokerSession::~BrokerSession() noexcept = default;
+
+
+std::unique_ptr<zmq::PollerWaiter> Broker::BrokerSession::createPoller()
+{
+    auto poll = new zmq::Poller{zmq::PollerEvents::Type::Read, zopr_.get(), zstore_.get()};
     return std::unique_ptr<zmq::PollerWaiter>{poll};
 }
 
 
-void Broker::socketReady(zmq::Socket* sock)
+void Broker::BrokerSession::socketReady(zmq::Socket* sock)
 {
     zmq::Part payload;
 

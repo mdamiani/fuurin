@@ -68,9 +68,9 @@ bool Runner::isRunning() const noexcept
 }
 
 
-zmq::Context* Runner::zmqContext() const noexcept
+std::unique_ptr<Runner::Session> Runner::makeSession(std::function<void()> onComplete) const
 {
-    return zctx_.get();
+    return std::make_unique<Session>(token_, onComplete, zctx_, zopr_, zevs_);
 }
 
 
@@ -89,7 +89,12 @@ std::future<void> Runner::start()
             running_ = false;
     };
 
-    auto ret = std::async(std::launch::async, &Runner::run, this);
+    auto ret = std::async(std::launch::async,
+        [s = makeSession([this]() {
+            running_ = false;
+        })]() {
+            s->run();
+        });
 
     commit = true;
     return ret;
@@ -152,14 +157,36 @@ void Runner::sendOperation(oper_type_t oper, zmq::Part&& payload) noexcept
  * ASYNC TASK
  */
 
-void Runner::run()
+Runner::Session::Session(token_type_t token, std::function<void()> oncompl,
+    const std::unique_ptr<zmq::Context>& zctx,
+    const std::unique_ptr<zmq::Socket>& zoper,
+    const std::unique_ptr<zmq::Socket>& zevent)
+    : token_(token)
+    , docompl_(oncompl)
+    , zctx_(zctx)
+    , zopr_(zoper)
+    , zevs_(zevent)
+{
+}
+
+
+Runner::Session::~Session() noexcept = default;
+
+
+void Runner::Session::run()
 {
     BOOST_SCOPE_EXIT(this)
     {
-        running_ = false;
+        try {
+            if (docompl_)
+                docompl_();
+        } catch (...) {
+            LOG_FATAL(log::Arg{"runner"sv},
+                log::Arg{"session on complete action threw exception"sv});
+        }
     };
 
-    auto poll = createPoller(zopr_.get());
+    auto poll = createPoller();
 
     for (;;) {
         for (auto s : poll->wait()) {
@@ -183,23 +210,24 @@ void Runner::run()
 }
 
 
-std::unique_ptr<zmq::PollerWaiter> Runner::createPoller(zmq::Socket* sock)
+std::unique_ptr<zmq::PollerWaiter> Runner::Session::createPoller()
 {
-    return std::unique_ptr<zmq::PollerWaiter>{new zmq::PollerAuto{zmq::PollerEvents::Type::Read, sock}};
+    auto poll = new zmq::Poller{zmq::PollerEvents::Type::Read, zopr_.get()};
+    return std::unique_ptr<zmq::PollerWaiter>{poll};
 }
 
 
-void Runner::operationReady(oper_type_t, zmq::Part&)
-{
-}
-
-
-void Runner::socketReady(zmq::Socket*)
+void Runner::Session::operationReady(oper_type_t, zmq::Part&)
 {
 }
 
 
-std::tuple<Runner::oper_type_t, zmq::Part, bool> Runner::recvOperation() noexcept
+void Runner::Session::socketReady(zmq::Socket*)
+{
+}
+
+
+std::tuple<Runner::oper_type_t, zmq::Part, bool> Runner::Session::recvOperation() noexcept
 {
     zmq::Part tok, oper, payload;
 
@@ -214,9 +242,9 @@ std::tuple<Runner::oper_type_t, zmq::Part, bool> Runner::recvOperation() noexcep
 }
 
 
-void Runner::sendEvent(zmq::Part&& ev)
+void Runner::Session::sendEvent(zmq::Part&& ev)
 {
-    zevs_->send(zmq::PartMulti::pack(token_.load(), ev).withGroup(GROUP_EVENTS));
+    zevs_->send(zmq::PartMulti::pack(token_, ev).withGroup(GROUP_EVENTS));
 }
 
 } // namespace fuurin

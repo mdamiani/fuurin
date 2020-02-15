@@ -65,22 +65,39 @@ std::tuple<zmq::Part, Runner::EventRead> Worker::waitForEvent(std::chrono::milli
 }
 
 
+std::unique_ptr<Runner::Session> Worker::makeSession(std::function<void()> oncompl) const
+{
+    return std::make_unique<WorkerSession>(token_, oncompl, zctx_, zopr_, zevs_);
+}
+
+
 /**
  * ASYNC TASK
  */
 
-std::unique_ptr<zmq::PollerWaiter> Worker::createPoller(zmq::Socket* sock)
+Worker::WorkerSession::WorkerSession(token_type_t token, std::function<void()> oncompl,
+    const std::unique_ptr<zmq::Context>& zctx,
+    const std::unique_ptr<zmq::Socket>& zoper,
+    const std::unique_ptr<zmq::Socket>& zevent)
+    : Session(token, oncompl, zctx, zoper, zevent)
+    , zstore_{std::make_unique<zmq::Socket>(zctx.get(), zmq::Socket::CLIENT)}
 {
-    zstore_ = std::make_unique<zmq::Socket>(zmqContext(), zmq::Socket::CLIENT);
     zstore_->setEndpoints({"ipc:///tmp/broker_storage"});
     zstore_->connect();
+}
 
-    auto poll = new zmq::PollerAuto{zmq::PollerEvents::Type::Read, sock, zstore_.get()};
+
+Worker::WorkerSession::~WorkerSession() noexcept = default;
+
+
+std::unique_ptr<zmq::PollerWaiter> Worker::WorkerSession::createPoller()
+{
+    auto poll = new zmq::PollerAuto{zmq::PollerEvents::Type::Read, zopr_.get(), zstore_.get()};
     return std::unique_ptr<zmq::PollerWaiter>{poll};
 }
 
 
-void Worker::operationReady(oper_type_t oper, zmq::Part& payload)
+void Worker::WorkerSession::operationReady(oper_type_t oper, zmq::Part& payload)
 {
 #ifndef NDEBUG
     const auto paysz = payload.size();
@@ -97,7 +114,8 @@ void Worker::operationReady(oper_type_t oper, zmq::Part& payload)
     }
 }
 
-void Worker::socketReady(zmq::Socket* sock)
+
+void Worker::WorkerSession::socketReady(zmq::Socket* sock)
 {
     zmq::Part payload;
 

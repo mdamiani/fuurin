@@ -39,12 +39,51 @@ public:
 
 
 protected:
-    virtual std::unique_ptr<zmq::PollerWaiter> createPoller(zmq::Socket* sock) override;
-    virtual void socketReady(zmq::Socket* sock) override;
+    /**
+     * \return A new broker session.
+     * \see Runner::makeSession()
+     * \see BrokerSession
+     */
+    virtual std::unique_ptr<Session> makeSession(std::function<void()> oncompl) const override;
 
 
 protected:
-    std::unique_ptr<zmq::Socket> zstore_; ///< ZMQ socket to store data.
+    /**
+     * \brief Broker specific asynchronous task session.
+     * \see Runner::Session
+     */
+    class BrokerSession : public Session
+    {
+    public:
+        /**
+         * \brief Creates the broker asynchronous task session.
+         *
+         * The socket used to receive storage is created and bound.
+         *
+         * \see Runner::Session::Session(...)
+         */
+        BrokerSession(token_type_t token, std::function<void()> oncompl,
+            const std::unique_ptr<zmq::Context>& zctx,
+            const std::unique_ptr<zmq::Socket>& zoper,
+            const std::unique_ptr<zmq::Socket>& zevents);
+
+        /**
+         * \brief Destructor.
+         */
+        virtual ~BrokerSession() noexcept;
+
+
+    protected:
+        /// \see Runner::Session::createPoller()
+        virtual std::unique_ptr<zmq::PollerWaiter> createPoller() override;
+
+        /// \see Runner::Session::socketReady(zmq::Socket*)
+        virtual void socketReady(zmq::Socket* sock) override;
+
+
+    protected:
+        const std::unique_ptr<zmq::Socket> zstore_; ///< ZMQ socket to store data.
+    };
 };
 
 

@@ -48,6 +48,12 @@ public:
     void store(zmq::Part&& data);
 
 
+    /**
+     * \see Runner::waitForEvent(std::chrono::milliseconds)
+     */
+    std::tuple<zmq::Part, Runner::EventRead> waitForEvent(std::chrono::milliseconds timeout = std::chrono::milliseconds(-1));
+
+
 protected:
     /**
      * \brief Worker operations.
@@ -59,18 +65,55 @@ protected:
 
 
 protected:
-    virtual std::unique_ptr<zmq::PollerWaiter> createPoller(zmq::Socket* sock) override;
-    virtual void operationReady(oper_type_t oper, zmq::Part& payload) override;
-    virtual void socketReady(zmq::Socket* sock) override;
-
-public:
-    std::tuple<zmq::Part, Runner::EventRead> waitForEvent(std::chrono::milliseconds timeout = std::chrono::milliseconds(-1));
+    /**
+     * \return A new worker session.
+     * \see Runner::makeSession()
+     * \see WorkerSession
+     */
+    virtual std::unique_ptr<Session> makeSession(std::function<void()> oncompl) const override;
 
 
 protected:
-    std::unique_ptr<zmq::Socket> zstore_; ///< ZMQ socket to store data.
-};
+    /**
+     * \brief Worker specific asynchronous task session.
+     * \see Runner::Session
+     */
+    class WorkerSession : public Session
+    {
+    public:
+        /**
+         * \brief Creates the worker asynchronous task session.
+         *
+         * The socket used to store data is created and connected.
+         *
+         * \see Runner::Session::Session(...)
+         */
+        WorkerSession(token_type_t token, std::function<void()> oncompl,
+            const std::unique_ptr<zmq::Context>& zctx,
+            const std::unique_ptr<zmq::Socket>& zoper,
+            const std::unique_ptr<zmq::Socket>& zevent);
 
+        /**
+         * \brief Destructor.
+         */
+        virtual ~WorkerSession() noexcept;
+
+
+    protected:
+        /// \see Runner::Session::createPoller()
+        virtual std::unique_ptr<zmq::PollerWaiter> createPoller() override;
+
+        /// \see Runner::Session::operationReady(oper_type_t, zmq::Part&)
+        virtual void operationReady(oper_type_t oper, zmq::Part& payload) override;
+
+        /// \see Runner::Session::socketReady(zmq::Socket*)
+        virtual void socketReady(zmq::Socket* sock) override;
+
+
+    protected:
+        const std::unique_ptr<zmq::Socket> zstore_; ///< ZMQ socket to store data.
+    };
+};
 
 } // namespace fuurin
 
