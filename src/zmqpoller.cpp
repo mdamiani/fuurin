@@ -25,12 +25,19 @@ namespace fuurin {
 namespace zmq {
 namespace internal {
 
+namespace {
+inline std::string getSocketDescr(const Pollable& s)
+{
+    return !s.description().empty() ? s.description() : "n/a";
+}
+} // namespace
 
-void* PollerImpl::createPoller(PollerObserver* obs, Socket* array[], size_t size, bool read, bool write)
+
+void* PollerImpl::createPoller(PollerObserver* obs, Pollable* array[], size_t size, bool read, bool write)
 {
     // assert raw backing array
-    static_assert(sizeof(Poller<Socket*>::Raw) >= sizeof(zmq_poller_event_t));
-    static_assert(alignof(Poller<Socket*>::Raw) >= alignof(zmq_poller_event_t));
+    static_assert(sizeof(Poller<Pollable*>::Raw) >= sizeof(zmq_poller_event_t));
+    static_assert(alignof(Poller<Pollable*>::Raw) >= alignof(zmq_poller_event_t));
 
     // create poller
     void* ptr = zmq_poller_new();
@@ -48,7 +55,7 @@ void* PollerImpl::createPoller(PollerObserver* obs, Socket* array[], size_t size
 
     // add sockets
     for (size_t i = 0; i < size; ++i) {
-        Socket* const s = array[i];
+        Pollable* const s = array[i];
 
         if (obs)
             s->registerPoller(obs);
@@ -62,14 +69,14 @@ void* PollerImpl::createPoller(PollerObserver* obs, Socket* array[], size_t size
 }
 
 
-void PollerImpl::addSocket(void* ptr, Socket* s, bool read, bool write)
+void PollerImpl::addSocket(void* ptr, Pollable* s, bool read, bool write)
 {
     ASSERT(s != nullptr, "poller was given a null socket");
     const short events = (ZMQ_POLLIN * !!read) | (ZMQ_POLLOUT * !!write);
 
     if (!s->isOpen()) {
         throw ERROR(ZMQPollerAddSocketFailed, "socket is not open",
-            log::Arg{"endpoint"sv, !s->endpoints().empty() ? s->endpoints().front() : ""});
+            log::Arg{"endpoint"sv, getSocketDescr(*s)});
     }
 
     const int rc = zmq_poller_add(ptr, s->zmqPointer(), s, events);
@@ -80,24 +87,34 @@ void PollerImpl::addSocket(void* ptr, Socket* s, bool read, bool write)
 }
 
 
-void PollerImpl::delSocket(void* ptr, Socket* s)
+void PollerImpl::delSocket(void* ptr, Pollable* s) noexcept
 {
     ASSERT(s != nullptr, "poller was given a null socket");
 
     if (!s->isOpen()) {
-        throw ERROR(ZMQPollerDelSocketFailed, "socket is not open",
-            log::Arg{"endpoint"sv, !s->endpoints().empty() ? s->endpoints().front() : ""});
+        LOG_FATAL(log::Arg{"fuurin::PollerAuto"sv, "could not remove socket"sv},
+            log::Arg{"reason"sv, "socket is not open"sv},
+            log::Arg{"endpoint"sv, getSocketDescr(*s)});
+        return;
     }
 
     const int rc = zmq_poller_remove(ptr, s->zmqPointer());
     if (rc == -1) {
-        throw ERROR(ZMQPollerDelSocketFailed, "could not remove socket",
-            log::Arg{"reason"sv, log::ec_t{zmq_errno()}});
+        /**
+         * If the socket was not present before, the return code is EINVAL.
+         * In this case, we can consider the operation to be succeed.
+         */
+        if (zmq_errno() != EINVAL) {
+            LOG_FATAL(log::Arg{"fuurin::PollerAuto"sv, "could not remove socket"sv},
+                log::Arg{"reason"sv, log::ec_t{zmq_errno()}},
+                log::Arg{"endpoint"sv, getSocketDescr(*s)});
+        }
+        return;
     }
 }
 
 
-void PollerImpl::updateSocket(void* ptr, Socket* array[], size_t size, Socket* s, bool read, bool write)
+void PollerImpl::updateSocket(void* ptr, Pollable* array[], size_t size, Pollable* s, bool read, bool write)
 {
     const bool found = (std::find(array, array + size, s) != array + size);
 
@@ -109,19 +126,21 @@ void PollerImpl::updateSocket(void* ptr, Socket* array[], size_t size, Socket* s
         addSocket(ptr, s, read, write);
     } else {
         if (!found) {
-            throw ERROR(ZMQPollerDelSocketFailed, "could not remove socket",
-                log::Arg{"reason"sv, "socket not being polled"sv});
+            LOG_DEBUG(log::Arg{"fuurin::PollerAuto"sv, "could not remove socket"sv},
+                log::Arg{"reason"sv, "socket not found"sv},
+                log::Arg{"endpoint"sv, getSocketDescr(*s)});
+            return;
         }
         delSocket(ptr, s);
     }
 }
 
 
-void PollerImpl::destroyPoller(void** ptr, PollerObserver* obs, Socket* array[], size_t size) noexcept
+void PollerImpl::destroyPoller(void** ptr, PollerObserver* obs, Pollable* array[], size_t size) noexcept
 {
     if (obs) {
         for (size_t i = 0; i < size; ++i) {
-            Socket* const s = array[i];
+            Pollable* const s = array[i];
             try {
                 s->unregisterPoller(obs);
             } catch (...) {
@@ -184,7 +203,7 @@ bool PollerEvents::empty() const noexcept
 }
 
 
-Socket* PollerEvents::operator[](size_t pos) const
+Pollable* PollerEvents::operator[](size_t pos) const
 {
     return *PollerIterator(first_ + pos);
 }

@@ -84,7 +84,6 @@ DECL_ERROR(ZMQPartRoutingIDFailed)
 DECL_ERROR(ZMQPartGroupFailed)
 DECL_ERROR(ZMQPollerCreateFailed)
 DECL_ERROR(ZMQPollerAddSocketFailed)
-DECL_ERROR(ZMQPollerDelSocketFailed)
 DECL_ERROR(ZMQPollerWaitFailed)
 
 #undef DECL_ERROR

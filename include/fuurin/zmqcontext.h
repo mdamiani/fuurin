@@ -11,6 +11,16 @@
 #ifndef ZMQCONTEXT_H
 #define ZMQCONTEXT_H
 
+#include <memory>
+#include <future>
+
+
+namespace boost {
+namespace asio {
+class io_context;
+}
+} // namespace boost
+
 
 namespace fuurin {
 namespace zmq {
@@ -32,7 +42,7 @@ public:
 
     /**
      * \brief Stops this ZMQ context.
-     * This method calls \c zmq_ctx_term.
+     * \see terminate()
      */
     ~Context() noexcept;
 
@@ -49,9 +59,31 @@ public:
      */
     void* zmqPointer() const noexcept;
 
+    /**
+     * \return The ASIO context.
+     */
+    boost::asio::io_context& ioContext() noexcept;
+
+
+private:
+    /**
+     * \brief Terminates the ZMQ context.
+     * This method calls \c zmq_ctx_term.
+     * It panics in case the ZMQ context
+     * could not be terminated.
+     */
+    void terminate() noexcept;
+
 
 private:
     void* const ptr_; ///< ZMQ context.
+
+    /**
+     * \brief ASIO context which runs asynchrous I/O, e.g. ASIO timers.
+     */
+    struct IOWork;
+    std::unique_ptr<IOWork> iowork_; ///< ASIO context for asynchronous I/O.
+    std::future<void> iocompl_;      ///< Future to wait for ASIO context completion.
 };
 } // namespace zmq
 } // namespace fuurin

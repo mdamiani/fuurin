@@ -73,6 +73,9 @@ Socket::Socket(Context* ctx, Type type) noexcept
     , type_(type)
     , ptr_(nullptr)
     , linger_(0ms)
+    , hwmsnd_(0)
+    , hwmrcv_(0)
+    , conflate_(false)
 {
 }
 
@@ -86,6 +89,15 @@ Socket::~Socket() noexcept
 void* Socket::zmqPointer() const noexcept
 {
     return ptr_;
+}
+
+
+std::string Socket::description() const
+{
+    if (endpoints().empty())
+        return std::string();
+
+    return endpoints().front();
 }
 
 
@@ -110,6 +122,31 @@ void Socket::setLinger(std::chrono::milliseconds value) noexcept
 std::chrono::milliseconds Socket::linger() const noexcept
 {
     return linger_;
+}
+
+
+void Socket::setHighWaterMark(int snd, int rcv) noexcept
+{
+    hwmsnd_ = snd;
+    hwmrcv_ = rcv;
+}
+
+
+std::tuple<int, int> Socket::highWaterMark() const noexcept
+{
+    return std::make_tuple(hwmsnd_, hwmrcv_);
+}
+
+
+void Socket::setConflate(bool val) noexcept
+{
+    conflate_ = val;
+}
+
+
+bool Socket::conflate() const noexcept
+{
+    return conflate_;
 }
 
 
@@ -289,6 +326,9 @@ void Socket::open(std::function<void(std::string)> action)
 
     // Configure socket.
     setOption(ZMQ_LINGER, getMillis<int>(linger_));
+    setOption(ZMQ_SNDHWM, hwmsnd_);
+    setOption(ZMQ_RCVHWM, hwmrcv_);
+    setOption(ZMQ_CONFLATE, conflate_ ? 1 : 0);
 
     for (const auto& s : subscriptions_)
         setOption(ZMQ_SUBSCRIBE, s);
@@ -297,10 +337,16 @@ void Socket::open(std::function<void(std::string)> action)
         join(s);
 
     // Connect or bind socket.
-    for (const auto& endp : endpoints_) {
-        action(endp);
-        const auto& lastEndp = getOption<std::string>(ZMQ_LAST_ENDPOINT);
-        openEndpoints_.push_back(lastEndp);
+    if (!endpoints_.empty()) {
+        for (const auto& endp : endpoints_) {
+            action(endp);
+            const auto& lastEndp = getOption<std::string>(ZMQ_LAST_ENDPOINT);
+            openEndpoints_.push_back(lastEndp);
+        }
+    } else {
+        // raise an error due to empty endpoint.
+        // TODO: any better method?
+        action(std::string());
     }
 
     // Notify observers
@@ -317,6 +363,16 @@ void Socket::close() noexcept
         return;
 
     try {
+        /**
+         * In case open() raises and exception,
+         * updateOnClose() is called on the overall
+         * list of sockets, in order to restore state.
+         * This implies that, for some sockets, the
+         * updateOnOpen() might not even called.
+         * For this reason, PollerImpl::delSocket(...)
+         * has to manage the deletion of a socket from
+         * poller which was not inserted before.
+         */
         for (auto* poller : observers_)
             poller->updateOnClose(this);
 
@@ -447,27 +503,6 @@ int Socket::recvMessageMore(Part* part)
 int Socket::recvMessageLast(Part* part)
 {
     return recvMessagePart(ptr_, 0, part->zmqPointer());
-}
-
-
-void Socket::registerPoller(PollerObserver* poller)
-{
-    if (std::find(observers_.begin(), observers_.end(), poller) != observers_.end())
-        return;
-
-    observers_.push_back(poller);
-}
-
-
-void Socket::unregisterPoller(PollerObserver* poller)
-{
-    observers_.erase(std::remove(observers_.begin(), observers_.end(), poller), observers_.end());
-}
-
-
-size_t Socket::pollersCount() const noexcept
-{
-    return observers_.size();
 }
 
 

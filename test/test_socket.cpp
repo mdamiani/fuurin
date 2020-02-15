@@ -8,7 +8,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-#define BOOST_TEST_MODULE zmqlow
+#define BOOST_TEST_MODULE socket
 #include <boost/test/unit_test.hpp>
 #include <boost/test/data/test_case.hpp>
 #include <boost/mpl/list.hpp>
@@ -39,6 +39,12 @@ inline std::ostream& operator<<(std::ostream& os, const std::chrono::millisecond
     return os;
 }
 } // namespace chrono
+
+inline std::ostream& operator<<(std::ostream& os, const std::tuple<int, int>& t)
+{
+    os << "<" << std::get<0>(t) << ", " << std::get<1>(t) << ">";
+    return os;
+}
 } // namespace std
 
 
@@ -570,8 +576,7 @@ BOOST_AUTO_TEST_CASE(transferMultiPart)
 
 void testWaitForEvents(Socket* socket, PollerEvents::Type type, std::chrono::milliseconds timeout, bool expected)
 {
-    Poller poll{type, socket};
-    poll.setTimeout(timeout);
+    Poller poll{type, timeout, socket};
 
     const auto events = poll.wait();
 
@@ -687,10 +692,8 @@ BOOST_AUTO_TEST_CASE(waitForEventOpen)
     s2->setEndpoints({"inproc://transfer1"});
 
     // Create poller on closed sockets
-    auto poll1 = std::shared_ptr<PollerWaiter>(new PollerAuto{PollerEvents::Type::Read, s2.get()});
-    auto poll2 = std::shared_ptr<PollerWaiter>(new PollerAuto{PollerEvents::Type::Read, s2.get()});
-    poll1->setTimeout(500ms);
-    poll2->setTimeout(500ms);
+    auto poll1 = std::shared_ptr<PollerWaiter>(new PollerAuto{PollerEvents::Type::Read, 500ms, s2.get()});
+    auto poll2 = std::shared_ptr<PollerWaiter>(new PollerAuto{PollerEvents::Type::Read, 500ms, s2.get()});
 
     BOOST_TEST(int(s2->pollersCount()) == 2);
     BOOST_TEST(poll1->wait().empty());
@@ -739,6 +742,54 @@ BOOST_AUTO_TEST_CASE(pollerOpenSockets)
 }
 
 
+BOOST_AUTO_TEST_CASE(pollerAutoOpenWithException)
+{
+    Context ctx;
+    Socket s{&ctx, Socket::Type::PAIR};
+    PollerAuto poll{PollerEvents::Type::Read, &s};
+
+    BOOST_REQUIRE_THROW(s.bind(), fuurin::err::ZMQSocketBindFailed);
+    BOOST_TEST(!s.isOpen());
+    BOOST_TEST(s.pollersCount() == 1u);
+}
+
+
+BOOST_AUTO_TEST_CASE(pollerAutoClosedSocket)
+{
+    Context ctx;
+    Socket s{&ctx, Socket::Type::PAIR};
+    PollerAuto poll{PollerEvents::Type::Read, &s};
+
+    s.setEndpoints({"inproc://transfer1"});
+    s.bind();
+    s.close();
+    BOOST_TEST(!s.isOpen());
+    BOOST_TEST(s.pollersCount() == 1u);
+}
+
+
+BOOST_AUTO_TEST_CASE(pollerAutoAddUnknownSocket)
+{
+    Context ctx;
+    Socket s{&ctx, Socket::Type::PAIR};
+    PollerAuto poll{PollerEvents::Type::Read, &s};
+
+    Socket s2{&ctx, Socket::Type::PAIR};
+    BOOST_REQUIRE_THROW(poll.updateOnOpen(&s2), fuurin::err::ZMQPollerAddSocketFailed);
+}
+
+
+BOOST_AUTO_TEST_CASE(pollerAutoDelUnknownSocket)
+{
+    Context ctx;
+    Socket s{&ctx, Socket::Type::PAIR};
+    PollerAuto poll{PollerEvents::Type::Read, &s};
+
+    Socket s2{&ctx, Socket::Type::PAIR};
+    BOOST_REQUIRE_NO_THROW(poll.updateOnClose(&s2));
+}
+
+
 BOOST_DATA_TEST_CASE(publishMessage,
     bdata::make({
         std::make_tuple("filt1"s, "filt1"s, 100ms, 50, true),
@@ -755,8 +806,7 @@ BOOST_DATA_TEST_CASE(publishMessage,
     s2->close();
     s2->connect();
 
-    Poller poll{PollerEvents::Type::Read, s2.get()};
-    poll.setTimeout(timeout);
+    Poller poll{PollerEvents::Type::Read, timeout, s2.get()};
 
     int retry = 0;
     bool ready = false;
@@ -781,6 +831,22 @@ BOOST_DATA_TEST_CASE(publishMessage,
     }
 
     transferTeardown({ctx, s1, s2});
+}
+
+
+BOOST_AUTO_TEST_CASE(socketProps)
+{
+    Context ctx;
+    Socket s{&ctx, Socket::Type::PAIR};
+
+    BOOST_TEST(s.linger() == 0s);
+    BOOST_TEST(s.highWaterMark() == std::make_tuple(0, 0));
+
+    s.setLinger(10s);
+    BOOST_TEST(s.linger() == 10s);
+
+    s.setHighWaterMark(1000, 2000);
+    BOOST_TEST(s.highWaterMark() == std::make_tuple(1000, 2000));
 }
 
 
