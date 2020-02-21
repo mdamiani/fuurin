@@ -7,6 +7,14 @@ Simple and fast [ZeroMQ](http://zeromq.org) communication library.
 ## Features
 
  - **TDB**
+ - ZMQ C++ bindings with RAII design and exception safe code.
+ - Leverage ZMQ thread safe sockets, like RADIO/DISH, CLIENT/SERVER.
+ - Multipart messages can be used with ZMQ thread safe sockets.
+ - Polling of ZMQ sockets made easy: can integrate with C++ range based loops, freely open/close sockets, etc..
+ - Multicore friendly, due to the usage of ZMQ and Boost::ASIO.
+ - Logging aware library: levels, customization and performance.
+ - Endianess management for integer types.
+ - Timers can be polled like they were sockets.
 
 
 ## Licenses
