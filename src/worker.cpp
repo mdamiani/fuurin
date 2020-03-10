@@ -115,11 +115,11 @@ void Worker::WorkerSession::operationReady(oper_type_t oper, zmq::Part& payload)
 }
 
 
-void Worker::WorkerSession::socketReady(zmq::Socket* sock)
+void Worker::WorkerSession::socketReady(zmq::Pollable* pble)
 {
     zmq::Part payload;
 
-    if (zstore_.get() == sock) {
+    if (pble == zstore_.get()) {
         zstore_->recv(&payload);
         LOG_DEBUG(log::Arg{"worker"sv}, log::Arg{"store"sv, "recv"sv},
             log::Arg{"size"sv, int(payload.size())});

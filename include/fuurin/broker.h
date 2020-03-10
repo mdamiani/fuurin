@@ -77,8 +77,8 @@ protected:
         /// \see Runner::Session::createPoller()
         virtual std::unique_ptr<zmq::PollerWaiter> createPoller() override;
 
-        /// \see Runner::Session::socketReady(zmq::Socket*)
-        virtual void socketReady(zmq::Socket* sock) override;
+        /// \see Runner::Session::socketReady(zmq::Pollable*)
+        virtual void socketReady(zmq::Pollable* pble) override;
 
 
     protected:

@@ -25,6 +25,7 @@ namespace zmq {
 class Context;
 class Socket;
 class Part;
+class Pollable;
 class PollerWaiter;
 } // namespace zmq
 
@@ -257,7 +258,7 @@ protected:
          *
          * \see createPoller()
          * \see operationReady(oper_type_t, zmq::Part&)
-         * \see socketReady(zmq::Socket*)
+         * \see socketReady(zmq::Pollable*)
          * \see recvOperation()
          */
         void run();
@@ -291,7 +292,7 @@ protected:
         virtual void operationReady(oper_type_t oper, zmq::Part& payload);
 
         /**
-         * \brief Notifies whenever any socket being polled is ready to be read by the asynchronous task.
+         * \brief Notifies whenever any item being polled is ready to be accessed by the asynchronous task.
          *
          * This notification shall be executed in the asynchronous task thread.
          *
@@ -299,8 +300,10 @@ protected:
          * handle their specific sockets. In case no additional sockets are
          * added by \ref createPoller() (other than the inter-thread \ref zopr_),
          * then this nofitication is never issued.
+         *
+         * \param[in] pble Ready pollable item.
          */
-        virtual void socketReady(zmq::Socket* sock);
+        virtual void socketReady(zmq::Pollable* pble);
 
         /**
          * \brief Sends an event notification to the main thread.

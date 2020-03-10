@@ -191,7 +191,7 @@ void Runner::Session::run()
     for (;;) {
         for (auto s : poll->wait()) {
             if (s != zopr_.get()) {
-                socketReady(static_cast<zmq::Socket*>(s));
+                socketReady(s);
                 continue;
             }
 
@@ -222,7 +222,7 @@ void Runner::Session::operationReady(oper_type_t, zmq::Part&)
 }
 
 
-void Runner::Session::socketReady(zmq::Socket*)
+void Runner::Session::socketReady(zmq::Pollable*)
 {
 }
 

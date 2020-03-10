@@ -63,11 +63,11 @@ std::unique_ptr<zmq::PollerWaiter> Broker::BrokerSession::createPoller()
 }
 
 
-void Broker::BrokerSession::socketReady(zmq::Socket* sock)
+void Broker::BrokerSession::socketReady(zmq::Pollable* pble)
 {
     zmq::Part payload;
 
-    if (zstore_.get() == sock) {
+    if (pble == zstore_.get()) {
         zstore_->recv(&payload);
         LOG_DEBUG(log::Arg{"broker"sv}, log::Arg{"store"sv, "recv"sv},
             log::Arg{"size"sv, int(payload.size())});

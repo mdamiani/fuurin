@@ -106,8 +106,8 @@ protected:
         /// \see Runner::Session::operationReady(oper_type_t, zmq::Part&)
         virtual void operationReady(oper_type_t oper, zmq::Part& payload) override;
 
-        /// \see Runner::Session::socketReady(zmq::Socket*)
-        virtual void socketReady(zmq::Socket* sock) override;
+        /// \see Runner::Session::socketReady(zmq::Pollable*)
+        virtual void socketReady(zmq::Pollable* pble) override;
 
 
     protected:
