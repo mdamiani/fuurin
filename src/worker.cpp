@@ -97,7 +97,7 @@ std::unique_ptr<zmq::PollerWaiter> Worker::WorkerSession::createPoller()
 }
 
 
-void Worker::WorkerSession::operationReady(oper_type_t oper, zmq::Part& payload)
+void Worker::WorkerSession::operationReady(oper_type_t oper, zmq::Part&& payload)
 {
 #ifndef NDEBUG
     const auto paysz = payload.size();

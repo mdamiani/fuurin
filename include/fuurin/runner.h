@@ -130,7 +130,7 @@ protected:
      *
      * \see sendOperation(Operation)
      * \see recvOperation()
-     * \see operationReady(oper_type_t, zmq::Part&)
+     * \see operationReady(oper_type_t, zmq::Part&&)
      */
     enum Operation : oper_type_t
     {
@@ -257,7 +257,7 @@ protected:
          * \exception Throws exceptions in case of unexpected errors.
          *
          * \see createPoller()
-         * \see operationReady(oper_type_t, zmq::Part&)
+         * \see operationReady(oper_type_t, zmq::Part&&)
          * \see socketReady(zmq::Pollable*)
          * \see recvOperation()
          */
@@ -289,7 +289,7 @@ protected:
          * Concrete classes shall override this virtual method in order to
          * handle and define any other specific tasks than \ref Operation::Stop.
          */
-        virtual void operationReady(oper_type_t oper, zmq::Part& payload);
+        virtual void operationReady(oper_type_t oper, zmq::Part&& payload);
 
         /**
          * \brief Notifies whenever any item being polled is ready to be accessed by the asynchronous task.

@@ -201,7 +201,7 @@ void Runner::Session::run()
             if (!valid)
                 continue;
 
-            operationReady(oper, payload);
+            operationReady(oper, std::move(payload));
 
             if (oper == Operation::Stop)
                 return;
@@ -217,7 +217,7 @@ std::unique_ptr<zmq::PollerWaiter> Runner::Session::createPoller()
 }
 
 
-void Runner::Session::operationReady(oper_type_t, zmq::Part&)
+void Runner::Session::operationReady(oper_type_t, zmq::Part&&)
 {
 }
 
