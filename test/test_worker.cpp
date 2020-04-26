@@ -17,6 +17,7 @@
 #include "fuurin/broker.h"
 #include "fuurin/worker.h"
 #include "fuurin/zmqpart.h"
+#include "types.h"
 
 #include <string_view>
 #include <chrono>
@@ -27,6 +28,34 @@ namespace utf = boost::unit_test;
 
 using namespace std::literals::string_view_literals;
 using namespace std::literals::chrono_literals;
+
+
+/**
+ * BOOST_TEST print functions.
+ */
+namespace fuurin {
+inline std::ostream& operator<<(std::ostream& os, const Runner::EventRead& rd)
+{
+    os << toIntegral(rd);
+    return os;
+}
+} // namespace fuurin
+
+
+void testWaitForEvent(Worker& w, std::chrono::milliseconds timeout, Runner::EventRead evRet, Runner::event_type_t evType, const std::string& evPay = std::string())
+{
+    const auto [type, pay, ret] = w.waitForEvent(timeout);
+
+    BOOST_TEST(ret == evRet);
+    BOOST_TEST(type == evType);
+
+    if (!evPay.empty()) {
+        BOOST_TEST(!pay.empty());
+        BOOST_TEST(pay.toString() == std::string_view(evPay));
+    } else {
+        BOOST_TEST(pay.empty());
+    }
+}
 
 
 typedef boost::mpl::list<Broker, Worker> runnerTypes;
@@ -50,6 +79,22 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(workerStart, T, runnerTypes)
 }
 
 
+BOOST_AUTO_TEST_CASE(waitForStart)
+{
+    Worker w;
+
+    auto wf = w.start();
+
+    testWaitForEvent(w, 2s, Runner::EventRead::Success,
+        toIntegral(Runner::EventType::Started));
+
+    w.stop();
+
+    testWaitForEvent(w, 2s, Runner::EventRead::Success,
+        toIntegral(Runner::EventType::Stopped));
+}
+
+
 BOOST_AUTO_TEST_CASE(simpleStore)
 {
     Worker w;
@@ -60,14 +105,17 @@ BOOST_AUTO_TEST_CASE(simpleStore)
 
     w.store(zmq::Part{"hello"sv});
 
-    const auto [ev, ret] = w.waitForEvent(5s);
+    testWaitForEvent(w, 2s, Runner::EventRead::Success,
+        toIntegral(Runner::EventType::Started));
 
-    BOOST_TEST(ret == Runner::EventRead::Success);
-    BOOST_TEST(!ev.empty());
-    BOOST_TEST(ev.toString() == "hello"sv);
+    testWaitForEvent(w, 5s, Runner::EventRead::Success,
+        toIntegral(Worker::EventType::Stored), "hello");
 
     w.stop();
     b.stop();
+
+    testWaitForEvent(w, 2s, Runner::EventRead::Success,
+        toIntegral(Runner::EventType::Stopped));
 }
 
 
@@ -79,11 +127,14 @@ BOOST_AUTO_TEST_CASE(waitForEventThreadSafe)
     auto wf = w.start();
     auto bf = b.start();
 
+    testWaitForEvent(w, 2s, Runner::EventRead::Success,
+        toIntegral(Runner::EventType::Started));
+
     const auto recvEvent = [&w]() {
         int cnt = 0;
         for (;;) {
-            const auto [ev, ret] = w.waitForEvent(1500ms);
-            if (ev.empty() || ret != Runner::EventRead::Success)
+            const auto [ev, pay, ret] = w.waitForEvent(1500ms);
+            if (pay.empty() || ret != Runner::EventRead::Success)
                 break;
             ++cnt;
         }
@@ -107,6 +158,9 @@ BOOST_AUTO_TEST_CASE(waitForEventThreadSafe)
 
     w.stop();
     b.stop();
+
+    testWaitForEvent(w, 2s, Runner::EventRead::Success,
+        toIntegral(Runner::EventType::Stopped));
 }
 
 
@@ -118,17 +172,17 @@ BOOST_AUTO_TEST_CASE(waitForEventDiscard)
     auto wf = w.start();
     auto bf = b.start();
 
+    testWaitForEvent(w, 2s, Runner::EventRead::Success,
+        toIntegral(Runner::EventType::Started));
+
     // produce some events
     const int iterations = 3;
     for (int i = 0; i < iterations; ++i)
         w.store(zmq::Part{"hello1"sv});
 
     // receive just one event
-    {
-        const auto [ev, ret] = w.waitForEvent(1500ms);
-        BOOST_TEST(ret == Runner::EventRead::Success);
-        BOOST_TEST(ev.toString() == "hello1"sv);
-    }
+    testWaitForEvent(w, 1500ms, Runner::EventRead::Success,
+        toIntegral(Worker::EventType::Stored), "hello1");
 
     // wait for other events to be received
     std::this_thread::sleep_for(1s);
@@ -143,20 +197,25 @@ BOOST_AUTO_TEST_CASE(waitForEventDiscard)
 
     // discard old events
     for (int i = 0; i < iterations - 1; ++i) {
-        const auto [ev, ret] = w.waitForEvent(1500ms);
-        BOOST_TEST(ret == Runner::EventRead::Discard);
-        BOOST_TEST(ev.toString() == "hello1"sv);
+        testWaitForEvent(w, 1500ms, Runner::EventRead::Discard,
+            toIntegral(Worker::EventType::Stored), "hello1");
     }
 
+    // discard old stop event
+    testWaitForEvent(w, 1500ms, Runner::EventRead::Discard, toIntegral(Runner::EventType::Stopped));
+
+    // receive new start event
+    testWaitForEvent(w, 1500ms, Runner::EventRead::Success, toIntegral(Runner::EventType::Started));
+
     // receive new events
-    {
-        const auto [ev, ret] = w.waitForEvent(1500ms);
-        BOOST_TEST(ret == Runner::EventRead::Success);
-        BOOST_TEST(ev.toString() == "hello2"sv);
-    }
+    testWaitForEvent(w, 1500ms, Runner::EventRead::Success,
+        toIntegral(Worker::EventType::Stored), "hello2");
 
     w.stop();
     b.stop();
+
+    testWaitForEvent(w, 2s, Runner::EventRead::Success,
+        toIntegral(Runner::EventType::Stopped));
 }
 
 

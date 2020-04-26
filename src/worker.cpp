@@ -13,6 +13,7 @@
 #include "fuurin/zmqsocket.h"
 #include "fuurin/zmqpoller.h"
 #include "fuurin/zmqpart.h"
+#include "types.h"
 #include "log.h"
 
 #include <utility>
@@ -45,19 +46,21 @@ void Worker::store(zmq::Part&& data)
             log::Arg{"reason"sv, "worker is not running"sv});
     }
 
-    sendOperation(Operation::Store, std::forward<zmq::Part>(data));
+    sendOperation(toIntegral(Operation::Store), std::forward<zmq::Part>(data));
 }
 
 
-std::tuple<zmq::Part, Runner::EventRead> Worker::waitForEvent(std::chrono::milliseconds timeout)
+std::tuple<Runner::event_type_t, zmq::Part, Runner::EventRead> Worker::waitForEvent(std::chrono::milliseconds timeout)
 {
     const auto ev = Runner::waitForEvent(timeout);
 
-    if (std::get<1>(ev) == EventRead::Success) {
+    if (std::get<2>(ev) == EventRead::Success) {
         LOG_DEBUG(log::Arg{"worker"sv}, log::Arg{"event"sv, "recv"sv},
-            log::Arg{"size"sv, int(std::get<0>(ev).size())});
+            log::Arg{"type"sv, std::get<0>(ev)},
+            log::Arg{"size"sv, int(std::get<1>(ev).size())});
     } else {
         LOG_DEBUG(log::Arg{"worker"sv}, log::Arg{"event"sv, "recv"sv},
+            log::Arg{"type"sv, "n/a"sv},
             log::Arg{"size"sv, "n/a"sv});
     }
 
@@ -104,11 +107,22 @@ void Worker::WorkerSession::operationReady(oper_type_t oper, zmq::Part&& payload
 #endif
 
     switch (oper) {
-    case Worker::Operation::Store:
+    case toIntegral(Runner::Operation::Start):
+        sendEvent(toIntegral(Runner::EventType::Started), std::move(payload));
+        LOG_DEBUG(log::Arg{"worker"sv}, log::Arg{"started"sv});
+        break;
+
+    case toIntegral(Runner::Operation::Stop):
+        sendEvent(toIntegral(Runner::EventType::Stopped), std::move(payload));
+        LOG_DEBUG(log::Arg{"worker"sv}, log::Arg{"stopped"sv});
+        break;
+
+    case toIntegral(Worker::Operation::Store):
         zstore_->send(payload);
         LOG_DEBUG(log::Arg{"worker"sv}, log::Arg{"store"sv, "send"sv},
             log::Arg{"size"sv, int(paysz)});
         break;
+
     default:
         break;
     }
@@ -128,7 +142,7 @@ void Worker::WorkerSession::socketReady(zmq::Pollable* pble)
             log::Arg{"unknown socket"sv});
     }
 
-    sendEvent(std::move(payload));
+    sendEvent(toIntegral(EventType::Stored), std::move(payload));
 }
 
 } // namespace fuurin

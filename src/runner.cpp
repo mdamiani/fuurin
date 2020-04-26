@@ -14,6 +14,7 @@
 #include "fuurin/zmqpoller.h"
 #include "fuurin/zmqpart.h"
 #include "fuurin/zmqpartmulti.h"
+#include "types.h"
 #include "log.h"
 
 #include <boost/scope_exit.hpp>
@@ -106,33 +107,33 @@ bool Runner::stop() noexcept
     if (!isRunning())
         return false;
 
-    sendOperation(Operation::Stop);
+    sendOperation(toIntegral(Operation::Stop));
     return true;
 }
 
 
-std::tuple<zmq::Part, Runner::EventRead> Runner::waitForEvent(std::chrono::milliseconds timeout)
+std::tuple<Runner::event_type_t, zmq::Part, Runner::EventRead> Runner::waitForEvent(std::chrono::milliseconds timeout)
 {
     zmq::Poller poll{zmq::PollerEvents::Read, timeout, zevr_.get()};
 
     if (poll.wait().empty())
-        return std::make_tuple(zmq::Part{}, EventRead::Timeout);
+        return std::make_tuple(toIntegral(EventType::Invalid), zmq::Part{}, EventRead::Timeout);
 
-    auto [ev, valid] = recvEvent();
+    auto [ev, pay, valid] = recvEvent();
     if (!valid)
-        return std::make_tuple(std::move(ev), EventRead::Discard);
+        return std::make_tuple(ev, std::move(pay), EventRead::Discard);
 
-    return std::make_tuple(std::move(ev), EventRead::Success);
+    return std::make_tuple(ev, std::move(pay), EventRead::Success);
 }
 
 
-std::tuple<zmq::Part, bool> Runner::recvEvent()
+std::tuple<Runner::event_type_t, zmq::Part, bool> Runner::recvEvent()
 {
     zmq::Part r;
     zevr_->recv(&r);
-    auto [tok, ev] = zmq::PartMulti::unpack<token_type_t, zmq::Part>(r);
+    auto [tok, ev, pay] = zmq::PartMulti::unpack<token_type_t, event_type_t, zmq::Part>(r);
 
-    return std::make_tuple(std::move(ev), tok == token_);
+    return std::make_tuple(ev, std::move(pay), tok == token_);
 }
 
 
@@ -188,6 +189,9 @@ void Runner::Session::run()
 
     auto poll = createPoller();
 
+    // generate a start operation
+    operationReady(toIntegral(Operation::Start), zmq::Part{});
+
     for (;;) {
         for (auto s : poll->wait()) {
             if (s != zopr_.get()) {
@@ -203,7 +207,7 @@ void Runner::Session::run()
 
             operationReady(oper, std::move(payload));
 
-            if (oper == Operation::Stop)
+            if (oper == toIntegral(Operation::Stop))
                 return;
         }
     }
@@ -242,9 +246,9 @@ std::tuple<Runner::oper_type_t, zmq::Part, bool> Runner::Session::recvOperation(
 }
 
 
-void Runner::Session::sendEvent(zmq::Part&& ev)
+void Runner::Session::sendEvent(event_type_t ev, zmq::Part&& pay)
 {
-    zevs_->send(zmq::PartMulti::pack(token_, ev).withGroup(GROUP_EVENTS));
+    zevs_->send(zmq::PartMulti::pack(token_, ev, pay).withGroup(GROUP_EVENTS));
 }
 
 } // namespace fuurin

@@ -28,6 +28,21 @@ class Worker : public Runner
 {
 public:
     /**
+     * \brief Type of event payload.
+     *
+     * \see Runner::EventType
+     * \see waitForEvent(std::chrono::milliseconds)
+     */
+    enum struct EventType : event_type_t
+    {
+        Stored = event_type_t(Runner::EventType::EVENT_COUNT), ///< Event delivered when \ref Worker::store(zmq::Part&&) was acknowledged.
+
+        EVENT_COUNT, ///< Number of events.
+    };
+
+
+public:
+    /**
      * \brief Initializes this worker.
      */
     Worker();
@@ -51,16 +66,16 @@ public:
     /**
      * \see Runner::waitForEvent(std::chrono::milliseconds)
      */
-    std::tuple<zmq::Part, Runner::EventRead> waitForEvent(std::chrono::milliseconds timeout = std::chrono::milliseconds(-1));
+    std::tuple<event_type_t, zmq::Part, Runner::EventRead> waitForEvent(std::chrono::milliseconds timeout = std::chrono::milliseconds(-1));
 
 
 protected:
     /**
      * \brief Worker operations.
      */
-    enum Operation : oper_type_t
+    enum struct Operation : oper_type_t
     {
-        Store = Runner::Operation::OPER_COUNT,
+        Store = oper_type_t(Runner::Operation::OPER_COUNT),
     };
 
 

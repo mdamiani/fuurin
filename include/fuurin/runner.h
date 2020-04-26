@@ -45,12 +45,30 @@ public:
      * \brief Type of event read.
      *
      * \see waitForEvent(std::chrono::milliseconds)
+     * \see sendEvent(event_type_t, zmq::Part&&)
      */
-    enum EventRead
+    enum struct EventRead
     {
         Timeout, ///< The read operation timed out.
         Success, ///< The read operation successfully returned an event.
         Discard, ///< The read operation returned an old event.
+    };
+
+    typedef uint8_t event_type_t; ///< Type of the event kind.
+
+    /**
+     * \brief Type of event payload.
+     *
+     * \see waitForEvent(std::chrono::milliseconds)
+     * \see sendEvent(event_type_t, zmq::Part&&)
+     */
+    enum struct EventType : event_type_t
+    {
+        Invalid, ///< Event is invalid.
+        Started, ///< Event delivered when \ref Runner::start() was acknowledged.
+        Stopped, ///< Event delivered when \ref Runner::stop() was acknowledged.
+
+        EVENT_COUNT, ///< Number of events.
     };
 
 
@@ -80,7 +98,7 @@ public:
     ///@}
 
     /**
-     * \brief Starts the backgroud thread of the main task.
+     * \brief Starts the background thread of the main task.
      *
      * \return A future to hold the result (or an exception) of the computation,
      *      or and empty future in case the asynchronous task is already running.
@@ -132,9 +150,10 @@ protected:
      * \see recvOperation()
      * \see operationReady(oper_type_t, zmq::Part&&)
      */
-    enum Operation : oper_type_t
+    enum struct Operation : oper_type_t
     {
         Invalid, ///< Invalid command.
+        Start,   ///< Request to start the asynchronous task.
         Stop,    ///< Request to stop the asynchronous task.
 
         OPER_COUNT, ///< Number of operations.
@@ -182,7 +201,7 @@ protected:
      *
      * \see recvEvent()
      */
-    std::tuple<zmq::Part, Runner::EventRead> waitForEvent(std::chrono::milliseconds timeout = std::chrono::milliseconds(-1));
+    std::tuple<event_type_t, zmq::Part, Runner::EventRead> waitForEvent(std::chrono::milliseconds timeout = std::chrono::milliseconds(-1));
 
 
 private:
@@ -199,7 +218,7 @@ private:
      *
      * \see waitForEvent(std::chrono::milliseconds)
      */
-    std::tuple<zmq::Part, bool> recvEvent();
+    std::tuple<event_type_t, zmq::Part, bool> recvEvent();
 
 
 protected:
@@ -311,9 +330,10 @@ protected:
          * This method shall be called from the asynchronous task thread.
          * The event is send over the inter-thread radio socket.
          *
-         * \param[in] ev The event to be notified.
+         * \param[in] event The type of event to be notified.
+         * \param[in] payload The payload of event to be notified.
          */
-        void sendEvent(zmq::Part&& ev);
+        void sendEvent(event_type_t event, zmq::Part&& payload);
 
 
     private:
@@ -354,7 +374,7 @@ protected:
     const std::unique_ptr<zmq::Socket> zevr_;  ///< Inter-thread events reception.
     std::atomic<bool> running_;                ///< Whether the task is running.
     std::atomic<token_type_t> token_;          ///< Current execution token for the task.
-};
+};                                             // namespace fuurin
 
 } // namespace fuurin
 
