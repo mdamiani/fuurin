@@ -39,6 +39,20 @@ namespace utf = boost::unit_test;
 namespace bdata = utf::data;
 
 
+/**
+ * BOOST_TEST print functions.
+ */
+namespace fuurin {
+namespace log {
+inline std::ostream& operator<<(std::ostream& os, const Arg::Type& type)
+{
+    os << toIntegral(type);
+    return os;
+}
+} // namespace log
+} // namespace fuurin
+
+
 BOOST_AUTO_TEST_CASE(libVersion)
 {
     char buf[16];
@@ -182,17 +196,17 @@ static void testArg(const log::Arg& arg, log::Arg::Type type, std::string_view k
 
 BOOST_DATA_TEST_CASE(logArgType,
     bdata::make({
-        std::make_tuple(log::Arg::Invalid, "key1"sv, 0, 0.0, "0"sv, ""s, false, 0),
-        std::make_tuple(log::Arg::Int, "key2"sv, 10, 0.0, "0"sv, ""s, false, 0),
-        std::make_tuple(log::Arg::Errno, "key2.1"sv, ENOENT, 0.0, "0"sv, ""s, false, 0),
-        std::make_tuple(log::Arg::Double, "key3"sv, 0, 10.0, "0"sv, ""s, false, 0),
-        std::make_tuple(log::Arg::String, "key4"sv, 0, 0.0, "charval"sv, ""s, false, 0),
-        std::make_tuple(log::Arg::String, "key5"sv, 0, 0.0, ""sv, "strval"s, true, 0),
-        std::make_tuple(log::Arg::String, "key6"sv, 0, 0.0, ""sv, ""s, true, 0),
-        std::make_tuple(log::Arg::String, "key7"sv, 0, 0.0, ""sv, std::string(), true, 0),
-        std::make_tuple(log::Arg::String, "key8"sv, 0, 0.0, ""sv, std::string(log::Arg::MaxStringStackSize + 1, 'a'), true, 1),
-        std::make_tuple(log::Arg::Array, "key9"sv, 1, 2.2, "char*"sv, "1234567"s, bool(), 0),
-        std::make_tuple(log::Arg::Array, "key10"sv, 3, 3.3, "char3*"sv, std::string(log::Arg::MaxStringStackSize + 1, 'a'), bool(), 1),
+        std::make_tuple(log::Arg::Type::Invalid, "key1"sv, 0, 0.0, "0"sv, ""s, false, 0),
+        std::make_tuple(log::Arg::Type::Int, "key2"sv, 10, 0.0, "0"sv, ""s, false, 0),
+        std::make_tuple(log::Arg::Type::Errno, "key2.1"sv, ENOENT, 0.0, "0"sv, ""s, false, 0),
+        std::make_tuple(log::Arg::Type::Double, "key3"sv, 0, 10.0, "0"sv, ""s, false, 0),
+        std::make_tuple(log::Arg::Type::String, "key4"sv, 0, 0.0, "charval"sv, ""s, false, 0),
+        std::make_tuple(log::Arg::Type::String, "key5"sv, 0, 0.0, ""sv, "strval"s, true, 0),
+        std::make_tuple(log::Arg::Type::String, "key6"sv, 0, 0.0, ""sv, ""s, true, 0),
+        std::make_tuple(log::Arg::Type::String, "key7"sv, 0, 0.0, ""sv, std::string(), true, 0),
+        std::make_tuple(log::Arg::Type::String, "key8"sv, 0, 0.0, ""sv, std::string(log::Arg::MaxStringStackSize + 1, 'a'), true, 1),
+        std::make_tuple(log::Arg::Type::Array, "key9"sv, 1, 2.2, "char*"sv, "1234567"s, bool(), 0),
+        std::make_tuple(log::Arg::Type::Array, "key10"sv, 3, 3.3, "char3*"sv, std::string(log::Arg::MaxStringStackSize + 1, 'a'), bool(), 1),
     }),
     argType, argKey, argInt, argDouble, argChar, argString, useString, refCnt)
 {

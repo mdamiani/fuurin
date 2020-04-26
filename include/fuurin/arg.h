@@ -55,7 +55,7 @@ public:
     /**
      * \brief Type of this argument.
      */
-    enum Type : uint8_t
+    enum struct Type : uint8_t
     {
         Invalid, ///< Invalid argument.
         Int,     ///< Integer.
@@ -238,7 +238,7 @@ private:
     /**
      * \brief Type of allocation of argument value.
      */
-    enum Alloc : uint8_t
+    enum struct Alloc : uint8_t
     {
         None,  ///< No allocation / pointer to data.
         Stack, ///< Stack allocation.

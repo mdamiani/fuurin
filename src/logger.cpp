@@ -65,7 +65,7 @@ inline void println(std::ostream& os, const Arg args[], size_t num)
 std::ostream& operator<<(std::ostream& os, const Arg& arg)
 {
     switch (arg.type()) {
-    case Arg::Invalid:
+    case Arg::Type::Invalid:
         os << "<>";
         break;
     case Arg::Type::Int:
