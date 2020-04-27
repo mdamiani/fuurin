@@ -134,6 +134,7 @@ BOOST_AUTO_TEST_CASE(waitForEventThreadSafe)
         int cnt = 0;
         for (;;) {
             const auto [ev, pay, ret] = w.waitForEvent(1500ms);
+            UNUSED(ev);
             if (pay.empty() || ret != Runner::EventRead::Success)
                 break;
             ++cnt;
