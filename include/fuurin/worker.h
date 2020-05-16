@@ -40,9 +40,9 @@ public:
      */
     enum struct EventType : event_type_t
     {
-        Stored = event_type_t(Runner::EventType::EVENT_COUNT), ///< Event delivered when \ref Worker::store(zmq::Part&&) was acknowledged.
+        Stored = event_type_t(Runner::EventType::COUNT), ///< Event delivered when \ref Worker::store(zmq::Part&&) was acknowledged.
 
-        EVENT_COUNT, ///< Number of events.
+        COUNT, ///< Number of events.
     };
 
 
@@ -80,7 +80,7 @@ protected:
      */
     enum struct Operation : oper_type_t
     {
-        Store = oper_type_t(Runner::Operation::OPER_COUNT),
+        Store = oper_type_t(Runner::Operation::COUNT),
     };
 
 

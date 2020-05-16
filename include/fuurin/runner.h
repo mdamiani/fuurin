@@ -68,7 +68,7 @@ public:
         Started, ///< Event delivered when \ref Runner::start() was acknowledged.
         Stopped, ///< Event delivered when \ref Runner::stop() was acknowledged.
 
-        EVENT_COUNT, ///< Number of events.
+        COUNT, ///< Number of events.
     };
 
 
@@ -156,7 +156,7 @@ protected:
         Start,   ///< Request to start the asynchronous task.
         Stop,    ///< Request to stop the asynchronous task.
 
-        OPER_COUNT, ///< Number of operations.
+        COUNT, ///< Number of operations.
     };
 
 
