@@ -28,7 +28,7 @@ ConnMachine::ConnMachine(zmq::Context* zctx,
     , onChange_{onChange}
     , timerTry_{std::make_unique<zmq::Timer>(zctx, "conn_tmr_retry")}
     , timerTmo_{std::make_unique<zmq::Timer>(zctx, "conn_tmr_timeout")}
-    , state_{State::Stable}
+    , state_{State::Trying}
 {
     timerTry_->setSingleShot(false);
     timerTmo_->setSingleShot(true);
