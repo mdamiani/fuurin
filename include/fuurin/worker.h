@@ -17,6 +17,11 @@
 
 
 namespace fuurin {
+namespace zmq {
+class Part;
+} // namespace zmq
+
+class ConnMachine;
 
 
 /**
@@ -126,7 +131,36 @@ protected:
 
 
     protected:
-        const std::unique_ptr<zmq::Socket> zstore_; ///< ZMQ socket to store data.
+        /**
+         * \brief Reconnects and configure communication sockets.
+         */
+        void reconnect();
+
+        /**
+         * \brief Sends announce message to the remote party.
+         */
+        void sendAnnounce();
+
+        /**
+         * \brief Collects a message which was published by a broker.
+         *
+         * \param[in] payload Message payload.
+         */
+        void collectBrokerMessage(zmq::Part&& payload);
+
+        /**
+         * \brief Notifies for any change of connection state.
+         *
+         * \param[in] isUp Whether the connection is up or down.
+         */
+        void notifyConnectionUpdate(bool isUp);
+
+
+    protected:
+        const std::unique_ptr<zmq::Socket> zstore_;   ///< ZMQ socket to store data.
+        const std::unique_ptr<zmq::Socket> zcollect_; ///< ZMQ socket to collect data.
+        const std::unique_ptr<zmq::Socket> zdeliver_; ///< ZMQ socket to deliver data.
+        const std::unique_ptr<ConnMachine> conn_;     ///< Connection state machine.
     };
 };
 

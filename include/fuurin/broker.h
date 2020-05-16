@@ -18,6 +18,10 @@
 
 namespace fuurin {
 
+namespace zmq {
+class Timer;
+} // namespace zmq
+
 
 /**
  * \brief Broker is the server interface to implement a storage broker.
@@ -82,7 +86,24 @@ protected:
 
 
     protected:
-        const std::unique_ptr<zmq::Socket> zstore_; ///< ZMQ socket to store data.
+        /**
+         * \brief Sends a keepalive.
+         */
+        void sendHugz();
+
+        /**
+         * \brief Collects a message which was published by a worker.
+         *
+         * \param[in] payload Message payload.
+         */
+        void collectWorkerMessage(zmq::Part&& payload);
+
+
+    protected:
+        const std::unique_ptr<zmq::Socket> zstore_;   ///< ZMQ socket to store data.
+        const std::unique_ptr<zmq::Socket> zcollect_; ///< ZMQ socket to collect data.
+        const std::unique_ptr<zmq::Socket> zdeliver_; ///< ZMQ socket to deliver data.
+        const std::unique_ptr<zmq::Timer> zhugz_;     ///< ZMQ timer to send keepalives.
     };
 };
 

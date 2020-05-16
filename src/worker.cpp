@@ -13,11 +13,18 @@
 #include "fuurin/zmqsocket.h"
 #include "fuurin/zmqpoller.h"
 #include "fuurin/zmqpart.h"
+#include "fuurin/zmqtimer.h"
+#include "connmachine.h"
 #include "types.h"
 #include "log.h"
 
 #include <utility>
+#include <chrono>
 #include <string_view>
+
+
+#define BROKER_HUGZ "HUGZ"
+#define WORKER_UPDT "UPDT"
 
 
 using namespace std::literals::string_view_literals;
@@ -84,6 +91,27 @@ Worker::WorkerSession::WorkerSession(token_type_t token, std::function<void()> o
     const std::unique_ptr<zmq::Socket>& zevent)
     : Session(token, oncompl, zctx, zoper, zevent)
     , zstore_{std::make_unique<zmq::Socket>(zctx.get(), zmq::Socket::CLIENT)}
+    , zcollect_{std::make_unique<zmq::Socket>(zctx.get(), zmq::Socket::DISH)}
+    , zdeliver_{std::make_unique<zmq::Socket>(zctx.get(), zmq::Socket::RADIO)}
+    , conn_{
+          std::make_unique<ConnMachine>(
+              zctx.get(),
+              500ms,  // TODO: make configurable
+              3000ms, // TODO: make configurable
+              std::bind(&Worker::WorkerSession::reconnect, this),
+              std::bind(&Worker::WorkerSession::sendAnnounce, this),
+              [this](ConnMachine::State s) {
+                  switch (s) {
+                  case ConnMachine::State::Trying:
+                      notifyConnectionUpdate(false);
+                      break;
+
+                  case ConnMachine::State::Stable:
+                      notifyConnectionUpdate(true);
+                      break;
+                  };
+              }),
+      }
 {
     zstore_->setEndpoints({"ipc:///tmp/broker_storage"});
     zstore_->connect();
@@ -95,8 +123,8 @@ Worker::WorkerSession::~WorkerSession() noexcept = default;
 
 std::unique_ptr<zmq::PollerWaiter> Worker::WorkerSession::createPoller()
 {
-    auto poll = new zmq::PollerAuto{zmq::PollerEvents::Type::Read, zopr_.get(), zstore_.get()};
-    return std::unique_ptr<zmq::PollerWaiter>{poll};
+    return std::unique_ptr<zmq::PollerWaiter>{new zmq::PollerAuto{zmq::PollerEvents::Type::Read,
+        zopr_.get(), zstore_.get(), zcollect_.get(), conn_->timerRetry(), conn_->timerTimeout()}};
 }
 
 
@@ -131,18 +159,78 @@ void Worker::WorkerSession::operationReady(oper_type_t oper, zmq::Part&& payload
 
 void Worker::WorkerSession::socketReady(zmq::Pollable* pble)
 {
-    zmq::Part payload;
-
     if (pble == zstore_.get()) {
+        zmq::Part payload;
         zstore_->recv(&payload);
         LOG_DEBUG(log::Arg{"worker"sv}, log::Arg{"store"sv, "recv"sv},
             log::Arg{"size"sv, int(payload.size())});
+
+        sendEvent(toIntegral(EventType::Stored), std::move(payload));
+
+    } else if (pble == zcollect_.get()) {
+        zmq::Part payload;
+        zcollect_->recv(&payload);
+        LOG_DEBUG(log::Arg{"worker"sv}, log::Arg{"collect"sv, "recv"sv},
+            log::Arg{"size"sv, int(payload.size())});
+
+        collectBrokerMessage(std::move(payload));
+
+    } else if (pble == conn_->timerRetry()) {
+        conn_->onTimerRetryFired();
+
+    } else if (pble == conn_->timerTimeout()) {
+        conn_->onTimerTimeoutFired();
+
     } else {
         LOG_FATAL(log::Arg{"worker"sv}, log::Arg{"could not read ready socket"sv},
             log::Arg{"unknown socket"sv});
     }
+}
 
-    sendEvent(toIntegral(EventType::Stored), std::move(payload));
+
+void Worker::WorkerSession::reconnect()
+{
+    // close
+    zcollect_->close();
+    zdeliver_->close();
+
+    // configure
+    zcollect_->setEndpoints({"ipc:///tmp/worker_collect"});
+    zdeliver_->setEndpoints({"ipc:///tmp/worker_deliver"});
+    zcollect_->setGroups({BROKER_HUGZ});
+
+    // connect
+    zcollect_->connect();
+    zdeliver_->connect();
+}
+
+
+void Worker::WorkerSession::sendAnnounce()
+{
+    zdeliver_->send(zmq::Part{}.withGroup(WORKER_UPDT));
+}
+
+
+void Worker::WorkerSession::collectBrokerMessage(zmq::Part&& payload)
+{
+    if (payload.group() == BROKER_HUGZ) {
+        // TODO: extract the message
+        conn_->onPing();
+
+    } else {
+        LOG_WARN(log::Arg{"worker"sv},
+            log::Arg{"collect"sv, "recv"sv},
+            log::Arg{"group"sv, std::string(payload.group())},
+            log::Arg{"unknown message"sv});
+    }
+}
+
+
+void Worker::WorkerSession::notifyConnectionUpdate(bool isUp)
+{
+    LOG_DEBUG(log::Arg{"worker"sv}, log::Arg{"connection"sv, isUp ? "up"sv : "down"sv});
+
+    // TODO: send connection event
 }
 
 } // namespace fuurin

@@ -12,7 +12,12 @@
 #include "fuurin/zmqsocket.h"
 #include "fuurin/zmqpoller.h"
 #include "fuurin/zmqpart.h"
+#include "fuurin/zmqtimer.h"
 #include "log.h"
+
+
+#define BROKER_HUGZ "HUGZ"
+#define WORKER_UPDT "UPDT"
 
 
 namespace fuurin {
@@ -47,9 +52,22 @@ Broker::BrokerSession::BrokerSession(token_type_t token, std::function<void()> o
     const std::unique_ptr<zmq::Socket>& zevent)
     : Session(token, oncompl, zctx, zoper, zevent)
     , zstore_{std::make_unique<zmq::Socket>(zctx.get(), zmq::Socket::SERVER)}
+    , zcollect_{std::make_unique<zmq::Socket>(zctx.get(), zmq::Socket::DISH)}
+    , zdeliver_{std::make_unique<zmq::Socket>(zctx.get(), zmq::Socket::RADIO)}
+    , zhugz_{std::make_unique<zmq::Timer>(zctx.get(), "hugz")}
 {
     zstore_->setEndpoints({"ipc:///tmp/broker_storage"});
+    zcollect_->setEndpoints({"ipc:///tmp/worker_deliver"});
+    zdeliver_->setEndpoints({"ipc:///tmp/worker_collect"});
+
+    zcollect_->setGroups({WORKER_UPDT});
+
     zstore_->bind();
+    zcollect_->bind();
+    zdeliver_->bind();
+
+    zhugz_->setInterval(1s);
+    zhugz_->setSingleShot(false);
 }
 
 
@@ -58,25 +76,58 @@ Broker::BrokerSession::~BrokerSession() noexcept = default;
 
 std::unique_ptr<zmq::PollerWaiter> Broker::BrokerSession::createPoller()
 {
-    auto poll = new zmq::Poller{zmq::PollerEvents::Type::Read, zopr_.get(), zstore_.get()};
-    return std::unique_ptr<zmq::PollerWaiter>{poll};
+    return std::unique_ptr<zmq::PollerWaiter>{new zmq::Poller{zmq::PollerEvents::Type::Read,
+        zopr_.get(), zstore_.get(), zhugz_.get()}};
 }
 
 
 void Broker::BrokerSession::socketReady(zmq::Pollable* pble)
 {
-    zmq::Part payload;
-
     if (pble == zstore_.get()) {
+        zmq::Part payload;
         zstore_->recv(&payload);
         LOG_DEBUG(log::Arg{"broker"sv}, log::Arg{"store"sv, "recv"sv},
             log::Arg{"size"sv, int(payload.size())});
+
+        zstore_->send(payload);
+
+    } else if (pble == zcollect_.get()) {
+        zmq::Part payload;
+        zcollect_->recv(&payload);
+        LOG_DEBUG(log::Arg{"broker"sv}, log::Arg{"collect"sv, "recv"sv},
+            log::Arg{"size"sv, int(payload.size())});
+
+    } else if (pble == zhugz_.get()) {
+        zhugz_->consume();
+        sendHugz();
+
     } else {
         LOG_FATAL(log::Arg{"broker"sv}, log::Arg{"could not read ready socket"sv},
             log::Arg{"unknown socket"sv});
     }
+}
 
-    zstore_->send(payload);
+
+void Broker::BrokerSession::collectWorkerMessage(zmq::Part&& payload)
+{
+    if (payload.group() == WORKER_UPDT) {
+        // TODO: extract the message
+        if (!zhugz_->isActive())
+            zhugz_->start();
+
+    } else {
+        LOG_WARN(log::Arg{"broker"sv},
+            log::Arg{"collect"sv, "recv"sv},
+            log::Arg{"group"sv, std::string(payload.group())},
+            log::Arg{"unknown message"sv});
+    }
+}
+
+
+void Broker::BrokerSession::sendHugz()
+{
+    // TODO: send network status update.
+    zdeliver_->send(zmq::Part{}.withGroup(BROKER_HUGZ));
 }
 
 } // namespace fuurin
