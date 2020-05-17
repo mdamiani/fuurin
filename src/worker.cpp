@@ -98,10 +98,12 @@ Worker::WorkerSession::WorkerSession(token_type_t token, std::function<void()> o
               zctx.get(),
               500ms,  // TODO: make configurable
               3000ms, // TODO: make configurable
-              std::bind(&Worker::WorkerSession::reconnect, this),
+              std::bind(&Worker::WorkerSession::connClose, this),
+              std::bind(&Worker::WorkerSession::connOpen, this),
               std::bind(&Worker::WorkerSession::sendAnnounce, this),
               [this](ConnMachine::State s) {
                   switch (s) {
+                  case ConnMachine::State::Halted:
                   case ConnMachine::State::Trying:
                       notifyConnectionUpdate(false);
                       break;
@@ -136,11 +138,13 @@ void Worker::WorkerSession::operationReady(oper_type_t oper, zmq::Part&& payload
 
     switch (oper) {
     case toIntegral(Runner::Operation::Start):
-        sendEvent(toIntegral(Runner::EventType::Started), std::move(payload));
         LOG_DEBUG(log::Arg{"worker"sv}, log::Arg{"started"sv});
+        sendEvent(toIntegral(Runner::EventType::Started), std::move(payload));
+        conn_->onStart();
         break;
 
     case toIntegral(Runner::Operation::Stop):
+        conn_->onStop();
         sendEvent(toIntegral(Runner::EventType::Stopped), std::move(payload));
         LOG_DEBUG(log::Arg{"worker"sv}, log::Arg{"stopped"sv});
         break;
@@ -188,12 +192,16 @@ void Worker::WorkerSession::socketReady(zmq::Pollable* pble)
 }
 
 
-void Worker::WorkerSession::reconnect()
+void Worker::WorkerSession::connClose()
 {
     // close
     zcollect_->close();
     zdeliver_->close();
+}
 
+
+void Worker::WorkerSession::connOpen()
+{
     // configure
     zcollect_->setEndpoints({"ipc:///tmp/worker_collect"});
     zdeliver_->setEndpoints({"ipc:///tmp/worker_deliver"});

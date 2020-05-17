@@ -20,27 +20,24 @@ namespace fuurin {
 ConnMachine::ConnMachine(zmq::Context* zctx,
     std::chrono::milliseconds retry,
     std::chrono::milliseconds timeout,
-    std::function<void()> doReset,
+    std::function<void()> doClose,
+    std::function<void()> doOpen,
     std::function<void()> doPong,
     std::function<void(State)> onChange)
-    : doReset_{doReset}
+    : doClose_{doClose}
+    , doOpen_{doOpen}
     , doPong_{doPong}
     , onChange_{onChange}
     , timerTry_{std::make_unique<zmq::Timer>(zctx, "conn_tmr_retry")}
     , timerTmo_{std::make_unique<zmq::Timer>(zctx, "conn_tmr_timeout")}
-    , state_{State::Trying}
+    , state_{State::Halted}
 {
     timerTry_->setSingleShot(false);
     timerTmo_->setSingleShot(true);
     timerTry_->setInterval(retry);
     timerTmo_->setInterval(timeout);
 
-    timerTry_->start();
-    timerTmo_->start();
-
-    change(State::Trying);
-    reconnect();
-    pong();
+    halt();
 }
 
 
@@ -65,63 +62,96 @@ zmq::Timer* ConnMachine::timerTimeout() const noexcept
 }
 
 
+void ConnMachine::onStart()
+{
+    if (state_ != State::Halted)
+        return;
+
+    LOG_DEBUG(log::Arg{"connection"sv}, log::Arg{"event"sv, "started"sv});
+
+    trigger();
+}
+
+
+void ConnMachine::onStop()
+{
+    if (state_ == State::Halted)
+        return;
+
+    halt();
+
+    LOG_DEBUG(log::Arg{"connection"sv}, log::Arg{"event"sv, "stopped"sv});
+}
+
+
 void ConnMachine::onPing()
 {
+    if (state_ == State::Halted)
+        return;
+
     LOG_DEBUG(log::Arg{"connection"sv}, log::Arg{"event"sv, "ping"sv});
 
     timerTry_->stop();
     timerTmo_->start();
 
     change(State::Stable);
-    pong();
-}
 
-
-void ConnMachine::onTimerRetryFired()
-{
-    if (state_ != State::Trying) {
-        throw ERROR(Error, "connmachine could not handle onTimerRetryFired",
-            log::Arg{"reason"sv, "state must be State::Trying"sv});
-    }
-
-    LOG_DEBUG(log::Arg{"connection"sv}, log::Arg{"event"sv, "retry"sv});
-
-    if (timerTry_->isExpired())
-        timerTry_->consume();
-
-    pong();
-}
-
-
-void ConnMachine::onTimerTimeoutFired()
-{
-    LOG_DEBUG(log::Arg{"connection"sv}, log::Arg{"event"sv, "timeout"sv});
-
-    if (timerTmo_->isExpired())
-        timerTmo_->consume();
-
-    timerTry_->start();
-    timerTmo_->start();
-
-    change(State::Trying);
-    reconnect();
-    pong();
-}
-
-
-void ConnMachine::pong()
-{
     LOG_DEBUG(log::Arg{"connection"sv}, log::Arg{"event"sv, "pong"sv});
 
     doPong_();
 }
 
 
-void ConnMachine::reconnect()
+void ConnMachine::onTimerRetryFired()
 {
-    LOG_DEBUG(log::Arg{"connection"sv}, log::Arg{"event"sv, "reset"sv});
+    if (timerTry_->isExpired())
+        timerTry_->consume();
 
-    doReset_();
+    if (state_ == State::Halted)
+        return;
+
+    if (state_ == State::Stable)
+        return;
+
+    LOG_DEBUG(log::Arg{"connection"sv}, log::Arg{"event"sv, "announce"sv});
+
+    doPong_();
+}
+
+
+void ConnMachine::onTimerTimeoutFired()
+{
+    if (timerTmo_->isExpired())
+        timerTmo_->consume();
+
+    if (state_ == State::Halted)
+        return;
+
+    LOG_DEBUG(log::Arg{"connection"sv}, log::Arg{"event"sv, "timeout"sv});
+
+    trigger();
+}
+
+
+void ConnMachine::trigger()
+{
+    timerTry_->start();
+    timerTmo_->start();
+
+    change(State::Trying);
+    doClose_();
+    doOpen_();
+    doPong_();
+}
+
+
+void ConnMachine::halt()
+{
+    timerTry_->stop();
+    timerTmo_->stop();
+
+    doClose_();
+    change(State::Halted);
 }
 
 
@@ -131,6 +161,11 @@ void ConnMachine::change(State state)
         return;
 
     switch (state) {
+    case State::Halted:
+        LOG_DEBUG(log::Arg{"connection"sv}, log::Arg{"event"sv, "transition"sv},
+            log::Arg{"state"sv, "halted"sv});
+        break;
+
     case State::Trying:
         LOG_DEBUG(log::Arg{"connection"sv}, log::Arg{"event"sv, "transition"sv},
             log::Arg{"state"sv, "trying"sv});

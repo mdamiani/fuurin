@@ -27,7 +27,10 @@ class Timer;
 /**
  * \brief State machine to establish the connection.
  *
- * The state machine has two states:
+ * The state machine has three states:
+ *
+ *   - \ref State::Halted:
+ *      The sockets are disconnected and the state machine is halted.
  *
  *   - \ref State::Trying:
  *      Announcements are sent through the \ref pong() function, every
@@ -49,6 +52,7 @@ public:
      */
     enum struct State
     {
+        Halted, ///< Sockets are disconnected.
         Trying, ///< Sockets are connecting.
         Stable, ///< Sockets are connected.
     };
@@ -58,18 +62,20 @@ public:
     /**
      * \brief Initializes the connection.
      * The connection state machine is initialized
-     * and the initial state is \ref State::Trying.
-     * Sockets are all opened.
+     * and the initial state is \ref State::Halted.
+     * Sockets are all closed.
      *
      * param[in] zctx ZMQ context.
-     * param[in] doReset Function to call to reset the sockets.
+     * param[in] doClose Function to call to close sockets.
+     * param[in] doOpen Function to call to open sockets.
      * param[in] doPong Function to send reply to a ping.
      * param[in] onChange Function called whenever the state changes.
      */
     ConnMachine(zmq::Context* zctx,
         std::chrono::milliseconds retry,
         std::chrono::milliseconds timeout,
-        std::function<void()> doReset,
+        std::function<void()> doClose,
+        std::function<void()> doOpen,
         std::function<void()> doPong,
         std::function<void(State)> onChange);
 
@@ -95,12 +101,22 @@ public:
     /**
      * \brief Return the timer used to check for connection timeout.
      *
-     * This timer is alwasy active.
+     * This timer is alwasy active, except in \ref State::Halted.
      * A transition to \ref State::Trying happens in case this timer expires.
      *
      * \return A pointer to the internal timer.
      */
     zmq::Timer* timerTimeout() const noexcept;
+
+    /**
+     * \brief Notifies that the connection shall be started.
+     */
+    void onStart();
+
+    /**
+     * \brief Notifies that the connection shall be stopped.
+     */
+    void onStop();
 
     /**
      * \brief Notifies a ping event due to a request from remote party.
@@ -137,18 +153,20 @@ public:
 
 private:
     /**
-     * \brief Sends a reply to a \ref ping();
+     * \brief (Re)Triggers the state machine.
      *
+     * \see doOpen_
+     * \see doClose_
      * \see doPong_
      */
-    void pong();
+    void trigger();
 
     /**
-     * \brief Reconnects the sockets.
+     * \brief Halts the state machine.
      *
-     * \see doReset_
+     * \see doClose_
      */
-    void reconnect();
+    void halt();
 
     /**
      * \brief Change state to the new passed one.
@@ -161,7 +179,8 @@ private:
 
 
 private:
-    const std::function<void()> doReset_;       ///< Function to reset sockets.
+    const std::function<void()> doClose_;       ///< Function to close sockets.
+    const std::function<void()> doOpen_;        ///< Function to open sockets.
     const std::function<void()> doPong_;        ///< Function to send a reply to a ping.
     const std::function<void(State)> onChange_; ///< Function called whenever state changes.
 

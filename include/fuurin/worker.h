@@ -132,9 +132,12 @@ protected:
 
     protected:
         /**
-         * \brief Reconnects and configure communication sockets.
+         * \brief Closes/Opens the sockets connection.
          */
-        void reconnect();
+        ///{@
+        void connClose();
+        void connOpen();
+        ///@}
 
         /**
          * \brief Sends announce message to the remote party.
