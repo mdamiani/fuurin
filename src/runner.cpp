@@ -14,10 +14,13 @@
 #include "fuurin/zmqpoller.h"
 #include "fuurin/zmqpart.h"
 #include "fuurin/zmqpartmulti.h"
+#include "failure.h"
 #include "types.h"
 #include "log.h"
 
 #include <boost/scope_exit.hpp>
+
+#include <cstring>
 
 
 #define GROUP_EVENTS "EVN"
@@ -131,6 +134,8 @@ std::tuple<Runner::event_type_t, zmq::Part, bool> Runner::recvEvent()
 {
     zmq::Part r;
     zevr_->recv(&r);
+    ASSERT(std::strncmp(r.group(), GROUP_EVENTS, sizeof(GROUP_EVENTS)) == 0, "bad event group");
+
     auto [tok, ev, pay] = zmq::PartMulti::unpack<token_type_t, event_type_t, zmq::Part>(r);
 
     return std::make_tuple(ev, std::move(pay), tok == token_);
