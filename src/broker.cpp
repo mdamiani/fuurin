@@ -13,7 +13,10 @@
 #include "fuurin/zmqpoller.h"
 #include "fuurin/zmqpart.h"
 #include "fuurin/zmqtimer.h"
+#include "types.h"
 #include "log.h"
+
+#include <cstring>
 
 
 #define BROKER_HUGZ "HUGZ"
@@ -77,7 +80,26 @@ Broker::BrokerSession::~BrokerSession() noexcept = default;
 std::unique_ptr<zmq::PollerWaiter> Broker::BrokerSession::createPoller()
 {
     return std::unique_ptr<zmq::PollerWaiter>{new zmq::Poller{zmq::PollerEvents::Type::Read,
-        zopr_.get(), zstore_.get(), zhugz_.get()}};
+        zopr_.get(), zstore_.get(), zcollect_.get(), zhugz_.get()}};
+}
+
+
+void Broker::BrokerSession::operationReady(oper_type_t oper, zmq::Part&&)
+{
+    switch (oper) {
+    case toIntegral(Runner::Operation::Start):
+        LOG_DEBUG(log::Arg{"broker"sv}, log::Arg{"started"sv});
+        break;
+
+    case toIntegral(Runner::Operation::Stop):
+        LOG_DEBUG(log::Arg{"broker"sv}, log::Arg{"stopped"sv});
+        break;
+
+    default:
+        LOG_ERROR(log::Arg{"broker"sv}, log::Arg{"operation"sv, oper},
+            log::Arg{"unknown"sv});
+        break;
+    }
 }
 
 
@@ -97,6 +119,8 @@ void Broker::BrokerSession::socketReady(zmq::Pollable* pble)
         LOG_DEBUG(log::Arg{"broker"sv}, log::Arg{"collect"sv, "recv"sv},
             log::Arg{"size"sv, int(payload.size())});
 
+        collectWorkerMessage(std::move(payload));
+
     } else if (pble == zhugz_.get()) {
         zhugz_->consume();
         sendHugz();
@@ -110,7 +134,7 @@ void Broker::BrokerSession::socketReady(zmq::Pollable* pble)
 
 void Broker::BrokerSession::collectWorkerMessage(zmq::Part&& payload)
 {
-    if (payload.group() == WORKER_UPDT) {
+    if (std::strncmp(payload.group(), WORKER_UPDT, sizeof(WORKER_UPDT)) == 0) {
         // TODO: extract the message
         if (!zhugz_->isActive())
             zhugz_->start();

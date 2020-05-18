@@ -36,7 +36,17 @@ using namespace std::literals::chrono_literals;
 namespace fuurin {
 inline std::ostream& operator<<(std::ostream& os, const Runner::EventRead& rd)
 {
-    os << toIntegral(rd);
+    switch (rd) {
+    case Runner::EventRead::Timeout:
+        os << "timeout";
+        break;
+    case Runner::EventRead::Success:
+        os << "success";
+        break;
+    case Runner::EventRead::Discard:
+        os << "discard";
+        break;
+    }
     return os;
 }
 } // namespace fuurin
@@ -47,7 +57,7 @@ void testWaitForEvent(Worker& w, std::chrono::milliseconds timeout, Runner::Even
     const auto [type, pay, ret] = w.waitForEvent(timeout);
 
     BOOST_TEST(ret == evRet);
-    BOOST_TEST(type == evType);
+    BOOST_TEST(Worker::eventToString(type) == Worker::eventToString(evType));
 
     if (!evPay.empty()) {
         BOOST_TEST(!pay.empty());
@@ -79,7 +89,7 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(workerStart, T, runnerTypes)
 }
 
 
-BOOST_AUTO_TEST_CASE(waitForStart)
+BOOST_AUTO_TEST_CASE(testWaitForStart)
 {
     Worker w;
 
@@ -95,7 +105,7 @@ BOOST_AUTO_TEST_CASE(waitForStart)
 }
 
 
-BOOST_AUTO_TEST_CASE(simpleStore)
+BOOST_AUTO_TEST_CASE(testWaitForOnline)
 {
     Worker w;
     Broker b;
@@ -103,10 +113,55 @@ BOOST_AUTO_TEST_CASE(simpleStore)
     auto wf = w.start();
     auto bf = b.start();
 
-    w.store(zmq::Part{"hello"sv});
+    testWaitForEvent(w, 2s, Runner::EventRead::Success, toIntegral(Runner::EventType::Started));
+    testWaitForEvent(w, 2s, Runner::EventRead::Success, toIntegral(Worker::EventType::Online));
 
-    testWaitForEvent(w, 2s, Runner::EventRead::Success,
-        toIntegral(Runner::EventType::Started));
+    w.stop();
+    b.stop();
+
+    testWaitForEvent(w, 2s, Runner::EventRead::Success, toIntegral(Worker::EventType::Offline));
+    testWaitForEvent(w, 2s, Runner::EventRead::Success, toIntegral(Runner::EventType::Stopped));
+}
+
+
+BOOST_AUTO_TEST_CASE(testWaitForOffline)
+{
+    Worker w;
+    Broker b;
+
+    auto wf = w.start();
+    auto bf = b.start();
+
+    testWaitForEvent(w, 2s, Runner::EventRead::Success, toIntegral(Runner::EventType::Started));
+    testWaitForEvent(w, 2s, Runner::EventRead::Success, toIntegral(Worker::EventType::Online));
+
+    b.stop();
+    bf.get();
+    testWaitForEvent(w, 6s, Runner::EventRead::Success, toIntegral(Worker::EventType::Offline));
+
+    bf = b.start();
+    testWaitForEvent(w, 2s, Runner::EventRead::Success, toIntegral(Worker::EventType::Online));
+
+    w.stop();
+    b.stop();
+
+    testWaitForEvent(w, 2s, Runner::EventRead::Success, toIntegral(Worker::EventType::Offline));
+    testWaitForEvent(w, 2s, Runner::EventRead::Success, toIntegral(Runner::EventType::Stopped));
+}
+
+
+BOOST_AUTO_TEST_CASE(testSimpleStore)
+{
+    Worker w;
+    Broker b;
+
+    auto wf = w.start();
+    auto bf = b.start();
+
+    testWaitForEvent(w, 2s, Runner::EventRead::Success, toIntegral(Runner::EventType::Started));
+    testWaitForEvent(w, 2s, Runner::EventRead::Success, toIntegral(Worker::EventType::Online));
+
+    w.store(zmq::Part{"hello"sv});
 
     testWaitForEvent(w, 5s, Runner::EventRead::Success,
         toIntegral(Worker::EventType::Stored), "hello");
@@ -114,12 +169,12 @@ BOOST_AUTO_TEST_CASE(simpleStore)
     w.stop();
     b.stop();
 
-    testWaitForEvent(w, 2s, Runner::EventRead::Success,
-        toIntegral(Runner::EventType::Stopped));
+    testWaitForEvent(w, 2s, Runner::EventRead::Success, toIntegral(Worker::EventType::Offline));
+    testWaitForEvent(w, 2s, Runner::EventRead::Success, toIntegral(Runner::EventType::Stopped));
 }
 
 
-BOOST_AUTO_TEST_CASE(waitForEventThreadSafe)
+BOOST_AUTO_TEST_CASE(testWaitForEventThreadSafe)
 {
     Worker w;
     Broker b;
@@ -127,8 +182,8 @@ BOOST_AUTO_TEST_CASE(waitForEventThreadSafe)
     auto wf = w.start();
     auto bf = b.start();
 
-    testWaitForEvent(w, 2s, Runner::EventRead::Success,
-        toIntegral(Runner::EventType::Started));
+    testWaitForEvent(w, 2s, Runner::EventRead::Success, toIntegral(Runner::EventType::Started));
+    testWaitForEvent(w, 2s, Runner::EventRead::Success, toIntegral(Worker::EventType::Online));
 
     const auto recvEvent = [&w]() {
         int cnt = 0;
@@ -160,12 +215,12 @@ BOOST_AUTO_TEST_CASE(waitForEventThreadSafe)
     w.stop();
     b.stop();
 
-    testWaitForEvent(w, 2s, Runner::EventRead::Success,
-        toIntegral(Runner::EventType::Stopped));
+    testWaitForEvent(w, 2s, Runner::EventRead::Success, toIntegral(Worker::EventType::Offline));
+    testWaitForEvent(w, 2s, Runner::EventRead::Success, toIntegral(Runner::EventType::Stopped));
 }
 
 
-BOOST_AUTO_TEST_CASE(waitForEventDiscard)
+BOOST_AUTO_TEST_CASE(testWaitForEventDiscard)
 {
     Worker w;
     Broker b;
@@ -173,8 +228,8 @@ BOOST_AUTO_TEST_CASE(waitForEventDiscard)
     auto wf = w.start();
     auto bf = b.start();
 
-    testWaitForEvent(w, 2s, Runner::EventRead::Success,
-        toIntegral(Runner::EventType::Started));
+    testWaitForEvent(w, 2s, Runner::EventRead::Success, toIntegral(Runner::EventType::Started));
+    testWaitForEvent(w, 2s, Runner::EventRead::Success, toIntegral(Worker::EventType::Online));
 
     // produce some events
     const int iterations = 3;
@@ -193,9 +248,6 @@ BOOST_AUTO_TEST_CASE(waitForEventDiscard)
     wf.get();
     wf = w.start();
 
-    // produce a new event
-    w.store(zmq::Part{"hello2"sv});
-
     // discard old events
     for (int i = 0; i < iterations - 1; ++i) {
         testWaitForEvent(w, 1500ms, Runner::EventRead::Discard,
@@ -203,10 +255,15 @@ BOOST_AUTO_TEST_CASE(waitForEventDiscard)
     }
 
     // discard old stop event
+    testWaitForEvent(w, 1500ms, Runner::EventRead::Discard, toIntegral(Worker::EventType::Offline));
     testWaitForEvent(w, 1500ms, Runner::EventRead::Discard, toIntegral(Runner::EventType::Stopped));
 
     // receive new start event
     testWaitForEvent(w, 1500ms, Runner::EventRead::Success, toIntegral(Runner::EventType::Started));
+    testWaitForEvent(w, 1500ms, Runner::EventRead::Success, toIntegral(Worker::EventType::Online));
+
+    // produce a new event
+    w.store(zmq::Part{"hello2"sv});
 
     // receive new events
     testWaitForEvent(w, 1500ms, Runner::EventRead::Success,
@@ -215,8 +272,8 @@ BOOST_AUTO_TEST_CASE(waitForEventDiscard)
     w.stop();
     b.stop();
 
-    testWaitForEvent(w, 2s, Runner::EventRead::Success,
-        toIntegral(Runner::EventType::Stopped));
+    testWaitForEvent(w, 2s, Runner::EventRead::Success, toIntegral(Worker::EventType::Offline));
+    testWaitForEvent(w, 2s, Runner::EventRead::Success, toIntegral(Runner::EventType::Stopped));
 }
 
 

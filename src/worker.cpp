@@ -20,7 +20,7 @@
 
 #include <utility>
 #include <chrono>
-#include <string_view>
+#include <cstring>
 
 
 #define BROKER_HUGZ "HUGZ"
@@ -63,7 +63,7 @@ std::tuple<Runner::event_type_t, zmq::Part, Runner::EventRead> Worker::waitForEv
 
     if (std::get<2>(ev) == EventRead::Success) {
         LOG_DEBUG(log::Arg{"worker"sv}, log::Arg{"event"sv, "recv"sv},
-            log::Arg{"type"sv, std::get<0>(ev)},
+            log::Arg{"type"sv, eventToString(std::get<0>(ev))},
             log::Arg{"size"sv, int(std::get<1>(ev).size())});
     } else {
         LOG_DEBUG(log::Arg{"worker"sv}, log::Arg{"event"sv, "recv"sv},
@@ -72,6 +72,27 @@ std::tuple<Runner::event_type_t, zmq::Part, Runner::EventRead> Worker::waitForEv
     }
 
     return ev;
+}
+
+
+std::string_view Worker::eventToString(event_type_t ev)
+{
+    switch (ev) {
+    case toIntegral(Runner::EventType::Invalid):
+        return "invalid"sv;
+    case toIntegral(Runner::EventType::Started):
+        return "started"sv;
+    case toIntegral(Runner::EventType::Stopped):
+        return "stopped"sv;
+    case toIntegral(Worker::EventType::Offline):
+        return "offline"sv;
+    case toIntegral(Worker::EventType::Online):
+        return "online"sv;
+    case toIntegral(Worker::EventType::Stored):
+        return "stored"sv;
+    default:
+        return "unknown"sv;
+    }
 }
 
 
@@ -114,6 +135,7 @@ Worker::WorkerSession::WorkerSession(token_type_t token, std::function<void()> o
                   };
               }),
       }
+    , isOnline_{false}
 {
     zstore_->setEndpoints({"ipc:///tmp/broker_storage"});
     zstore_->connect();
@@ -121,6 +143,12 @@ Worker::WorkerSession::WorkerSession(token_type_t token, std::function<void()> o
 
 
 Worker::WorkerSession::~WorkerSession() noexcept = default;
+
+
+bool Worker::WorkerSession::isOnline() const noexcept
+{
+    return isOnline_;
+}
 
 
 std::unique_ptr<zmq::PollerWaiter> Worker::WorkerSession::createPoller()
@@ -132,10 +160,6 @@ std::unique_ptr<zmq::PollerWaiter> Worker::WorkerSession::createPoller()
 
 void Worker::WorkerSession::operationReady(oper_type_t oper, zmq::Part&& payload)
 {
-#ifndef NDEBUG
-    const auto paysz = payload.size();
-#endif
-
     switch (oper) {
     case toIntegral(Runner::Operation::Start):
         LOG_DEBUG(log::Arg{"worker"sv}, log::Arg{"started"sv});
@@ -152,10 +176,12 @@ void Worker::WorkerSession::operationReady(oper_type_t oper, zmq::Part&& payload
     case toIntegral(Worker::Operation::Store):
         zstore_->send(payload);
         LOG_DEBUG(log::Arg{"worker"sv}, log::Arg{"store"sv, "send"sv},
-            log::Arg{"size"sv, int(paysz)});
+            log::Arg{"size"sv, int(payload.size())});
         break;
 
     default:
+        LOG_ERROR(log::Arg{"worker"sv}, log::Arg{"operation"sv, oper},
+            log::Arg{"unknown"sv});
         break;
     }
 }
@@ -221,7 +247,7 @@ void Worker::WorkerSession::sendAnnounce()
 
 void Worker::WorkerSession::collectBrokerMessage(zmq::Part&& payload)
 {
-    if (payload.group() == BROKER_HUGZ) {
+    if (std::strncmp(payload.group(), BROKER_HUGZ, sizeof(BROKER_HUGZ)) == 0) {
         // TODO: extract the message
         conn_->onPing();
 
@@ -236,9 +262,13 @@ void Worker::WorkerSession::collectBrokerMessage(zmq::Part&& payload)
 
 void Worker::WorkerSession::notifyConnectionUpdate(bool isUp)
 {
+    if (isUp == isOnline_)
+        return;
+
     LOG_DEBUG(log::Arg{"worker"sv}, log::Arg{"connection"sv, isUp ? "up"sv : "down"sv});
 
-    // TODO: send connection event
+    isOnline_ = isUp;
+    sendEvent(toIntegral(isUp ? EventType::Online : EventType::Offline), zmq::Part{});
 }
 
 } // namespace fuurin

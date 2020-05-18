@@ -14,6 +14,7 @@
 #include "fuurin/runner.h"
 
 #include <memory>
+#include <string_view>
 
 
 namespace fuurin {
@@ -40,10 +41,19 @@ public:
      */
     enum struct EventType : event_type_t
     {
-        Stored = event_type_t(Runner::EventType::COUNT), ///< Event delivered when \ref Worker::store(zmq::Part&&) was acknowledged.
+        /// Event for disconnection.
+        Offline = event_type_t(Runner::EventType::COUNT),
+        Online, ///< Event for connection.
+        Stored, ///< Event delivered when \ref Worker::store(zmq::Part&&) was acknowledged.
 
         COUNT, ///< Number of events.
     };
+
+    /**
+     * \return Returns a representable description of the event.
+     * \param[in] ev Event to print.
+     */
+    static std::string_view eventToString(event_type_t ev);
 
 
 public:
@@ -57,7 +67,6 @@ public:
      */
     virtual ~Worker() noexcept;
 
-
     /**
      * \brief Stores data to the broker.
      *
@@ -67,11 +76,11 @@ public:
      */
     void store(zmq::Part&& data);
 
-
     /**
      * \see Runner::waitForEvent(std::chrono::milliseconds)
      */
-    std::tuple<event_type_t, zmq::Part, Runner::EventRead> waitForEvent(std::chrono::milliseconds timeout = std::chrono::milliseconds(-1));
+    std::tuple<event_type_t, zmq::Part, Runner::EventRead> waitForEvent(
+        std::chrono::milliseconds timeout = std::chrono::milliseconds(-1));
 
 
 protected:
@@ -80,6 +89,7 @@ protected:
      */
     enum struct Operation : oper_type_t
     {
+        /// Operation for storage.
         Store = oper_type_t(Runner::Operation::COUNT),
     };
 
@@ -117,6 +127,11 @@ protected:
          * \brief Destructor.
          */
         virtual ~WorkerSession() noexcept;
+
+        /**
+         * \return Returns \c true when it's online.
+         */
+        bool isOnline() const noexcept;
 
 
     protected:
@@ -164,6 +179,8 @@ protected:
         const std::unique_ptr<zmq::Socket> zcollect_; ///< ZMQ socket to collect data.
         const std::unique_ptr<zmq::Socket> zdeliver_; ///< ZMQ socket to deliver data.
         const std::unique_ptr<ConnMachine> conn_;     ///< Connection state machine.
+
+        bool isOnline_; ///< Whether the worker's connection is up.
     };
 };
 
