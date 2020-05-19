@@ -43,8 +43,8 @@ public:
     {
         /// Event for disconnection.
         Offline = event_type_t(Runner::EventType::COUNT),
-        Online, ///< Event for connection.
-        Stored, ///< Event delivered when \ref Worker::store(zmq::Part&&) was acknowledged.
+        Online,   ///< Event for connection.
+        Delivery, ///< Event for any \ref Worker::dispatch(zmq::Part&&).
 
         COUNT, ///< Number of events.
     };
@@ -68,13 +68,13 @@ public:
     virtual ~Worker() noexcept;
 
     /**
-     * \brief Stores data to the broker.
+     * \brief Sends data to the broker.
      *
      * \exception Error The worker task is not running.
      *
      * \see isRunning()
      */
-    void store(zmq::Part&& data);
+    void dispatch(zmq::Part&& data);
 
     /**
      * \see Runner::waitForEvent(std::chrono::milliseconds)
@@ -89,8 +89,8 @@ protected:
      */
     enum struct Operation : oper_type_t
     {
-        /// Operation for storage.
-        Store = oper_type_t(Runner::Operation::COUNT),
+        /// Operation for dispatch.
+        Dispatch = oper_type_t(Runner::Operation::COUNT),
     };
 
 
@@ -114,7 +114,7 @@ protected:
         /**
          * \brief Creates the worker asynchronous task session.
          *
-         * The socket used to store data is created and connected.
+         * The sockets used for communication are created.
          *
          * \see Runner::Session::Session(...)
          */
@@ -175,10 +175,10 @@ protected:
 
 
     protected:
-        const std::unique_ptr<zmq::Socket> zstore_;   ///< ZMQ socket to store data.
-        const std::unique_ptr<zmq::Socket> zcollect_; ///< ZMQ socket to collect data.
-        const std::unique_ptr<zmq::Socket> zdeliver_; ///< ZMQ socket to deliver data.
-        const std::unique_ptr<ConnMachine> conn_;     ///< Connection state machine.
+        const std::unique_ptr<zmq::Socket> zsnapshot_; ///< ZMQ socket to receive snapshots.
+        const std::unique_ptr<zmq::Socket> zdelivery_; ///< ZMQ socket to receive data.
+        const std::unique_ptr<zmq::Socket> zdispatch_; ///< ZMQ socket to send data.
+        const std::unique_ptr<ConnMachine> conn_;      ///< Connection state machine.
 
         bool isOnline_; ///< Whether the worker's connection is up.
     };

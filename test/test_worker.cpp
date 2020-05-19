@@ -150,7 +150,7 @@ BOOST_AUTO_TEST_CASE(testWaitForOffline)
 }
 
 
-BOOST_AUTO_TEST_CASE(testSimpleStore)
+BOOST_AUTO_TEST_CASE(testSimpleDispatch)
 {
     Worker w;
     Broker b;
@@ -161,10 +161,10 @@ BOOST_AUTO_TEST_CASE(testSimpleStore)
     testWaitForEvent(w, 2s, Runner::EventRead::Success, toIntegral(Runner::EventType::Started));
     testWaitForEvent(w, 2s, Runner::EventRead::Success, toIntegral(Worker::EventType::Online));
 
-    w.store(zmq::Part{"hello"sv});
+    w.dispatch(zmq::Part{"hello"sv});
 
     testWaitForEvent(w, 5s, Runner::EventRead::Success,
-        toIntegral(Worker::EventType::Stored), "hello");
+        toIntegral(Worker::EventType::Delivery), "hello");
 
     w.stop();
     b.stop();
@@ -200,7 +200,7 @@ BOOST_AUTO_TEST_CASE(testWaitForEventThreadSafe)
     const int iterations = 100;
 
     for (int i = 0; i < iterations; ++i)
-        w.store(zmq::Part{"hello"sv});
+        w.dispatch(zmq::Part{"hello"sv});
 
     auto f1 = std::async(std::launch::async, recvEvent);
     auto f2 = std::async(std::launch::async, recvEvent);
@@ -234,11 +234,11 @@ BOOST_AUTO_TEST_CASE(testWaitForEventDiscard)
     // produce some events
     const int iterations = 3;
     for (int i = 0; i < iterations; ++i)
-        w.store(zmq::Part{"hello1"sv});
+        w.dispatch(zmq::Part{"hello1"sv});
 
     // receive just one event
     testWaitForEvent(w, 1500ms, Runner::EventRead::Success,
-        toIntegral(Worker::EventType::Stored), "hello1");
+        toIntegral(Worker::EventType::Delivery), "hello1");
 
     // wait for other events to be received
     std::this_thread::sleep_for(1s);
@@ -251,7 +251,7 @@ BOOST_AUTO_TEST_CASE(testWaitForEventDiscard)
     // discard old events
     for (int i = 0; i < iterations - 1; ++i) {
         testWaitForEvent(w, 1500ms, Runner::EventRead::Discard,
-            toIntegral(Worker::EventType::Stored), "hello1");
+            toIntegral(Worker::EventType::Delivery), "hello1");
     }
 
     // discard old stop event
@@ -263,11 +263,11 @@ BOOST_AUTO_TEST_CASE(testWaitForEventDiscard)
     testWaitForEvent(w, 1500ms, Runner::EventRead::Success, toIntegral(Worker::EventType::Online));
 
     // produce a new event
-    w.store(zmq::Part{"hello2"sv});
+    w.dispatch(zmq::Part{"hello2"sv});
 
     // receive new events
     testWaitForEvent(w, 1500ms, Runner::EventRead::Success,
-        toIntegral(Worker::EventType::Stored), "hello2");
+        toIntegral(Worker::EventType::Delivery), "hello2");
 
     w.stop();
     b.stop();

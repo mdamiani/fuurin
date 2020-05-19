@@ -54,20 +54,20 @@ Broker::BrokerSession::BrokerSession(token_type_t token, std::function<void()> o
     const std::unique_ptr<zmq::Socket>& zoper,
     const std::unique_ptr<zmq::Socket>& zevent)
     : Session(token, oncompl, zctx, zoper, zevent)
-    , zstore_{std::make_unique<zmq::Socket>(zctx.get(), zmq::Socket::SERVER)}
-    , zcollect_{std::make_unique<zmq::Socket>(zctx.get(), zmq::Socket::DISH)}
-    , zdeliver_{std::make_unique<zmq::Socket>(zctx.get(), zmq::Socket::RADIO)}
+    , zsnapshot_{std::make_unique<zmq::Socket>(zctx.get(), zmq::Socket::SERVER)}
+    , zdelivery_{std::make_unique<zmq::Socket>(zctx.get(), zmq::Socket::DISH)}
+    , zdispatch_{std::make_unique<zmq::Socket>(zctx.get(), zmq::Socket::RADIO)}
     , zhugz_{std::make_unique<zmq::Timer>(zctx.get(), "hugz")}
 {
-    zstore_->setEndpoints({"ipc:///tmp/broker_storage"});
-    zcollect_->setEndpoints({"ipc:///tmp/worker_deliver"});
-    zdeliver_->setEndpoints({"ipc:///tmp/worker_collect"});
+    zsnapshot_->setEndpoints({"ipc:///tmp/broker_snapshot"});
+    zdelivery_->setEndpoints({"ipc:///tmp/worker_dispatch"});
+    zdispatch_->setEndpoints({"ipc:///tmp/worker_delivery"});
 
-    zcollect_->setGroups({WORKER_UPDT});
+    zdelivery_->setGroups({WORKER_UPDT});
 
-    zstore_->bind();
-    zcollect_->bind();
-    zdeliver_->bind();
+    zsnapshot_->bind();
+    zdelivery_->bind();
+    zdispatch_->bind();
 
     zhugz_->setInterval(1s);
     zhugz_->setSingleShot(false);
@@ -80,7 +80,7 @@ Broker::BrokerSession::~BrokerSession() noexcept = default;
 std::unique_ptr<zmq::PollerWaiter> Broker::BrokerSession::createPoller()
 {
     return std::unique_ptr<zmq::PollerWaiter>{new zmq::Poller{zmq::PollerEvents::Type::Read,
-        zopr_.get(), zstore_.get(), zcollect_.get(), zhugz_.get()}};
+        zopr_.get(), zsnapshot_.get(), zdelivery_.get(), zhugz_.get()}};
 }
 
 
@@ -105,18 +105,18 @@ void Broker::BrokerSession::operationReady(oper_type_t oper, zmq::Part&&)
 
 void Broker::BrokerSession::socketReady(zmq::Pollable* pble)
 {
-    if (pble == zstore_.get()) {
+    if (pble == zsnapshot_.get()) {
         zmq::Part payload;
-        zstore_->recv(&payload);
-        LOG_DEBUG(log::Arg{"broker"sv}, log::Arg{"store"sv, "recv"sv},
+        zsnapshot_->recv(&payload);
+        LOG_DEBUG(log::Arg{"broker"sv}, log::Arg{"snapshot"sv},
             log::Arg{"size"sv, int(payload.size())});
 
-        zstore_->send(payload);
+        zsnapshot_->send(payload);
 
-    } else if (pble == zcollect_.get()) {
+    } else if (pble == zdelivery_.get()) {
         zmq::Part payload;
-        zcollect_->recv(&payload);
-        LOG_DEBUG(log::Arg{"broker"sv}, log::Arg{"collect"sv, "recv"sv},
+        zdelivery_->recv(&payload);
+        LOG_DEBUG(log::Arg{"broker"sv}, log::Arg{"delivery"sv},
             log::Arg{"size"sv, int(payload.size())});
 
         collectWorkerMessage(std::move(payload));
@@ -151,7 +151,7 @@ void Broker::BrokerSession::collectWorkerMessage(zmq::Part&& payload)
 void Broker::BrokerSession::sendHugz()
 {
     // TODO: send network status update.
-    zdeliver_->send(zmq::Part{}.withGroup(BROKER_HUGZ));
+    zdispatch_->send(zmq::Part{}.withGroup(BROKER_HUGZ));
 }
 
 } // namespace fuurin

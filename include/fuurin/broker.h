@@ -103,10 +103,10 @@ protected:
 
 
     protected:
-        const std::unique_ptr<zmq::Socket> zstore_;   ///< ZMQ socket to store data.
-        const std::unique_ptr<zmq::Socket> zcollect_; ///< ZMQ socket to collect data.
-        const std::unique_ptr<zmq::Socket> zdeliver_; ///< ZMQ socket to deliver data.
-        const std::unique_ptr<zmq::Timer> zhugz_;     ///< ZMQ timer to send keepalives.
+        const std::unique_ptr<zmq::Socket> zsnapshot_; ///< ZMQ socket send snapshots.
+        const std::unique_ptr<zmq::Socket> zdelivery_; ///< ZMQ socket receive data.
+        const std::unique_ptr<zmq::Socket> zdispatch_; ///< ZMQ socket send data.
+        const std::unique_ptr<zmq::Timer> zhugz_;      ///< ZMQ timer to send keepalives.
     };
 };
 

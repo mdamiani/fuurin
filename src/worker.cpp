@@ -46,14 +46,14 @@ Worker::~Worker() noexcept
 }
 
 
-void Worker::store(zmq::Part&& data)
+void Worker::dispatch(zmq::Part&& data)
 {
     if (!isRunning()) {
-        throw ERROR(Error, "could not store data",
+        throw ERROR(Error, "could not dispatch data",
             log::Arg{"reason"sv, "worker is not running"sv});
     }
 
-    sendOperation(toIntegral(Operation::Store), std::forward<zmq::Part>(data));
+    sendOperation(toIntegral(Operation::Dispatch), std::forward<zmq::Part>(data));
 }
 
 
@@ -88,8 +88,8 @@ std::string_view Worker::eventToString(event_type_t ev)
         return "offline"sv;
     case toIntegral(Worker::EventType::Online):
         return "online"sv;
-    case toIntegral(Worker::EventType::Stored):
-        return "stored"sv;
+    case toIntegral(Worker::EventType::Delivery):
+        return "delivery"sv;
     default:
         return "unknown"sv;
     }
@@ -111,9 +111,9 @@ Worker::WorkerSession::WorkerSession(token_type_t token, std::function<void()> o
     const std::unique_ptr<zmq::Socket>& zoper,
     const std::unique_ptr<zmq::Socket>& zevent)
     : Session(token, oncompl, zctx, zoper, zevent)
-    , zstore_{std::make_unique<zmq::Socket>(zctx.get(), zmq::Socket::CLIENT)}
-    , zcollect_{std::make_unique<zmq::Socket>(zctx.get(), zmq::Socket::DISH)}
-    , zdeliver_{std::make_unique<zmq::Socket>(zctx.get(), zmq::Socket::RADIO)}
+    , zsnapshot_{std::make_unique<zmq::Socket>(zctx.get(), zmq::Socket::CLIENT)}
+    , zdelivery_{std::make_unique<zmq::Socket>(zctx.get(), zmq::Socket::DISH)}
+    , zdispatch_{std::make_unique<zmq::Socket>(zctx.get(), zmq::Socket::RADIO)}
     , conn_{
           std::make_unique<ConnMachine>(
               zctx.get(),
@@ -137,8 +137,8 @@ Worker::WorkerSession::WorkerSession(token_type_t token, std::function<void()> o
       }
     , isOnline_{false}
 {
-    zstore_->setEndpoints({"ipc:///tmp/broker_storage"});
-    zstore_->connect();
+    zsnapshot_->setEndpoints({"ipc:///tmp/broker_snapshot"});
+    zsnapshot_->connect();
 }
 
 
@@ -154,7 +154,7 @@ bool Worker::WorkerSession::isOnline() const noexcept
 std::unique_ptr<zmq::PollerWaiter> Worker::WorkerSession::createPoller()
 {
     return std::unique_ptr<zmq::PollerWaiter>{new zmq::PollerAuto{zmq::PollerEvents::Type::Read,
-        zopr_.get(), zstore_.get(), zcollect_.get(), conn_->timerRetry(), conn_->timerTimeout()}};
+        zopr_.get(), zsnapshot_.get(), zdelivery_.get(), conn_->timerRetry(), conn_->timerTimeout()}};
 }
 
 
@@ -173,9 +173,9 @@ void Worker::WorkerSession::operationReady(oper_type_t oper, zmq::Part&& payload
         LOG_DEBUG(log::Arg{"worker"sv}, log::Arg{"stopped"sv});
         break;
 
-    case toIntegral(Worker::Operation::Store):
-        zstore_->send(payload);
-        LOG_DEBUG(log::Arg{"worker"sv}, log::Arg{"store"sv, "send"sv},
+    case toIntegral(Worker::Operation::Dispatch):
+        zsnapshot_->send(payload);
+        LOG_DEBUG(log::Arg{"worker"sv}, log::Arg{"dispatch"sv},
             log::Arg{"size"sv, int(payload.size())});
         break;
 
@@ -189,18 +189,18 @@ void Worker::WorkerSession::operationReady(oper_type_t oper, zmq::Part&& payload
 
 void Worker::WorkerSession::socketReady(zmq::Pollable* pble)
 {
-    if (pble == zstore_.get()) {
+    if (pble == zsnapshot_.get()) {
         zmq::Part payload;
-        zstore_->recv(&payload);
-        LOG_DEBUG(log::Arg{"worker"sv}, log::Arg{"store"sv, "recv"sv},
+        zsnapshot_->recv(&payload);
+        LOG_DEBUG(log::Arg{"worker"sv}, log::Arg{"snapshot"sv},
             log::Arg{"size"sv, int(payload.size())});
 
-        sendEvent(toIntegral(EventType::Stored), std::move(payload));
+        sendEvent(toIntegral(EventType::Delivery), std::move(payload));
 
-    } else if (pble == zcollect_.get()) {
+    } else if (pble == zdelivery_.get()) {
         zmq::Part payload;
-        zcollect_->recv(&payload);
-        LOG_DEBUG(log::Arg{"worker"sv}, log::Arg{"collect"sv, "recv"sv},
+        zdelivery_->recv(&payload);
+        LOG_DEBUG(log::Arg{"worker"sv}, log::Arg{"delivery"sv},
             log::Arg{"size"sv, int(payload.size())});
 
         collectBrokerMessage(std::move(payload));
@@ -221,27 +221,27 @@ void Worker::WorkerSession::socketReady(zmq::Pollable* pble)
 void Worker::WorkerSession::connClose()
 {
     // close
-    zcollect_->close();
-    zdeliver_->close();
+    zdelivery_->close();
+    zdispatch_->close();
 }
 
 
 void Worker::WorkerSession::connOpen()
 {
     // configure
-    zcollect_->setEndpoints({"ipc:///tmp/worker_collect"});
-    zdeliver_->setEndpoints({"ipc:///tmp/worker_deliver"});
-    zcollect_->setGroups({BROKER_HUGZ});
+    zdelivery_->setEndpoints({"ipc:///tmp/worker_delivery"});
+    zdispatch_->setEndpoints({"ipc:///tmp/worker_dispatch"});
+    zdelivery_->setGroups({BROKER_HUGZ});
 
     // connect
-    zcollect_->connect();
-    zdeliver_->connect();
+    zdelivery_->connect();
+    zdispatch_->connect();
 }
 
 
 void Worker::WorkerSession::sendAnnounce()
 {
-    zdeliver_->send(zmq::Part{}.withGroup(WORKER_UPDT));
+    zdispatch_->send(zmq::Part{}.withGroup(WORKER_UPDT));
 }
 
 
