@@ -20,6 +20,8 @@
 
 
 #define BROKER_HUGZ "HUGZ"
+#define WORKER_HUGZ "HUGZ"
+#define BROKER_UPDT "UPDT"
 #define WORKER_UPDT "UPDT"
 
 
@@ -63,7 +65,7 @@ Broker::BrokerSession::BrokerSession(token_type_t token, std::function<void()> o
     zdelivery_->setEndpoints({"ipc:///tmp/worker_dispatch"});
     zdispatch_->setEndpoints({"ipc:///tmp/worker_delivery"});
 
-    zdelivery_->setGroups({WORKER_UPDT});
+    zdelivery_->setGroups({WORKER_HUGZ, WORKER_UPDT});
 
     zsnapshot_->bind();
     zdelivery_->bind();
@@ -111,7 +113,7 @@ void Broker::BrokerSession::socketReady(zmq::Pollable* pble)
         LOG_DEBUG(log::Arg{"broker"sv}, log::Arg{"snapshot"sv},
             log::Arg{"size"sv, int(payload.size())});
 
-        zsnapshot_->send(payload);
+        // TODO: use snapshot payload
 
     } else if (pble == zdelivery_.get()) {
         zmq::Part payload;
@@ -134,10 +136,18 @@ void Broker::BrokerSession::socketReady(zmq::Pollable* pble)
 
 void Broker::BrokerSession::collectWorkerMessage(zmq::Part&& payload)
 {
-    if (std::strncmp(payload.group(), WORKER_UPDT, sizeof(WORKER_UPDT)) == 0) {
+    const auto paysz = payload.size();
+    UNUSED(paysz);
+
+    if (std::strncmp(payload.group(), WORKER_HUGZ, sizeof(WORKER_HUGZ)) == 0) {
         // TODO: extract the message
         if (!zhugz_->isActive())
             zhugz_->start();
+
+    } else if (std::strncmp(payload.group(), WORKER_UPDT, sizeof(WORKER_UPDT)) == 0) {
+        zdispatch_->send(payload.withGroup(BROKER_UPDT));
+        LOG_DEBUG(log::Arg{"broker"sv}, log::Arg{"dispatch"sv},
+            log::Arg{"size"sv, int(paysz)});
 
     } else {
         LOG_WARN(log::Arg{"broker"sv},

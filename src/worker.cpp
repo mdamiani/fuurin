@@ -24,6 +24,8 @@
 
 
 #define BROKER_HUGZ "HUGZ"
+#define WORKER_HUGZ "HUGZ"
+#define BROKER_UPDT "UPDT"
 #define WORKER_UPDT "UPDT"
 
 
@@ -160,6 +162,9 @@ std::unique_ptr<zmq::PollerWaiter> Worker::WorkerSession::createPoller()
 
 void Worker::WorkerSession::operationReady(oper_type_t oper, zmq::Part&& payload)
 {
+    const auto paysz = payload.size();
+    UNUSED(paysz);
+
     switch (oper) {
     case toIntegral(Runner::Operation::Start):
         LOG_DEBUG(log::Arg{"worker"sv}, log::Arg{"started"sv});
@@ -174,9 +179,9 @@ void Worker::WorkerSession::operationReady(oper_type_t oper, zmq::Part&& payload
         break;
 
     case toIntegral(Worker::Operation::Dispatch):
-        zsnapshot_->send(payload);
+        zdispatch_->send(payload.withGroup(WORKER_UPDT));
         LOG_DEBUG(log::Arg{"worker"sv}, log::Arg{"dispatch"sv},
-            log::Arg{"size"sv, int(payload.size())});
+            log::Arg{"size"sv, int(paysz)});
         break;
 
     default:
@@ -195,7 +200,7 @@ void Worker::WorkerSession::socketReady(zmq::Pollable* pble)
         LOG_DEBUG(log::Arg{"worker"sv}, log::Arg{"snapshot"sv},
             log::Arg{"size"sv, int(payload.size())});
 
-        sendEvent(toIntegral(EventType::Delivery), std::move(payload));
+        // TODO: use snapshot payload
 
     } else if (pble == zdelivery_.get()) {
         zmq::Part payload;
@@ -231,7 +236,8 @@ void Worker::WorkerSession::connOpen()
     // configure
     zdelivery_->setEndpoints({"ipc:///tmp/worker_delivery"});
     zdispatch_->setEndpoints({"ipc:///tmp/worker_dispatch"});
-    zdelivery_->setGroups({BROKER_HUGZ});
+
+    zdelivery_->setGroups({BROKER_HUGZ, BROKER_UPDT});
 
     // connect
     zdelivery_->connect();
@@ -241,7 +247,7 @@ void Worker::WorkerSession::connOpen()
 
 void Worker::WorkerSession::sendAnnounce()
 {
-    zdispatch_->send(zmq::Part{}.withGroup(WORKER_UPDT));
+    zdispatch_->send(zmq::Part{}.withGroup(WORKER_HUGZ));
 }
 
 
@@ -250,6 +256,9 @@ void Worker::WorkerSession::collectBrokerMessage(zmq::Part&& payload)
     if (std::strncmp(payload.group(), BROKER_HUGZ, sizeof(BROKER_HUGZ)) == 0) {
         // TODO: extract the message
         conn_->onPing();
+
+    } else if (std::strncmp(payload.group(), BROKER_UPDT, sizeof(BROKER_UPDT)) == 0) {
+        sendEvent(toIntegral(EventType::Delivery), std::move(payload));
 
     } else {
         LOG_WARN(log::Arg{"worker"sv},
