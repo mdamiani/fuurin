@@ -28,6 +28,7 @@ ConnMachine::ConnMachine(zmq::Context* zctx,
     , doOpen_{doOpen}
     , doPong_{doPong}
     , onChange_{onChange}
+    // TODO: configure 'conn' description.
     , timerTry_{std::make_unique<zmq::Timer>(zctx, "conn_tmr_retry")}
     , timerTmo_{std::make_unique<zmq::Timer>(zctx, "conn_tmr_timeout")}
     , state_{State::Halted}
@@ -67,6 +68,7 @@ void ConnMachine::onStart()
     if (state_ != State::Halted)
         return;
 
+    // TODO: replace 'connection' with this conn's description in logs.
     LOG_DEBUG(log::Arg{"connection"sv}, log::Arg{"event"sv, "started"sv});
 
     trigger();
