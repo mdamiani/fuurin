@@ -33,13 +33,13 @@ class Timer;
  *      The sockets are disconnected and the state machine is halted.
  *
  *   - \ref State::Trying:
- *      Announcements are sent through the \ref pong() function, every
+ *      Announcements are sent through the \ref doPong_ function, every
  *      \ref timerTry_ interval. A transition forward to \ref Stable is
  *      performed if \ref ping() is called and \ref timerTry_ is
  *      stopped.
  *
  *   - \ref State::Stable:
- *      Replies are sent through \ref pong() function, upon request
+ *      Replies are sent through \ref doPong_ function, upon request
  *      only, using \ref ping() method and \ref timerTmo_ is restarted.
  *      A transition back to \ref Trying is performed if \ref timerTmo_
  *      expires.
@@ -61,15 +61,18 @@ public:
 public:
     /**
      * \brief Initializes the connection.
+     *
      * The connection state machine is initialized
      * and the initial state is \ref State::Halted.
      * Sockets are all closed.
      *
-     * param[in] zctx ZMQ context.
-     * param[in] doClose Function to call to close sockets.
-     * param[in] doOpen Function to call to open sockets.
-     * param[in] doPong Function to send reply to a ping.
-     * param[in] onChange Function called whenever the state changes.
+     * \param[in] zctx ZMQ context.
+     * \param[in] retry Interval (in ms) for retry attempts.
+     * \param[in] timeout Timeout (in ms) for the connection.
+     * \param[in] doClose Function to call to close sockets.
+     * \param[in] doOpen Function to call to open sockets.
+     * \param[in] doPong Function to send reply to a ping.
+     * \param[in] onChange Function called whenever the state changes.
      */
     ConnMachine(zmq::Context* zctx,
         std::chrono::milliseconds retry,
@@ -109,7 +112,7 @@ public:
     /**
      * \brief Return the timer used to check for connection timeout.
      *
-     * This timer is alwasy active, except in \ref State::Halted.
+     * This timer is always active, except in \ref State::Halted.
      * A transition to \ref State::Trying happens in case this timer expires.
      *
      * \return A pointer to the internal timer.
@@ -131,7 +134,7 @@ public:
      *
      * A transition to \ref State::Stable happens.
      * Timer \ref timerTry_ is stopped.
-     * Causes \ref pong() to be called.
+     * Causes \ref doPong_ to be called.
      *
      * \see state()
      */
@@ -140,11 +143,9 @@ public:
     /**
      * \brief Notifies \ref timerRetry() has fired.
      *
-     * When in State::Trying, it causes:
-     *  - if the timer has expired, then it calls Timer::consume().
-     *  - \ref pong() is called.
-     *
-     * \exception Error if called when in State::Stable.
+     * When in \ref State::Trying, it causes:
+     *  - if the timer has expired, then it calls \ref Timer::consume().
+     *  - \ref doPong_ is called.
      */
     void onTimerRetryFired();
 
@@ -152,7 +153,7 @@ public:
      * \brief Notifies \ref timerTimeout() has fired.
      *
      * When in any state, it causes:
-     *  - if the timer has expired, then it calls Timer::consume().
+     *  - if the timer has expired, then it calls \ref Timer::consume().
      *  - \ref change(State) is called with \ref State::Trying.
      *  - \ref reconnect() is called.
      */
