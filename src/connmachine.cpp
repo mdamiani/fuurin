@@ -20,10 +20,8 @@ namespace fuurin {
 ConnMachine::ConnMachine(zmq::Context* zctx,
     std::chrono::milliseconds retry,
     std::chrono::milliseconds timeout,
-    std::function<void()> doClose,
-    std::function<void()> doOpen,
-    std::function<void()> doPong,
-    std::function<void(State)> onChange)
+    CloseFunc doClose, OpenFunc doOpen,
+    PongFunc doPong, ChangeFunc onChange)
     : doClose_{doClose}
     , doOpen_{doOpen}
     , doPong_{doPong}

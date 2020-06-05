@@ -57,6 +57,15 @@ public:
         Stable, ///< Sockets are connected.
     };
 
+    ///< Function type to close sockets.
+    using CloseFunc = std::function<void()>;
+    ///< Function type to open sockets.
+    using OpenFunc = std::function<void()>;
+    ///< Function type to send a pong reply.
+    using PongFunc = std::function<void()>;
+    ///< Function type for change of state.
+    using ChangeFunc = std::function<void(State)>;
+
 
 public:
     /**
@@ -77,10 +86,8 @@ public:
     ConnMachine(zmq::Context* zctx,
         std::chrono::milliseconds retry,
         std::chrono::milliseconds timeout,
-        std::function<void()> doClose,
-        std::function<void()> doOpen,
-        std::function<void()> doPong,
-        std::function<void(State)> onChange);
+        CloseFunc doClose, OpenFunc doOpen,
+        PongFunc doPong, ChangeFunc onChange);
 
     /**
      * \brief Destructor.
@@ -188,10 +195,10 @@ private:
 
 
 private:
-    const std::function<void()> doClose_;       ///< Function to close sockets.
-    const std::function<void()> doOpen_;        ///< Function to open sockets.
-    const std::function<void()> doPong_;        ///< Function to send a reply to a ping.
-    const std::function<void(State)> onChange_; ///< Function called whenever state changes.
+    const CloseFunc doClose_;   ///< Function to close sockets.
+    const OpenFunc doOpen_;     ///< Function to open sockets.
+    const PongFunc doPong_;     ///< Function to send a reply to a ping.
+    const ChangeFunc onChange_; ///< Function called whenever state changes.
 
     const std::unique_ptr<zmq::Timer> timerTry_; ///< Timer for announcements.
     const std::unique_ptr<zmq::Timer> timerTmo_; ///< Timer for connection timeout.
