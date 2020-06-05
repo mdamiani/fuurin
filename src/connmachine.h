@@ -85,6 +85,14 @@ public:
     virtual ~ConnMachine() noexcept;
 
     /**
+     * Disable copy.
+     */
+    ///{@
+    ConnMachine(const ConnMachine&) = delete;
+    ConnMachine& operator=(const ConnMachine&) = delete;
+    ///@}
+
+    /**
      * \return The current state.
      */
     State state() const noexcept;
