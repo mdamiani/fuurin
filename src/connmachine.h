@@ -14,6 +14,7 @@
 #include <functional>
 #include <chrono>
 #include <memory>
+#include <string_view>
 
 
 namespace fuurin {
@@ -75,6 +76,7 @@ public:
      * and the initial state is \ref State::Halted.
      * Sockets are all closed.
      *
+     * \param[in] name Description, used for logs and timers.
      * \param[in] zctx ZMQ context.
      * \param[in] retry Interval (in ms) for retry attempts.
      * \param[in] timeout Timeout (in ms) for the connection.
@@ -83,11 +85,9 @@ public:
      * \param[in] doPong Function to send reply to a ping.
      * \param[in] onChange Function called whenever the state changes.
      */
-    ConnMachine(zmq::Context* zctx,
-        std::chrono::milliseconds retry,
-        std::chrono::milliseconds timeout,
-        CloseFunc doClose, OpenFunc doOpen,
-        PongFunc doPong, ChangeFunc onChange);
+    explicit ConnMachine(std::string_view name, zmq::Context* zctx,
+        std::chrono::milliseconds retry, std::chrono::milliseconds timeout,
+        CloseFunc doClose, OpenFunc doOpen, PongFunc doPong, ChangeFunc onChange);
 
     /**
      * \brief Destructor.
@@ -101,6 +101,11 @@ public:
     ConnMachine(const ConnMachine&) = delete;
     ConnMachine& operator=(const ConnMachine&) = delete;
     ///@}
+
+    /**
+     * \return Description for this state machine.
+     */
+    std::string_view name() const noexcept;
 
     /**
      * \return The current state.
@@ -195,6 +200,8 @@ private:
 
 
 private:
+    const std::string_view name_; ///< Name to identify this state machine.
+
     const CloseFunc doClose_;   ///< Function to close sockets.
     const OpenFunc doOpen_;     ///< Function to open sockets.
     const PongFunc doPong_;     ///< Function to send a reply to a ping.

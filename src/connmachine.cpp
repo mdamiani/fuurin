@@ -17,18 +17,16 @@
 
 namespace fuurin {
 
-ConnMachine::ConnMachine(zmq::Context* zctx,
-    std::chrono::milliseconds retry,
-    std::chrono::milliseconds timeout,
-    CloseFunc doClose, OpenFunc doOpen,
-    PongFunc doPong, ChangeFunc onChange)
-    : doClose_{doClose}
+ConnMachine::ConnMachine(std::string_view name, zmq::Context* zctx,
+    std::chrono::milliseconds retry, std::chrono::milliseconds timeout,
+    CloseFunc doClose, OpenFunc doOpen, PongFunc doPong, ChangeFunc onChange)
+    : name_{name}
+    , doClose_{doClose}
     , doOpen_{doOpen}
     , doPong_{doPong}
     , onChange_{onChange}
-    // TODO: configure 'conn' description.
-    , timerTry_{std::make_unique<zmq::Timer>(zctx, "conn_tmr_retry")}
-    , timerTmo_{std::make_unique<zmq::Timer>(zctx, "conn_tmr_timeout")}
+    , timerTry_{std::make_unique<zmq::Timer>(zctx, log::format("%s_tmr_retry", name.data()))}
+    , timerTmo_{std::make_unique<zmq::Timer>(zctx, log::format("%s_tmr_timeout", name.data()))}
     , state_{State::Halted}
 {
     timerTry_->setSingleShot(false);
@@ -41,6 +39,12 @@ ConnMachine::ConnMachine(zmq::Context* zctx,
 
 
 ConnMachine::~ConnMachine() noexcept = default;
+
+
+std::string_view ConnMachine::name() const noexcept
+{
+    return name_;
+}
 
 
 ConnMachine::State ConnMachine::state() const noexcept
@@ -66,8 +70,7 @@ void ConnMachine::onStart()
     if (state_ != State::Halted)
         return;
 
-    // TODO: replace 'connection' with this conn's description in logs.
-    LOG_DEBUG(log::Arg{"connection"sv}, log::Arg{"event"sv, "started"sv});
+    LOG_DEBUG(log::Arg{name_}, log::Arg{"event"sv, "started"sv});
 
     trigger();
 }
@@ -80,7 +83,7 @@ void ConnMachine::onStop()
 
     halt();
 
-    LOG_DEBUG(log::Arg{"connection"sv}, log::Arg{"event"sv, "stopped"sv});
+    LOG_DEBUG(log::Arg{name_}, log::Arg{"event"sv, "stopped"sv});
 }
 
 
@@ -89,14 +92,14 @@ void ConnMachine::onPing()
     if (state_ == State::Halted)
         return;
 
-    LOG_DEBUG(log::Arg{"connection"sv}, log::Arg{"event"sv, "ping"sv});
+    LOG_DEBUG(log::Arg{name_}, log::Arg{"event"sv, "ping"sv});
 
     timerTry_->stop();
     timerTmo_->start();
 
     change(State::Stable);
 
-    LOG_DEBUG(log::Arg{"connection"sv}, log::Arg{"event"sv, "pong"sv});
+    LOG_DEBUG(log::Arg{name_}, log::Arg{"event"sv, "pong"sv});
 
     doPong_();
 }
@@ -113,7 +116,7 @@ void ConnMachine::onTimerRetryFired()
     if (state_ == State::Stable)
         return;
 
-    LOG_DEBUG(log::Arg{"connection"sv}, log::Arg{"event"sv, "announce"sv});
+    LOG_DEBUG(log::Arg{name_}, log::Arg{"event"sv, "announce"sv});
 
     doPong_();
 }
@@ -127,7 +130,7 @@ void ConnMachine::onTimerTimeoutFired()
     if (state_ == State::Halted)
         return;
 
-    LOG_DEBUG(log::Arg{"connection"sv}, log::Arg{"event"sv, "timeout"sv});
+    LOG_DEBUG(log::Arg{name_}, log::Arg{"event"sv, "timeout"sv});
 
     trigger();
 }
@@ -162,17 +165,17 @@ void ConnMachine::change(State state)
 
     switch (state) {
     case State::Halted:
-        LOG_DEBUG(log::Arg{"connection"sv}, log::Arg{"event"sv, "transition"sv},
+        LOG_DEBUG(log::Arg{name_}, log::Arg{"event"sv, "transition"sv},
             log::Arg{"state"sv, "halted"sv});
         break;
 
     case State::Trying:
-        LOG_DEBUG(log::Arg{"connection"sv}, log::Arg{"event"sv, "transition"sv},
+        LOG_DEBUG(log::Arg{name_}, log::Arg{"event"sv, "transition"sv},
             log::Arg{"state"sv, "trying"sv});
         break;
 
     case State::Stable:
-        LOG_DEBUG(log::Arg{"connection"sv}, log::Arg{"event"sv, "transition"sv},
+        LOG_DEBUG(log::Arg{name_}, log::Arg{"event"sv, "transition"sv},
             log::Arg{"state"sv, "stable"sv});
         break;
     }

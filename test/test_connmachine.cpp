@@ -29,6 +29,7 @@
 using namespace fuurin;
 namespace utf = boost::unit_test;
 
+using namespace std::literals::string_literals;
 using namespace std::literals::string_view_literals;
 using namespace std::literals::chrono_literals;
 
@@ -77,7 +78,7 @@ setupConn()
 
         zmq::Context ctx;
         ConnMachine conn = ConnMachine{
-            &ctx, 500ms, 2s,
+            "conn"sv, &ctx, 500ms, 2s,
             [this]() { ++closeCnt; },
             [this]() { ++openCnt; },
             [this]() { ++pongCnt; },
@@ -88,6 +89,7 @@ setupConn()
 
     const auto testConn = [t](ConnMachine::State state, bool updated, int close, int open, int pong,
                               bool isRetryActive, bool isTimeoutActive) {
+        BOOST_TEST(t->conn.name() == "conn"sv);
         BOOST_TEST(t->conn.timerRetry() != nullptr);
         BOOST_TEST(t->conn.timerTimeout() != nullptr);
         BOOST_TEST(t->conn.timerRetry()->isSingleShot() == false);
@@ -96,6 +98,8 @@ setupConn()
         BOOST_TEST(t->conn.timerTimeout()->interval() == 2s);
         BOOST_TEST(t->conn.timerRetry()->isActive() == isRetryActive);
         BOOST_TEST(t->conn.timerTimeout()->isActive() == isTimeoutActive);
+        BOOST_TEST(t->conn.timerRetry()->description() == "conn_tmr_retry"s);
+        BOOST_TEST(t->conn.timerTimeout()->description() == "conn_tmr_timeout"s);
         BOOST_TEST(t->conn.state() == state);
         BOOST_TEST(t->closeCnt == close);
         BOOST_TEST(t->openCnt == open);
@@ -276,7 +280,7 @@ BOOST_AUTO_TEST_CASE(testOnTimerTimeoutInStable)
 BOOST_AUTO_TEST_CASE(testConsumeTimerTrying)
 {
     zmq::Context ctx;
-    ConnMachine conn{&ctx, 10s, 10s, []() {}, []() {}, []() {}, [](ConnMachine::State) {}};
+    ConnMachine conn{"conn"sv, &ctx, 10s, 10s, []() {}, []() {}, []() {}, [](ConnMachine::State) {}};
     BOOST_TEST(!conn.timerRetry()->isExpired());
 
     conn.onTimerRetryFired();
@@ -298,7 +302,7 @@ BOOST_AUTO_TEST_CASE(testConsumeTimerTrying)
 BOOST_AUTO_TEST_CASE(testConsumeTimerTimeout)
 {
     zmq::Context ctx;
-    ConnMachine conn{&ctx, 10s, 10s, []() {}, []() {}, []() {}, [](ConnMachine::State) {}};
+    ConnMachine conn{"conn"sv, &ctx, 10s, 10s, []() {}, []() {}, []() {}, [](ConnMachine::State) {}};
     BOOST_TEST(!conn.timerTimeout()->isExpired());
 
     conn.onTimerTimeoutFired();

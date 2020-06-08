@@ -117,8 +117,7 @@ Worker::WorkerSession::WorkerSession(token_type_t token, std::function<void()> o
     , zdelivery_{std::make_unique<zmq::Socket>(zctx.get(), zmq::Socket::DISH)}
     , zdispatch_{std::make_unique<zmq::Socket>(zctx.get(), zmq::Socket::RADIO)}
     , conn_{
-          std::make_unique<ConnMachine>(
-              zctx.get(),
+          std::make_unique<ConnMachine>("worker"sv, zctx.get(),
               500ms,  // TODO: make configurable
               3000ms, // TODO: make configurable
               std::bind(&Worker::WorkerSession::connClose, this),
