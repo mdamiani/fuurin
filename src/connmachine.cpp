@@ -70,7 +70,7 @@ void ConnMachine::onStart()
     if (state_ != State::Halted)
         return;
 
-    LOG_DEBUG(log::Arg{name_}, log::Arg{"event"sv, "started"sv});
+    LOG_DEBUG(log::Arg{name_}, log::Arg{"event"sv, "start"sv});
 
     trigger();
 }
@@ -81,9 +81,9 @@ void ConnMachine::onStop()
     if (state_ == State::Halted)
         return;
 
-    halt();
+    LOG_DEBUG(log::Arg{name_}, log::Arg{"event"sv, "stop"sv});
 
-    LOG_DEBUG(log::Arg{name_}, log::Arg{"event"sv, "stopped"sv});
+    halt();
 }
 
 
@@ -99,7 +99,7 @@ void ConnMachine::onPing()
 
     change(State::Stable);
 
-    LOG_DEBUG(log::Arg{name_}, log::Arg{"event"sv, "pong"sv});
+    LOG_DEBUG(log::Arg{name_}, log::Arg{"action"sv, "pong"sv});
 
     doPong_();
 }
@@ -165,18 +165,15 @@ void ConnMachine::change(State state)
 
     switch (state) {
     case State::Halted:
-        LOG_DEBUG(log::Arg{name_}, log::Arg{"event"sv, "transition"sv},
-            log::Arg{"state"sv, "halted"sv});
+        LOG_DEBUG(log::Arg{name_}, log::Arg{"trans"sv, "halted"sv});
         break;
 
     case State::Trying:
-        LOG_DEBUG(log::Arg{name_}, log::Arg{"event"sv, "transition"sv},
-            log::Arg{"state"sv, "trying"sv});
+        LOG_DEBUG(log::Arg{name_}, log::Arg{"trans"sv, "trying"sv});
         break;
 
     case State::Stable:
-        LOG_DEBUG(log::Arg{name_}, log::Arg{"event"sv, "transition"sv},
-            log::Arg{"state"sv, "stable"sv});
+        LOG_DEBUG(log::Arg{name_}, log::Arg{"trans"sv, "stable"sv});
         break;
     }
 
