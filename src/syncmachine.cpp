@@ -30,6 +30,7 @@ SyncMachine::SyncMachine(std::string_view name, zmq::Context* zctx,
     , doSync_{sync}
     , onChange_{change}
     , timerTmo_{std::make_unique<zmq::Timer>(zctx, log::format("%s_tmr_timeout", name.data()))}
+    , state_{State::Halted}
     , indexCurr_{0}
     , indexNext_{0}
     , retryCurr_{0}
@@ -85,6 +86,9 @@ int SyncMachine::maxIndex() const noexcept
 
 void SyncMachine::setNextIndex(int index) noexcept
 {
+    if (index < 0)
+        index = 0;
+
     indexNext_ = index % (indexMax_ + 1);
 }
 
@@ -137,7 +141,7 @@ void SyncMachine::onSync()
 }
 
 
-SyncMachine::ReplyResult SyncMachine::onReply(int index, int seqn, ReplyType reply)
+SyncMachine::ReplyResult SyncMachine::onReply(int index, seqn_t seqn, ReplyType reply)
 {
     if (state_ != State::Download)
         return ReplyResult::Unexpected;
@@ -168,7 +172,7 @@ SyncMachine::ReplyResult SyncMachine::onReply(int index, int seqn, ReplyType rep
 }
 
 
-void SyncMachine::onTimerTimeout()
+void SyncMachine::onTimerTimeoutFired()
 {
     if (timerTmo_->isExpired())
         timerTmo_->consume();
@@ -199,7 +203,7 @@ void SyncMachine::halt(int indexClose)
     seqNum_ = 0;
     retryCurr_ = 0;
     indexCurr_ = 0;
-    indexNext_ = 0;
+    setNextIndex(1);
 
     close(indexClose);
     change(State::Halted);

@@ -73,9 +73,9 @@ public:
      */
     enum struct ReplyResult
     {
-        Accepted,   ///< Reply is accepted.
-        Discarded,  ///< Reply is discarded.
         Unexpected, ///< Reply was not expected.
+        Discarded,  ///< Reply is discarded.
+        Accepted,   ///< Reply is accepted.
     };
 
     ///< Data type for sequence number used in requests.
@@ -157,6 +157,10 @@ public:
      * The next index is used only when a new request is started,
      * it doesn't immediately ovverride \ref currentIndex().
      *
+     * The passed index is applied to a modulo of \ref maxIndex() + 1,
+     * in order to always obtain a value in the range [0, \c maxIndex].
+     * If the passed value is negative, then 0 is taken instead.
+     *
      * \param[in] index Index value.
      *
      * \see nextIndex()
@@ -231,7 +235,7 @@ public:
      *
      * \see currentIndex()
      */
-    ReplyResult onReply(int index, int seqn, ReplyType reply);
+    ReplyResult onReply(int index, seqn_t seqn, ReplyType reply);
 
     /**
      * \brief Notifies that \ref timerTimeout() has fired.
@@ -244,7 +248,7 @@ public:
      *     \ref nextIndex()
      *   - Synchronization is restarted.
      */
-    void onTimerTimeout();
+    void onTimerTimeoutFired();
 
 
 private:
