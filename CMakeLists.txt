@@ -62,6 +62,7 @@ set(LIB_SOURCES
     src/broker.cpp
     src/worker.cpp
     src/connmachine.cpp
+    src/syncmachine.cpp
 )
 
 set(LIB_PUBLIC_HEADERS
