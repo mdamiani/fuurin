@@ -45,10 +45,11 @@ public:
 protected:
     /**
      * \return A new broker session.
+     * \see Runner::createSession()
      * \see Runner::makeSession()
      * \see BrokerSession
      */
-    virtual std::unique_ptr<Session> makeSession(std::function<void()> oncompl) const override;
+    virtual std::unique_ptr<Session> createSession(std::function<void()> oncompl) const override;
 
 
 protected:

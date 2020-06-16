@@ -72,9 +72,9 @@ bool Runner::isRunning() const noexcept
 }
 
 
-std::unique_ptr<Runner::Session> Runner::makeSession(std::function<void()> onComplete) const
+std::unique_ptr<Runner::Session> Runner::createSession(std::function<void()> onComplete) const
 {
-    return std::make_unique<Session>(token_, onComplete, zctx_, zopr_, zevs_);
+    return makeSession<Session>(onComplete);
 }
 
 
@@ -94,7 +94,7 @@ std::future<void> Runner::start()
     };
 
     auto ret = std::async(std::launch::async,
-        [s = makeSession([this]() {
+        [s = createSession([this]() {
             running_ = false;
         })]() {
             s->run();

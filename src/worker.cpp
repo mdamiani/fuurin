@@ -98,9 +98,9 @@ std::string_view Worker::eventToString(event_type_t ev)
 }
 
 
-std::unique_ptr<Runner::Session> Worker::makeSession(std::function<void()> oncompl) const
+std::unique_ptr<Runner::Session> Worker::createSession(std::function<void()> oncompl) const
 {
-    return std::make_unique<WorkerSession>(token_, oncompl, zctx_, zopr_, zevs_);
+    return makeSession<WorkerSession>(oncompl);
 }
 
 

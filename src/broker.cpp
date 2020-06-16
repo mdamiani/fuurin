@@ -41,9 +41,9 @@ Broker::~Broker() noexcept
 }
 
 
-std::unique_ptr<Runner::Session> Broker::makeSession(std::function<void()> oncompl) const
+std::unique_ptr<Runner::Session> Broker::createSession(std::function<void()> oncompl) const
 {
-    return std::make_unique<BrokerSession>(token_, oncompl, zctx_, zopr_, zevs_);
+    return makeSession<BrokerSession>(oncompl);
 }
 
 

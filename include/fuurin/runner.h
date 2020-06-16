@@ -174,8 +174,21 @@ protected:
      *
      * \see Session
      * \return A pointer to a new session.
+     *
+     * \see makeSession()
      */
-    virtual std::unique_ptr<Session> makeSession(std::function<void()> oncompl) const;
+    virtual std::unique_ptr<Session> createSession(std::function<void()> oncompl) const;
+
+    /**
+     * \brief Wrapper to initialize any specific session.
+     *
+     * \see createSession()
+     */
+    template<typename S>
+    std::unique_ptr<Session> makeSession(std::function<void()> oncompl) const
+    {
+        return std::make_unique<S>(token_, oncompl, zctx_, zopr_, zevs_);
+    }
 
     /**
      * \brief Sends an operation to perform to the asynchronous task.
@@ -366,7 +379,7 @@ protected:
     };
 
 
-protected:
+private:
     const std::unique_ptr<zmq::Context> zctx_; ///< ZMQ context.
     const std::unique_ptr<zmq::Socket> zops_;  ///< Inter-thread sending socket.
     const std::unique_ptr<zmq::Socket> zopr_;  ///< Inter-thread receiving socket.
