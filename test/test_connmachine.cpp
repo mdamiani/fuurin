@@ -21,7 +21,7 @@
 #include <string_view>
 #include <chrono>
 #include <tuple>
-#include <optional>
+#include <vector>
 #include <memory>
 #include <thread>
 
@@ -63,18 +63,32 @@ inline std::ostream& operator<<(std::ostream& os, const ConnMachine::State& st)
     }
     return os;
 }
+
+inline std::ostream& operator<<(std::ostream& os, const std::vector<ConnMachine::State>& v)
+{
+    std::string sep;
+
+    os << "[";
+    for (const auto& en : v) {
+        os << sep;
+        os << en;
+        sep = ", ";
+    }
+    os << "]";
+
+    return os;
+}
 } // namespace fuurin
 
 
-std::tuple<ConnMachine&, std::function<void(ConnMachine::State, bool, int, int, int, bool, bool)>>
-setupConn()
+auto setupConn()
 {
     struct T
     {
         int closeCnt = 0;
         int openCnt = 0;
         int pongCnt = 0;
-        std::optional<ConnMachine::State> stateCurr;
+        std::vector<ConnMachine::State> stateCurr;
 
         zmq::Context ctx;
         ConnMachine conn = ConnMachine{
@@ -82,13 +96,19 @@ setupConn()
             [this]() { ++closeCnt; },
             [this]() { ++openCnt; },
             [this]() { ++pongCnt; },
-            [this](ConnMachine::State s) { stateCurr = s; }};
+            [this](ConnMachine::State s) { stateCurr.push_back(s); }};
     };
 
     const auto t = std::make_shared<T>();
 
-    const auto testConn = [t](ConnMachine::State state, bool updated, int close, int open, int pong,
-                              bool isRetryActive, bool isTimeoutActive) {
+    const auto testFunc = [t]( //
+                              std::vector<ConnMachine::State> state,
+                              int close,
+                              int open,
+                              int pong,
+                              bool isRetryActive,
+                              bool isTimeoutActive) //
+    {
         BOOST_TEST(t->conn.name() == "conn"sv);
         BOOST_TEST(t->conn.timerRetry() != nullptr);
         BOOST_TEST(t->conn.timerTimeout() != nullptr);
@@ -100,27 +120,28 @@ setupConn()
         BOOST_TEST(t->conn.timerTimeout()->isActive() == isTimeoutActive);
         BOOST_TEST(t->conn.timerRetry()->description() == "conn_tmr_retry"s);
         BOOST_TEST(t->conn.timerTimeout()->description() == "conn_tmr_timeout"s);
-        BOOST_TEST(t->conn.state() == state);
         BOOST_TEST(t->closeCnt == close);
         BOOST_TEST(t->openCnt == open);
         BOOST_TEST(t->pongCnt == pong);
-        if (updated) {
-            BOOST_TEST(t->stateCurr.has_value());
-            BOOST_TEST(t->stateCurr.value() == state);
-        } else {
-            BOOST_TEST(!t->stateCurr.has_value());
-        }
+        BOOST_TEST(t->stateCurr == state);
+        if (!state.empty())
+            BOOST_TEST(t->conn.state() == state.back());
+        else
+            BOOST_TEST(t->conn.state() == ConnMachine::State::Halted);
     };
 
-    return std::make_tuple(std::ref(t->conn), testConn);
+    return std::make_tuple(std::ref(t->conn), testFunc);
 }
 
 
+/**
+ * INIT
+ */
 BOOST_AUTO_TEST_CASE(testInitConn)
 {
-    auto [conn, testConn] = setupConn();
-    UNUSED(conn);
-    testConn(ConnMachine::State::Halted, false, 1, 0, 0, false, false);
+    auto [conn, test] = setupConn();
+    BOOST_TEST(conn.state() == ConnMachine::State::Halted);
+    test({}, 1, 0, 0, false, false);
 }
 
 
@@ -129,28 +150,35 @@ BOOST_AUTO_TEST_CASE(testInitConn)
  */
 BOOST_AUTO_TEST_CASE(testOnStartInHalted)
 {
-    auto [conn, testConn] = setupConn();
+    auto [conn, test] = setupConn();
+    BOOST_TEST(conn.state() == ConnMachine::State::Halted);
+
     conn.onStart();
-    testConn(ConnMachine::State::Trying, true, 2, 1, 1, true, true);
+    test({ConnMachine::State::Trying}, 2, 1, 1, true, true);
 }
 
 
 BOOST_AUTO_TEST_CASE(testOnStartInTrying)
 {
-    auto [conn, testConn] = setupConn();
+    auto [conn, test] = setupConn();
     conn.onStart();
+    BOOST_TEST(conn.state() == ConnMachine::State::Trying);
+
     conn.onStart();
-    testConn(ConnMachine::State::Trying, true, 2, 1, 1, true, true);
+    test({ConnMachine::State::Trying}, 2, 1, 1, true, true);
 }
 
 
 BOOST_AUTO_TEST_CASE(testOnStartInStable)
 {
-    auto [conn, testConn] = setupConn();
+    auto [conn, test] = setupConn();
     conn.onStart();
     conn.onPing();
+    BOOST_TEST(conn.state() == ConnMachine::State::Stable);
+
     conn.onStart();
-    testConn(ConnMachine::State::Stable, true, 2, 1, 2, false, true);
+    test({ConnMachine::State::Trying, ConnMachine::State::Stable},
+        2, 1, 2, false, true);
 }
 
 
@@ -159,28 +187,36 @@ BOOST_AUTO_TEST_CASE(testOnStartInStable)
  */
 BOOST_AUTO_TEST_CASE(testOnStopInHalted)
 {
-    auto [conn, testConn] = setupConn();
+    auto [conn, test] = setupConn();
+    BOOST_TEST(conn.state() == ConnMachine::State::Halted);
+
     conn.onStop();
-    testConn(ConnMachine::State::Halted, false, 1, 0, 0, false, false);
+    test({}, 1, 0, 0, false, false);
 }
 
 
 BOOST_AUTO_TEST_CASE(testOnStopInTrying)
 {
-    auto [conn, testConn] = setupConn();
+    auto [conn, test] = setupConn();
     conn.onStart();
+    BOOST_TEST(conn.state() == ConnMachine::State::Trying);
+
     conn.onStop();
-    testConn(ConnMachine::State::Halted, true, 3, 1, 1, false, false);
+    test({ConnMachine::State::Trying, ConnMachine::State::Halted},
+        3, 1, 1, false, false);
 }
 
 
 BOOST_AUTO_TEST_CASE(testOnStopInStable)
 {
-    auto [conn, testConn] = setupConn();
+    auto [conn, test] = setupConn();
     conn.onStart();
     conn.onPing();
+    BOOST_TEST(conn.state() == ConnMachine::State::Stable);
+
     conn.onStop();
-    testConn(ConnMachine::State::Halted, true, 3, 1, 2, false, false);
+    test({ConnMachine::State::Trying, ConnMachine::State::Stable, ConnMachine::State::Halted},
+        3, 1, 2, false, false);
 }
 
 
@@ -189,28 +225,36 @@ BOOST_AUTO_TEST_CASE(testOnStopInStable)
  */
 BOOST_AUTO_TEST_CASE(testOnPingInHalted)
 {
-    auto [conn, testConn] = setupConn();
+    auto [conn, test] = setupConn();
+    BOOST_TEST(conn.state() == ConnMachine::State::Halted);
+
     conn.onPing();
-    testConn(ConnMachine::State::Halted, false, 1, 0, 0, false, false);
+    test({}, 1, 0, 0, false, false);
 }
 
 
 BOOST_AUTO_TEST_CASE(testOnPingInTrying)
 {
-    auto [conn, testConn] = setupConn();
+    auto [conn, test] = setupConn();
     conn.onStart();
+    BOOST_TEST(conn.state() == ConnMachine::State::Trying);
+
     conn.onPing();
-    testConn(ConnMachine::State::Stable, true, 2, 1, 2, false, true);
+    test({ConnMachine::State::Trying, ConnMachine::State::Stable},
+        2, 1, 2, false, true);
 }
 
 
 BOOST_AUTO_TEST_CASE(testOnPingInStable)
 {
-    auto [conn, testConn] = setupConn();
+    auto [conn, test] = setupConn();
     conn.onStart();
     conn.onPing();
+    BOOST_TEST(conn.state() == ConnMachine::State::Stable);
+
     conn.onPing();
-    testConn(ConnMachine::State::Stable, true, 2, 1, 3, false, true);
+    test({ConnMachine::State::Trying, ConnMachine::State::Stable},
+        2, 1, 3, false, true);
 }
 
 
@@ -219,58 +263,72 @@ BOOST_AUTO_TEST_CASE(testOnPingInStable)
  */
 BOOST_AUTO_TEST_CASE(testOnTimerRetryInHalted)
 {
-    auto [conn, testConn] = setupConn();
+    auto [conn, test] = setupConn();
+    BOOST_TEST(conn.state() == ConnMachine::State::Halted);
+
     conn.onTimerRetryFired();
-    testConn(ConnMachine::State::Halted, false, 1, 0, 0, false, false);
+    test({}, 1, 0, 0, false, false);
 }
 
 
 BOOST_AUTO_TEST_CASE(testOnTimerRetryInTrying)
 {
-    auto [conn, testConn] = setupConn();
+    auto [conn, test] = setupConn();
     conn.onStart();
+    BOOST_TEST(conn.state() == ConnMachine::State::Trying);
+
     conn.onTimerRetryFired();
-    testConn(ConnMachine::State::Trying, true, 2, 1, 2, true, true);
+    test({ConnMachine::State::Trying}, 2, 1, 2, true, true);
 }
 
 
 BOOST_AUTO_TEST_CASE(testOnTimerRetryInStable)
 {
-    auto [conn, testConn] = setupConn();
+    auto [conn, test] = setupConn();
     conn.onStart();
     conn.onPing();
+    BOOST_TEST(conn.state() == ConnMachine::State::Stable);
+
     conn.onTimerRetryFired();
-    testConn(ConnMachine::State::Stable, true, 2, 1, 2, false, true);
+    test({ConnMachine::State::Trying, ConnMachine::State::Stable},
+        2, 1, 2, false, true);
 }
 
 
 /**
- * RETRY
+ * TIMEOUT
  */
 BOOST_AUTO_TEST_CASE(testOnTimerTimeoutInHalted)
 {
-    auto [conn, testConn] = setupConn();
+    auto [conn, test] = setupConn();
+    BOOST_TEST(conn.state() == ConnMachine::State::Halted);
+
     conn.onTimerTimeoutFired();
-    testConn(ConnMachine::State::Halted, false, 1, 0, 0, false, false);
+    test({}, 1, 0, 0, false, false);
 }
 
 
 BOOST_AUTO_TEST_CASE(testOnTimerTimeoutInTrying)
 {
-    auto [conn, testConn] = setupConn();
+    auto [conn, test] = setupConn();
     conn.onStart();
+    BOOST_TEST(conn.state() == ConnMachine::State::Trying);
+
     conn.onTimerTimeoutFired();
-    testConn(ConnMachine::State::Trying, true, 3, 2, 2, true, true);
+    test({ConnMachine::State::Trying}, 3, 2, 2, true, true);
 }
 
 
 BOOST_AUTO_TEST_CASE(testOnTimerTimeoutInStable)
 {
-    auto [conn, testConn] = setupConn();
+    auto [conn, test] = setupConn();
     conn.onStart();
     conn.onPing();
+    BOOST_TEST(conn.state() == ConnMachine::State::Stable);
+
     conn.onTimerTimeoutFired();
-    testConn(ConnMachine::State::Trying, true, 3, 2, 3, true, true);
+    test({ConnMachine::State::Trying, ConnMachine::State::Stable, ConnMachine::State::Trying},
+        3, 2, 3, true, true);
 }
 
 
