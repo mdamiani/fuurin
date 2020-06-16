@@ -41,9 +41,9 @@ Broker::~Broker() noexcept
 }
 
 
-std::unique_ptr<Runner::Session> Broker::createSession(std::function<void()> oncompl) const
+std::unique_ptr<Runner::Session> Broker::createSession(CompletionFunc onComplete) const
 {
-    return makeSession<BrokerSession>(oncompl);
+    return makeSession<BrokerSession>(onComplete);
 }
 
 
@@ -51,11 +51,11 @@ std::unique_ptr<Runner::Session> Broker::createSession(std::function<void()> onc
  * ASYNC TASK
  */
 
-Broker::BrokerSession::BrokerSession(token_type_t token, std::function<void()> oncompl,
+Broker::BrokerSession::BrokerSession(token_type_t token, CompletionFunc onComplete,
     const std::unique_ptr<zmq::Context>& zctx,
     const std::unique_ptr<zmq::Socket>& zoper,
     const std::unique_ptr<zmq::Socket>& zevent)
-    : Session(token, oncompl, zctx, zoper, zevent)
+    : Session(token, onComplete, zctx, zoper, zevent)
     , zsnapshot_{std::make_unique<zmq::Socket>(zctx.get(), zmq::Socket::SERVER)}
     , zdelivery_{std::make_unique<zmq::Socket>(zctx.get(), zmq::Socket::DISH)}
     , zdispatch_{std::make_unique<zmq::Socket>(zctx.get(), zmq::Socket::RADIO)}

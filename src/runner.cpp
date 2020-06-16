@@ -72,7 +72,7 @@ bool Runner::isRunning() const noexcept
 }
 
 
-std::unique_ptr<Runner::Session> Runner::createSession(std::function<void()> onComplete) const
+std::unique_ptr<Runner::Session> Runner::createSession(CompletionFunc onComplete) const
 {
     return makeSession<Session>(onComplete);
 }
@@ -163,12 +163,12 @@ void Runner::sendOperation(oper_type_t oper, zmq::Part&& payload) noexcept
  * ASYNC TASK
  */
 
-Runner::Session::Session(token_type_t token, std::function<void()> oncompl,
+Runner::Session::Session(token_type_t token, CompletionFunc onComplete,
     const std::unique_ptr<zmq::Context>& zctx,
     const std::unique_ptr<zmq::Socket>& zoper,
     const std::unique_ptr<zmq::Socket>& zevent)
     : token_(token)
-    , docompl_(oncompl)
+    , docompl_(onComplete)
     , zctx_(zctx)
     , zopr_(zoper)
     , zevs_(zevent)

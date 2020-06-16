@@ -101,7 +101,7 @@ protected:
      * \see Runner::makeSession()
      * \see WorkerSession
      */
-    virtual std::unique_ptr<Session> createSession(std::function<void()> oncompl) const override;
+    virtual std::unique_ptr<Session> createSession(CompletionFunc onComplete) const override;
 
 
 protected:
@@ -119,7 +119,7 @@ protected:
          *
          * \see Runner::Session::Session(...)
          */
-        WorkerSession(token_type_t token, std::function<void()> oncompl,
+        WorkerSession(token_type_t token, CompletionFunc onComplete,
             const std::unique_ptr<zmq::Context>& zctx,
             const std::unique_ptr<zmq::Socket>& zoper,
             const std::unique_ptr<zmq::Socket>& zevent);

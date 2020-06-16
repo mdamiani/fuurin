@@ -98,9 +98,9 @@ std::string_view Worker::eventToString(event_type_t ev)
 }
 
 
-std::unique_ptr<Runner::Session> Worker::createSession(std::function<void()> oncompl) const
+std::unique_ptr<Runner::Session> Worker::createSession(CompletionFunc onComplete) const
 {
-    return makeSession<WorkerSession>(oncompl);
+    return makeSession<WorkerSession>(onComplete);
 }
 
 
@@ -108,11 +108,11 @@ std::unique_ptr<Runner::Session> Worker::createSession(std::function<void()> onc
  * ASYNC TASK
  */
 
-Worker::WorkerSession::WorkerSession(token_type_t token, std::function<void()> oncompl,
+Worker::WorkerSession::WorkerSession(token_type_t token, CompletionFunc onComplete,
     const std::unique_ptr<zmq::Context>& zctx,
     const std::unique_ptr<zmq::Socket>& zoper,
     const std::unique_ptr<zmq::Socket>& zevent)
-    : Session(token, oncompl, zctx, zoper, zevent)
+    : Session(token, onComplete, zctx, zoper, zevent)
     , zsnapshot_{std::make_unique<zmq::Socket>(zctx.get(), zmq::Socket::CLIENT)}
     , zdelivery_{std::make_unique<zmq::Socket>(zctx.get(), zmq::Socket::DISH)}
     , zdispatch_{std::make_unique<zmq::Socket>(zctx.get(), zmq::Socket::RADIO)}

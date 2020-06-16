@@ -159,6 +159,9 @@ protected:
         COUNT, ///< Number of operations.
     };
 
+    ///< Function type to call when a sessions ends.
+    using CompletionFunc = std::function<void()>;
+
 
 protected:
     class Session;
@@ -169,15 +172,15 @@ protected:
      * This method shall be overridden by subclasses in order to
      * instantiate a more specific session.
      *
-     * \param[in] oncompl Function to call when session is completed.
-     *                    It shall not throw exceptions.
+     * \param[in] onComplete Function to call when session is completed.
+     *                       It shall not throw exceptions.
      *
      * \see Session
      * \return A pointer to a new session.
      *
      * \see makeSession()
      */
-    virtual std::unique_ptr<Session> createSession(std::function<void()> oncompl) const;
+    virtual std::unique_ptr<Session> createSession(CompletionFunc onComplete) const;
 
     /**
      * \brief Wrapper to initialize any specific session.
@@ -185,9 +188,9 @@ protected:
      * \see createSession()
      */
     template<typename S>
-    std::unique_ptr<Session> makeSession(std::function<void()> oncompl) const
+    std::unique_ptr<Session> makeSession(CompletionFunc onComplete) const
     {
-        return std::make_unique<S>(token_, oncompl, zctx_, zopr_, zevs_);
+        return std::make_unique<S>(token_, onComplete, zctx_, zopr_, zevs_);
     }
 
     /**
@@ -257,12 +260,12 @@ protected:
          * Passed sockets must be taken from a \ref Runner instance.
          *
          * \param[in] token Session token, it's constant as long as this session is alive.
-         * \param[in] running Boolean flag that will be set to \c false when session ends.
+         * \param[in] onComplete Function to call when session ends.
          * \param[in] zctx ZMQ context.
          * \param[in] zoper ZMQ socket to receive operation commands from main task.
          * \param[in] zevent ZMQ socket to send events to main task.
          */
-        Session(token_type_t token, std::function<void()> oncompl,
+        Session(token_type_t token, CompletionFunc onComplete,
             const std::unique_ptr<zmq::Context>& zctx,
             const std::unique_ptr<zmq::Socket>& zoper,
             const std::unique_ptr<zmq::Socket>& zevent);
@@ -372,7 +375,7 @@ protected:
 
     protected:
         const token_type_t token_;                  ///< Session token.
-        const std::function<void()> docompl_;       ///< Completion action.
+        const CompletionFunc docompl_;              ///< Completion action.
         const std::unique_ptr<zmq::Context>& zctx_; ///< \see Runner::zctx_.
         const std::unique_ptr<zmq::Socket>& zopr_;  ///< \see Runner::zopr_.
         const std::unique_ptr<zmq::Socket>& zevs_;  ///< \see Runner::zevs_.
