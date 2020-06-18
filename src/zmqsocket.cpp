@@ -450,9 +450,9 @@ inline int sendMessagePart(void* socket, int flags, zmq_msg_t* msg)
     } while (rc == -1 && zmq_errno() == EINTR);
 
     if (BOOST_UNLIKELY(rc == -1)) {
-        // TODO: check for non-blocking mode?
-        //if (zmq_errno() == EAGAIN)
-        //    return 0;
+        // check for non-blocking mode
+        if (zmq_errno() == EAGAIN)
+            return -1;
         throw ERROR(ZMQSocketSendFailed, "could not send message part",
             log::Arg{"reason"sv, log::ec_t{zmq_errno()}});
     }
@@ -470,9 +470,9 @@ inline int recvMessagePart(void* socket, int flags, zmq_msg_t* msg)
     } while (rc == -1 && zmq_errno() == EINTR);
 
     if (BOOST_UNLIKELY(rc == -1)) {
-        // TODO: check for non-blocking mode?
-        //if (zmq_errno() == EAGAIN)
-        //    return 0;
+        // check for non-blocking mode
+        if (zmq_errno() == EAGAIN)
+            return -1;
         throw ERROR(ZMQSocketRecvFailed, "could not recv message part",
             log::Arg{"reason"sv, log::ec_t{zmq_errno()}});
     }
@@ -494,6 +494,18 @@ int Socket::sendMessageLast(Part* part)
 }
 
 
+int Socket::sendMessageTryMore(Part* part)
+{
+    return sendMessagePart(ptr_, ZMQ_DONTWAIT | ZMQ_SNDMORE, part->zmqPointer());
+}
+
+
+int Socket::sendMessageTryLast(Part* part)
+{
+    return sendMessagePart(ptr_, ZMQ_DONTWAIT, part->zmqPointer());
+}
+
+
 int Socket::recvMessageMore(Part* part)
 {
     return recvMessagePart(ptr_, 0, part->zmqPointer());
@@ -503,6 +515,18 @@ int Socket::recvMessageMore(Part* part)
 int Socket::recvMessageLast(Part* part)
 {
     return recvMessagePart(ptr_, 0, part->zmqPointer());
+}
+
+
+int Socket::recvMessageTryMore(Part* part)
+{
+    return recvMessagePart(ptr_, ZMQ_DONTWAIT, part->zmqPointer());
+}
+
+
+int Socket::recvMessageTryLast(Part* part)
+{
+    return recvMessagePart(ptr_, ZMQ_DONTWAIT, part->zmqPointer());
 }
 
 

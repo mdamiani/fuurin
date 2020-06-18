@@ -574,6 +574,79 @@ BOOST_AUTO_TEST_CASE(transferMultiPart)
 }
 
 
+BOOST_AUTO_TEST_CASE(trySendSinglePart, *utf::timeout(2))
+{
+    Context ctx;
+    Socket s(&ctx, Socket::Type::PUSH);
+
+    s.setEndpoints({"inproc://transfer"});
+    s.bind();
+
+    const auto rc = s.trySend(Part{uint32_t(101)});
+    BOOST_TEST(rc == -1);
+}
+
+
+BOOST_AUTO_TEST_CASE(trySendMultiPart, *utf::timeout(2))
+{
+    Context ctx;
+    Socket s(&ctx, Socket::Type::PUSH);
+
+    s.setEndpoints({"inproc://transfer"});
+    s.bind();
+
+    const auto rc = s.trySend(Part{uint32_t(101)}, Part{uint32_t(102)});
+    BOOST_TEST(rc == -1);
+}
+
+
+BOOST_AUTO_TEST_CASE(tryRecvSinglePart, *utf::timeout(2))
+{
+    Context ctx;
+    Socket s(&ctx, Socket::Type::PULL);
+
+    s.setEndpoints({"inproc://transfer"});
+    s.bind();
+
+    Part m1;
+    const auto rc = s.tryRecv(&m1);
+    BOOST_TEST(rc == -1);
+}
+
+
+BOOST_AUTO_TEST_CASE(tryRecvMultiPart, *utf::timeout(2))
+{
+    Context ctx;
+    Socket s(&ctx, Socket::Type::PULL);
+
+    s.setEndpoints({"inproc://transfer"});
+    s.bind();
+
+    Part m1, m2;
+    const auto rc = s.tryRecv(&m1, &m2);
+    BOOST_TEST(rc == -1);
+}
+
+
+BOOST_AUTO_TEST_CASE(tryTransferMultiPart, *utf::timeout(2))
+{
+    const auto [ctx, s1, s2] = transferSetup(Socket::Type::PUSH, Socket::Type::PULL);
+
+    uint32_t a(101), b(102);
+
+    const size_t nw = s1->trySend(Part{a}, Part{b});
+    BOOST_TEST(nw == sizeof(a) + sizeof(b));
+
+    Part m1, m2;
+    const size_t nr = s2->tryRecv(&m1, &m2);
+    BOOST_TEST(nr == sizeof(a) + sizeof(b));
+    BOOST_TEST(m1.toUint32() == a);
+    BOOST_TEST(m2.toUint32() == b);
+
+    transferTeardown({ctx, s1, s2});
+}
+
+
 void testWaitForEvents(Socket* socket, PollerEvents::Type type, std::chrono::milliseconds timeout, bool expected)
 {
     Poller poll{type, timeout, socket};
