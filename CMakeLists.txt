@@ -63,13 +63,16 @@ set(LIB_SOURCES
     src/worker.cpp
     src/connmachine.cpp
     src/syncmachine.cpp
+    src/stopwatch.cpp
 )
 
 set(LIB_PUBLIC_HEADERS
     include/fuurin/arg.h
     include/fuurin/fuurin.h
     include/fuurin/errors.h
+    include/fuurin/elapser.h
     include/fuurin/logger.h
+    include/fuurin/stopwatch.h
     include/fuurin/zmqcontext.h
     include/fuurin/zmqsocket.h
     include/fuurin/zmqpollable.h
