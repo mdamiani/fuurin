@@ -14,6 +14,7 @@
 #include "fuurin/zmqpoller.h"
 #include "fuurin/zmqpart.h"
 #include "fuurin/zmqpartmulti.h"
+#include "fuurin/stopwatch.h"
 #include "failure.h"
 #include "types.h"
 #include "log.h"
@@ -115,30 +116,52 @@ bool Runner::stop() noexcept
 }
 
 
-std::tuple<Runner::event_type_t, zmq::Part, Runner::EventRead> Runner::waitForEvent(std::chrono::milliseconds timeout)
+Runner::event_wait_t Runner::waitForEvent(std::chrono::milliseconds timeout)
 {
-    zmq::Poller poll{zmq::PollerEvents::Read, timeout, zevr_.get()};
-
-    if (poll.wait().empty())
-        return std::make_tuple(toIntegral(EventType::Invalid), zmq::Part{}, EventRead::Timeout);
-
-    auto [ev, pay, valid] = recvEvent();
-    if (!valid)
-        return std::make_tuple(ev, std::move(pay), EventRead::Discard);
-
-    return std::make_tuple(ev, std::move(pay), EventRead::Success);
+    return waitForEvent(zmq::Poller{zmq::PollerEvents::Read, 0ms, zevr_.get()},
+        fuurin::StopWatch{}, std::bind(&Runner::recvEvent, this), timeout);
 }
 
 
-std::tuple<Runner::event_type_t, zmq::Part, bool> Runner::recvEvent()
+Runner::event_wait_t Runner::waitForEvent(zmq::PollerWaiter&& pw, Elapser&& dt,
+    EventRecvFunc recv, std::chrono::milliseconds timeout)
+{
+    for (;;) {
+        pw.setTimeout(timeout);
+
+        if (pw.wait().empty())
+            break;
+
+        auto [ev, pay, rd] = recv();
+        if (rd == EventRead::Timeout) {
+            timeout -= dt.elapsed();
+            if (timeout <= 0ms)
+                break;
+
+            dt.start();
+            continue;
+        }
+
+        return {ev, std::move(pay), rd};
+    }
+
+    return {toIntegral(EventType::Invalid), zmq::Part{}, EventRead::Timeout};
+}
+
+
+Runner::event_wait_t Runner::recvEvent()
 {
     zmq::Part r;
-    zevr_->recv(&r);
+    const auto n = zevr_->tryRecv(&r);
+    if (n == -1) {
+        return {toIntegral(EventType::Invalid), zmq::Part{}, EventRead::Timeout};
+    }
+
     ASSERT(std::strncmp(r.group(), GROUP_EVENTS, sizeof(GROUP_EVENTS)) == 0, "bad event group");
 
     auto [tok, ev, pay] = zmq::PartMulti::unpack<token_type_t, event_type_t, zmq::Part>(r);
 
-    return std::make_tuple(ev, std::move(pay), tok == token_);
+    return {ev, std::move(pay), tok == token_ ? EventRead::Success : EventRead::Discard};
 }
 
 

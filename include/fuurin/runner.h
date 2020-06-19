@@ -20,6 +20,7 @@
 
 
 namespace fuurin {
+class Elapser;
 
 namespace zmq {
 class Context;
@@ -207,20 +208,45 @@ protected:
     void sendOperation(oper_type_t oper, zmq::Part&& payload) noexcept;
     ///@}
 
+    ///< Type used as return value for event waiting function.
+    using event_wait_t = std::tuple<event_type_t, zmq::Part, Runner::EventRead>;
+
+    ///< Type used for function to receive an event;
+    using EventRecvFunc = std::function<event_wait_t()>;
+
     /**
      * \brief Waits for events from the asynchronous task.
      *
      * This method shall be called from the main thread.
      * This method is thread-safe.
      *
+     * \param[in] timeout Waiting deadline.
+     *
      * \return The (optionally) received event.
      *
      * \see recvEvent()
      */
-    std::tuple<event_type_t, zmq::Part, Runner::EventRead> waitForEvent(std::chrono::milliseconds timeout = std::chrono::milliseconds(-1));
+    event_wait_t waitForEvent(std::chrono::milliseconds timeout = std::chrono::milliseconds(-1));
 
 
 private:
+    friend class TestRunner;
+
+    /**
+     * \brief Waits for events from the asynchronous task.
+     *
+     * \param[in] poll Poller interface.
+     * \param[in] dt Elapser interface.
+     * \param[in] recv Function used to actually receive and event.
+     * \param[in] timeout Waiting deadline.
+     *
+     * \return A tuple representing the (optionally) received event.
+     *
+     * \see waitForEvent(std::chrono::milliseconds)
+     */
+    static event_wait_t waitForEvent(zmq::PollerWaiter&& pw, Elapser&& dt, EventRecvFunc recv,
+        std::chrono::milliseconds timeout);
+
     /**
      * \brief Receives an event notification from the asynchronous task.
      *
@@ -230,11 +256,12 @@ private:
      * In case the received event's token doesn't match the current one,
      * then the returned value is marked as invalid.
      *
-     * \return A tuple with the event and whether it's valid or not.
+     * \return A tuple with the event and whether it's valid or not and
+     *         whether the read should be retried.
      *
      * \see waitForEvent(std::chrono::milliseconds)
      */
-    std::tuple<event_type_t, zmq::Part, bool> recvEvent();
+    event_wait_t recvEvent();
 
 
 protected:

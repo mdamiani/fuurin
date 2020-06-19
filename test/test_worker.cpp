@@ -17,14 +17,19 @@
 #include "fuurin/broker.h"
 #include "fuurin/worker.h"
 #include "fuurin/zmqpart.h"
+#include "fuurin/zmqpoller.h"
+#include "fuurin/elapser.h"
 #include "types.h"
 
 #include <string_view>
 #include <chrono>
+#include <list>
+#include <type_traits>
 
 
 using namespace fuurin;
 namespace utf = boost::unit_test;
+namespace bdata = utf::data;
 
 using namespace std::literals::string_view_literals;
 using namespace std::literals::chrono_literals;
@@ -50,6 +55,148 @@ inline std::ostream& operator<<(std::ostream& os, const Runner::EventRead& rd)
     return os;
 }
 } // namespace fuurin
+
+
+namespace std {
+template<typename T>
+inline std::ostream& operator<<(std::ostream& os, const std::list<T>& l)
+{
+    std::string sep;
+
+    os << "[";
+    for (const auto& v : l) {
+        os << sep;
+        if constexpr (std::is_same_v<T, std::chrono::milliseconds>)
+            os << v.count();
+        else
+            os << int(v);
+        sep = ", ";
+    }
+    os << "]";
+
+    return os;
+}
+} // namespace std
+
+
+namespace fuurin {
+class TestRunner : public zmq::PollerWaiter, public Elapser
+{
+public:
+    virtual ~TestRunner() = default;
+
+    Runner r_;
+    std::list<std::chrono::milliseconds> timeout_;
+    std::list<std::chrono::milliseconds> elapsed_;
+    std::list<bool> empty_;
+    std::list<Runner::EventRead> recv_;
+
+    /**
+     * PollerWaiter
+     */
+    void setTimeout(std::chrono::milliseconds tmeo) noexcept override
+    {
+        timeout_.push_back(tmeo);
+    };
+
+    std::chrono::milliseconds timeout() const noexcept override
+    {
+        return 0ms;
+    };
+
+    zmq::PollerEvents wait() override
+    {
+        BOOST_TEST(!empty_.empty());
+        auto v = empty_.front();
+        empty_.pop_front();
+        return zmq::PollerEvents(zmq::PollerEvents::Read, nullptr, v ? 0 : 1);
+    };
+
+    /**
+     * PollerWaiter
+     */
+    void start() noexcept override
+    {
+    }
+
+    std::chrono::milliseconds elapsed() const noexcept override
+    {
+        BOOST_TEST(!elapsed_.empty());
+        auto v = elapsed_.front();
+        const_cast<TestRunner*>(this)->elapsed_.pop_front();
+        return v;
+    }
+
+    /**
+     * Runner
+     */
+    Runner::event_wait_t recvEvent()
+    {
+        BOOST_TEST(!recv_.empty());
+        auto v = recv_.front();
+        recv_.pop_front();
+        return {Runner::event_type_t(Runner::EventType::Invalid), zmq::Part{}, v};
+    }
+
+    Runner::event_wait_t waitForEvent(std::chrono::milliseconds timeout)
+    {
+        return r_.waitForEvent(static_cast<zmq::PollerWaiter&&>(*this),
+            static_cast<Elapser&&>(*this), std::bind(&TestRunner::recvEvent, this), timeout);
+    }
+};
+} // namespace fuurin
+
+using EM = std::list<bool>;
+using ER = std::list<Runner::EventRead>;
+using EL = std::list<std::chrono::milliseconds>;
+using TO = std::list<std::chrono::milliseconds>;
+using EV = Runner::EventRead;
+
+BOOST_DATA_TEST_CASE(testWaitForEventTimeout,
+    bdata::make({
+        std::make_tuple("read success",
+            EM{false},
+            ER{EV::Success},
+            EL{},
+            TO{1000ms},
+            EV::Success),
+        std::make_tuple("read timeout, simple",
+            EM{true},
+            ER{},
+            EL{},
+            TO{1000ms},
+            EV::Timeout),
+        std::make_tuple("read timeout, sequence to zero",
+            EM{false, false, false},
+            ER{EV::Timeout, EV::Timeout, EV::Timeout},
+            EL{500ms, 300ms, 200ms},
+            TO{1000ms, 500ms, 200ms},
+            EV::Timeout),
+        std::make_tuple("read timeout, sequence to below zero",
+            EM{false, false, false},
+            ER{EV::Timeout, EV::Timeout, EV::Timeout},
+            EL{500ms, 300ms, 300ms},
+            TO{1000ms, 500ms, 200ms},
+            EV::Timeout),
+        std::make_tuple("read timeout, sequence to success",
+            EM{false, false, false},
+            ER{EV::Timeout, EV::Timeout, EV::Success},
+            EL{500ms, 300ms},
+            TO{1000ms, 500ms, 200ms},
+            EV::Success),
+    }),
+    name, empty, recv, elapsed, wantTimeout, wantEvent)
+{
+    BOOST_TEST_MESSAGE(name);
+
+    TestRunner r;
+    r.empty_ = empty;
+    r.recv_ = recv;
+    r.elapsed_ = elapsed;
+    auto ev = r.waitForEvent(1000ms);
+    BOOST_TEST(r.timeout_ == wantTimeout);
+    BOOST_TEST(std::get<2>(ev) == wantEvent);
+}
 
 
 void testWaitForEvent(Worker& w, std::chrono::milliseconds timeout, Runner::EventRead evRet, Runner::event_type_t evType, const std::string& evPay = std::string())
