@@ -11,6 +11,8 @@
 #ifndef FUURIN_RUNNER_H
 #define FUURIN_RUNNER_H
 
+#include "fuurin/event.h"
+
 #include <memory>
 #include <future>
 #include <atomic>
@@ -41,38 +43,6 @@ class PollerWaiter;
  */
 class Runner
 {
-public:
-    /**
-     * \brief Type of event read.
-     *
-     * \see waitForEvent(std::chrono::milliseconds)
-     * \see sendEvent(event_type_t, zmq::Part&&)
-     */
-    enum struct EventRead
-    {
-        Timeout, ///< The read operation timed out.
-        Success, ///< The read operation successfully returned an event.
-        Discard, ///< The read operation returned an old event.
-    };
-
-    typedef uint8_t event_type_t; ///< Type of the event kind.
-
-    /**
-     * \brief Type of event payload.
-     *
-     * \see waitForEvent(std::chrono::milliseconds)
-     * \see sendEvent(event_type_t, zmq::Part&&)
-     */
-    enum struct EventType : event_type_t
-    {
-        Invalid, ///< Event is invalid.
-        Started, ///< Event delivered when \ref Runner::start() was acknowledged.
-        Stopped, ///< Event delivered when \ref Runner::stop() was acknowledged.
-
-        COUNT, ///< Number of events.
-    };
-
-
 public:
     /**
      * \brief Initializes this runner.
@@ -208,11 +178,8 @@ protected:
     void sendOperation(oper_type_t oper, zmq::Part&& payload) noexcept;
     ///@}
 
-    ///< Type used as return value for event waiting function.
-    using event_wait_t = std::tuple<event_type_t, zmq::Part, Runner::EventRead>;
-
     ///< Type used for function to receive an event;
-    using EventRecvFunc = std::function<event_wait_t()>;
+    using EventRecvFunc = std::function<Event()>;
 
     /**
      * \brief Waits for events from the asynchronous task.
@@ -226,7 +193,7 @@ protected:
      *
      * \see recvEvent()
      */
-    event_wait_t waitForEvent(std::chrono::milliseconds timeout = std::chrono::milliseconds(-1));
+    Event waitForEvent(std::chrono::milliseconds timeout = std::chrono::milliseconds(-1));
 
 
 private:
@@ -244,7 +211,7 @@ private:
      *
      * \see waitForEvent(std::chrono::milliseconds)
      */
-    static event_wait_t waitForEvent(zmq::PollerWaiter&& pw, Elapser&& dt, EventRecvFunc recv,
+    static Event waitForEvent(zmq::PollerWaiter&& pw, Elapser&& dt, EventRecvFunc recv,
         std::chrono::milliseconds timeout);
 
     /**
@@ -261,7 +228,7 @@ private:
      *
      * \see waitForEvent(std::chrono::milliseconds)
      */
-    event_wait_t recvEvent();
+    Event recvEvent();
 
 
 protected:
@@ -376,7 +343,7 @@ protected:
          * \param[in] event The type of event to be notified.
          * \param[in] payload The payload of event to be notified.
          */
-        void sendEvent(event_type_t event, zmq::Part&& payload);
+        void sendEvent(Event::Type event, zmq::Part&& payload);
 
 
     private:

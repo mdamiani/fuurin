@@ -59,14 +59,14 @@ void Worker::dispatch(zmq::Part&& data)
 }
 
 
-std::tuple<Runner::event_type_t, zmq::Part, Runner::EventRead> Worker::waitForEvent(std::chrono::milliseconds timeout)
+Event Worker::waitForEvent(std::chrono::milliseconds timeout)
 {
-    const auto ev = Runner::waitForEvent(timeout);
+    const auto& ev = Runner::waitForEvent(timeout);
 
-    if (std::get<2>(ev) == EventRead::Success) {
+    if (ev.notification() == Event::Notification::Success) {
         LOG_DEBUG(log::Arg{"worker"sv}, log::Arg{"event"sv, "recv"sv},
-            log::Arg{"type"sv, eventToString(std::get<0>(ev))},
-            log::Arg{"size"sv, int(std::get<1>(ev).size())});
+            log::Arg{"type"sv, Event::toString(ev.type())},
+            log::Arg{"size"sv, int(ev.payload().size())});
     } else {
         LOG_DEBUG(log::Arg{"worker"sv}, log::Arg{"event"sv, "recv"sv},
             log::Arg{"type"sv, "n/a"sv},
@@ -74,27 +74,6 @@ std::tuple<Runner::event_type_t, zmq::Part, Runner::EventRead> Worker::waitForEv
     }
 
     return ev;
-}
-
-
-std::string_view Worker::eventToString(event_type_t ev)
-{
-    switch (ev) {
-    case toIntegral(Runner::EventType::Invalid):
-        return "invalid"sv;
-    case toIntegral(Runner::EventType::Started):
-        return "started"sv;
-    case toIntegral(Runner::EventType::Stopped):
-        return "stopped"sv;
-    case toIntegral(Worker::EventType::Offline):
-        return "offline"sv;
-    case toIntegral(Worker::EventType::Online):
-        return "online"sv;
-    case toIntegral(Worker::EventType::Delivery):
-        return "delivery"sv;
-    default:
-        return "unknown"sv;
-    }
 }
 
 
@@ -167,13 +146,13 @@ void Worker::WorkerSession::operationReady(oper_type_t oper, zmq::Part&& payload
     switch (oper) {
     case toIntegral(Runner::Operation::Start):
         LOG_DEBUG(log::Arg{"worker"sv}, log::Arg{"started"sv});
-        sendEvent(toIntegral(Runner::EventType::Started), std::move(payload));
+        sendEvent(Event::Type::Started, std::move(payload));
         conn_->onStart();
         break;
 
     case toIntegral(Runner::Operation::Stop):
         conn_->onStop();
-        sendEvent(toIntegral(Runner::EventType::Stopped), std::move(payload));
+        sendEvent(Event::Type::Stopped, std::move(payload));
         LOG_DEBUG(log::Arg{"worker"sv}, log::Arg{"stopped"sv});
         break;
 
@@ -257,7 +236,7 @@ void Worker::WorkerSession::collectBrokerMessage(zmq::Part&& payload)
         conn_->onPing();
 
     } else if (std::strncmp(payload.group(), BROKER_UPDT, sizeof(BROKER_UPDT)) == 0) {
-        sendEvent(toIntegral(EventType::Delivery), std::move(payload));
+        sendEvent(Event::Type::Delivery, std::move(payload));
 
     } else {
         LOG_WARN(log::Arg{"worker"sv},
@@ -276,7 +255,7 @@ void Worker::WorkerSession::notifyConnectionUpdate(bool isUp)
     LOG_DEBUG(log::Arg{"worker"sv}, log::Arg{"connection"sv, isUp ? "up"sv : "down"sv});
 
     isOnline_ = isUp;
-    sendEvent(toIntegral(isUp ? EventType::Online : EventType::Offline), zmq::Part{});
+    sendEvent(isUp ? Event::Type::Online : Event::Type::Offline, zmq::Part{});
 }
 
 } // namespace fuurin

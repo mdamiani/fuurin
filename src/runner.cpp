@@ -116,14 +116,14 @@ bool Runner::stop() noexcept
 }
 
 
-Runner::event_wait_t Runner::waitForEvent(std::chrono::milliseconds timeout)
+Event Runner::waitForEvent(std::chrono::milliseconds timeout)
 {
     return waitForEvent(zmq::Poller{zmq::PollerEvents::Read, 0ms, zevr_.get()},
         fuurin::StopWatch{}, std::bind(&Runner::recvEvent, this), timeout);
 }
 
 
-Runner::event_wait_t Runner::waitForEvent(zmq::PollerWaiter&& pw, Elapser&& dt,
+Event Runner::waitForEvent(zmq::PollerWaiter&& pw, Elapser&& dt,
     EventRecvFunc recv, std::chrono::milliseconds timeout)
 {
     for (;;) {
@@ -132,8 +132,8 @@ Runner::event_wait_t Runner::waitForEvent(zmq::PollerWaiter&& pw, Elapser&& dt,
         if (pw.wait().empty())
             break;
 
-        auto [ev, pay, rd] = recv();
-        if (rd == EventRead::Timeout) {
+        const auto& ev = recv();
+        if (ev.notification() == Event::Notification::Timeout) {
             timeout -= dt.elapsed();
             if (timeout <= 0ms)
                 break;
@@ -142,26 +142,30 @@ Runner::event_wait_t Runner::waitForEvent(zmq::PollerWaiter&& pw, Elapser&& dt,
             continue;
         }
 
-        return {ev, std::move(pay), rd};
+        return ev;
     }
 
-    return {toIntegral(EventType::Invalid), zmq::Part{}, EventRead::Timeout};
+    return Event{Event::Type::Invalid, Event::Notification::Timeout};
 }
 
 
-Runner::event_wait_t Runner::recvEvent()
+Event Runner::recvEvent()
 {
     zmq::Part r;
     const auto n = zevr_->tryRecv(&r);
     if (n == -1) {
-        return {toIntegral(EventType::Invalid), zmq::Part{}, EventRead::Timeout};
+        return Event{Event::Type::Invalid, Event::Notification::Timeout};
     }
 
     ASSERT(std::strncmp(r.group(), GROUP_EVENTS, sizeof(GROUP_EVENTS)) == 0, "bad event group");
 
-    auto [tok, ev, pay] = zmq::PartMulti::unpack<token_type_t, event_type_t, zmq::Part>(r);
+    auto [tok, evt, pay] = zmq::PartMulti::unpack<token_type_t, Event::type_t, zmq::Part>(r);
+    ASSERT(evt >= toIntegral(Event::Type::Invalid) && evt < toIntegral(Event::Type::COUNT),
+        "Runner::recvEvent: bad event type");
 
-    return {ev, std::move(pay), tok == token_ ? EventRead::Success : EventRead::Discard};
+    return Event{Event::Type(evt),
+        tok == token_ ? Event::Notification::Success : Event::Notification::Discard,
+        std::move(pay)};
 }
 
 
@@ -274,9 +278,13 @@ std::tuple<Runner::oper_type_t, zmq::Part, bool> Runner::Session::recvOperation(
 }
 
 
-void Runner::Session::sendEvent(event_type_t ev, zmq::Part&& pay)
+void Runner::Session::sendEvent(Event::Type ev, zmq::Part&& pay)
 {
-    zevs_->send(zmq::PartMulti::pack(token_, ev, pay).withGroup(GROUP_EVENTS));
+    const auto evt = Event::type_t(ev);
+    ASSERT(evt >= toIntegral(Event::Type::Invalid) && evt < toIntegral(Event::Type::COUNT),
+        "Runner::sendEvent: bad event type");
+
+    zevs_->send(zmq::PartMulti::pack(token_, evt, pay).withGroup(GROUP_EVENTS));
 }
 
 } // namespace fuurin

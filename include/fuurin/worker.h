@@ -12,6 +12,7 @@
 #define FUURIN_WORKER_H
 
 #include "fuurin/runner.h"
+#include "fuurin/event.h"
 
 #include <memory>
 #include <string_view>
@@ -32,30 +33,6 @@ class ConnMachine;
  */
 class Worker : public Runner
 {
-public:
-    /**
-     * \brief Type of event payload.
-     *
-     * \see Runner::EventType
-     * \see waitForEvent(std::chrono::milliseconds)
-     */
-    enum struct EventType : event_type_t
-    {
-        /// Event for disconnection.
-        Offline = event_type_t(Runner::EventType::COUNT),
-        Online,   ///< Event for connection.
-        Delivery, ///< Event for any \ref Worker::dispatch(zmq::Part&&).
-
-        COUNT, ///< Number of events.
-    };
-
-    /**
-     * \return Returns a representable description of the event.
-     * \param[in] ev Event to print.
-     */
-    static std::string_view eventToString(event_type_t ev);
-
-
 public:
     /**
      * \brief Initializes this worker.
@@ -79,8 +56,7 @@ public:
     /**
      * \see Runner::waitForEvent(std::chrono::milliseconds)
      */
-    std::tuple<event_type_t, zmq::Part, Runner::EventRead> waitForEvent(
-        std::chrono::milliseconds timeout = std::chrono::milliseconds(-1));
+    Event waitForEvent(std::chrono::milliseconds timeout = std::chrono::milliseconds(-1));
 
 
 protected:

@@ -19,7 +19,6 @@
 #include "fuurin/zmqpart.h"
 #include "fuurin/zmqpoller.h"
 #include "fuurin/elapser.h"
-#include "types.h"
 
 #include <string_view>
 #include <chrono>
@@ -38,25 +37,6 @@ using namespace std::literals::chrono_literals;
 /**
  * BOOST_TEST print functions.
  */
-namespace fuurin {
-inline std::ostream& operator<<(std::ostream& os, const Runner::EventRead& rd)
-{
-    switch (rd) {
-    case Runner::EventRead::Timeout:
-        os << "timeout";
-        break;
-    case Runner::EventRead::Success:
-        os << "success";
-        break;
-    case Runner::EventRead::Discard:
-        os << "discard";
-        break;
-    }
-    return os;
-}
-} // namespace fuurin
-
-
 namespace std {
 template<typename T>
 inline std::ostream& operator<<(std::ostream& os, const std::list<T>& l)
@@ -89,7 +69,7 @@ public:
     std::list<std::chrono::milliseconds> timeout_;
     std::list<std::chrono::milliseconds> elapsed_;
     std::list<bool> empty_;
-    std::list<Runner::EventRead> recv_;
+    std::list<Event::Notification> recv_;
 
     /**
      * PollerWaiter
@@ -130,15 +110,15 @@ public:
     /**
      * Runner
      */
-    Runner::event_wait_t recvEvent()
+    Event recvEvent()
     {
         BOOST_TEST(!recv_.empty());
         auto v = recv_.front();
         recv_.pop_front();
-        return {Runner::event_type_t(Runner::EventType::Invalid), zmq::Part{}, v};
+        return Event{Event::Type::Invalid, v, zmq::Part{}};
     }
 
-    Runner::event_wait_t waitForEvent(std::chrono::milliseconds timeout)
+    Event waitForEvent(std::chrono::milliseconds timeout)
     {
         return r_.waitForEvent(static_cast<zmq::PollerWaiter&&>(*this),
             static_cast<Elapser&&>(*this), std::bind(&TestRunner::recvEvent, this), timeout);
@@ -147,10 +127,10 @@ public:
 } // namespace fuurin
 
 using EM = std::list<bool>;
-using ER = std::list<Runner::EventRead>;
+using ER = std::list<Event::Notification>;
 using EL = std::list<std::chrono::milliseconds>;
 using TO = std::list<std::chrono::milliseconds>;
-using EV = Runner::EventRead;
+using EV = Event::Notification;
 
 BOOST_DATA_TEST_CASE(testWaitForEventTimeout,
     bdata::make({
@@ -195,22 +175,23 @@ BOOST_DATA_TEST_CASE(testWaitForEventTimeout,
     r.elapsed_ = elapsed;
     auto ev = r.waitForEvent(1000ms);
     BOOST_TEST(r.timeout_ == wantTimeout);
-    BOOST_TEST(std::get<2>(ev) == wantEvent);
+    BOOST_TEST(ev.notification() == wantEvent);
 }
 
 
-void testWaitForEvent(Worker& w, std::chrono::milliseconds timeout, Runner::EventRead evRet, Runner::event_type_t evType, const std::string& evPay = std::string())
+void testWaitForEvent(Worker& w, std::chrono::milliseconds timeout, Event::Notification evRet,
+    Event::Type evType, const std::string& evPay = std::string())
 {
-    const auto [type, pay, ret] = w.waitForEvent(timeout);
+    const auto& ev = w.waitForEvent(timeout);
 
-    BOOST_TEST(ret == evRet);
-    BOOST_TEST(Worker::eventToString(type) == Worker::eventToString(evType));
+    BOOST_TEST(ev.notification() == evRet);
+    BOOST_TEST(ev.type() == evType);
 
     if (!evPay.empty()) {
-        BOOST_TEST(!pay.empty());
-        BOOST_TEST(pay.toString() == std::string_view(evPay));
+        BOOST_TEST(!ev.payload().empty());
+        BOOST_TEST(ev.payload().toString() == std::string_view(evPay));
     } else {
-        BOOST_TEST(pay.empty());
+        BOOST_TEST(ev.payload().empty());
     }
 }
 
@@ -242,13 +223,11 @@ BOOST_AUTO_TEST_CASE(testWaitForStart)
 
     auto wf = w.start();
 
-    testWaitForEvent(w, 2s, Runner::EventRead::Success,
-        toIntegral(Runner::EventType::Started));
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Started);
 
     w.stop();
 
-    testWaitForEvent(w, 2s, Runner::EventRead::Success,
-        toIntegral(Runner::EventType::Stopped));
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Stopped);
 }
 
 
@@ -260,14 +239,14 @@ BOOST_AUTO_TEST_CASE(testWaitForOnline)
     auto wf = w.start();
     auto bf = b.start();
 
-    testWaitForEvent(w, 2s, Runner::EventRead::Success, toIntegral(Runner::EventType::Started));
-    testWaitForEvent(w, 2s, Runner::EventRead::Success, toIntegral(Worker::EventType::Online));
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Started);
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Online);
 
     w.stop();
     b.stop();
 
-    testWaitForEvent(w, 2s, Runner::EventRead::Success, toIntegral(Worker::EventType::Offline));
-    testWaitForEvent(w, 2s, Runner::EventRead::Success, toIntegral(Runner::EventType::Stopped));
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Offline);
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Stopped);
 }
 
 
@@ -279,21 +258,21 @@ BOOST_AUTO_TEST_CASE(testWaitForOffline)
     auto wf = w.start();
     auto bf = b.start();
 
-    testWaitForEvent(w, 2s, Runner::EventRead::Success, toIntegral(Runner::EventType::Started));
-    testWaitForEvent(w, 2s, Runner::EventRead::Success, toIntegral(Worker::EventType::Online));
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Started);
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Online);
 
     b.stop();
     bf.get();
-    testWaitForEvent(w, 6s, Runner::EventRead::Success, toIntegral(Worker::EventType::Offline));
+    testWaitForEvent(w, 6s, Event::Notification::Success, Event::Type::Offline);
 
     bf = b.start();
-    testWaitForEvent(w, 2s, Runner::EventRead::Success, toIntegral(Worker::EventType::Online));
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Online);
 
     w.stop();
     b.stop();
 
-    testWaitForEvent(w, 2s, Runner::EventRead::Success, toIntegral(Worker::EventType::Offline));
-    testWaitForEvent(w, 2s, Runner::EventRead::Success, toIntegral(Runner::EventType::Stopped));
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Offline);
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Stopped);
 }
 
 
@@ -305,19 +284,18 @@ BOOST_AUTO_TEST_CASE(testSimpleDispatch)
     auto wf = w.start();
     auto bf = b.start();
 
-    testWaitForEvent(w, 2s, Runner::EventRead::Success, toIntegral(Runner::EventType::Started));
-    testWaitForEvent(w, 2s, Runner::EventRead::Success, toIntegral(Worker::EventType::Online));
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Started);
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Online);
 
     w.dispatch(zmq::Part{"hello"sv});
 
-    testWaitForEvent(w, 5s, Runner::EventRead::Success,
-        toIntegral(Worker::EventType::Delivery), "hello");
+    testWaitForEvent(w, 5s, Event::Notification::Success, Event::Type::Delivery, "hello");
 
     w.stop();
     b.stop();
 
-    testWaitForEvent(w, 2s, Runner::EventRead::Success, toIntegral(Worker::EventType::Offline));
-    testWaitForEvent(w, 2s, Runner::EventRead::Success, toIntegral(Runner::EventType::Stopped));
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Offline);
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Stopped);
 }
 
 
@@ -329,15 +307,14 @@ BOOST_AUTO_TEST_CASE(testWaitForEventThreadSafe)
     auto wf = w.start();
     auto bf = b.start();
 
-    testWaitForEvent(w, 2s, Runner::EventRead::Success, toIntegral(Runner::EventType::Started));
-    testWaitForEvent(w, 2s, Runner::EventRead::Success, toIntegral(Worker::EventType::Online));
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Started);
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Online);
 
     const auto recvEvent = [&w]() {
         int cnt = 0;
         for (;;) {
-            const auto [ev, pay, ret] = w.waitForEvent(1500ms);
-            UNUSED(ev);
-            if (pay.empty() || ret != Runner::EventRead::Success)
+            const auto& ev = w.waitForEvent(1500ms);
+            if (ev.payload().empty() || ev.notification() != Event::Notification::Success)
                 break;
             ++cnt;
         }
@@ -362,8 +339,8 @@ BOOST_AUTO_TEST_CASE(testWaitForEventThreadSafe)
     w.stop();
     b.stop();
 
-    testWaitForEvent(w, 2s, Runner::EventRead::Success, toIntegral(Worker::EventType::Offline));
-    testWaitForEvent(w, 2s, Runner::EventRead::Success, toIntegral(Runner::EventType::Stopped));
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Offline);
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Stopped);
 }
 
 
@@ -375,8 +352,8 @@ BOOST_AUTO_TEST_CASE(testWaitForEventDiscard)
     auto wf = w.start();
     auto bf = b.start();
 
-    testWaitForEvent(w, 2s, Runner::EventRead::Success, toIntegral(Runner::EventType::Started));
-    testWaitForEvent(w, 2s, Runner::EventRead::Success, toIntegral(Worker::EventType::Online));
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Started);
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Online);
 
     // produce some events
     const int iterations = 3;
@@ -384,8 +361,8 @@ BOOST_AUTO_TEST_CASE(testWaitForEventDiscard)
         w.dispatch(zmq::Part{"hello1"sv});
 
     // receive just one event
-    testWaitForEvent(w, 1500ms, Runner::EventRead::Success,
-        toIntegral(Worker::EventType::Delivery), "hello1");
+    testWaitForEvent(w, 1500ms, Event::Notification::Success,
+        Event::Type::Delivery, "hello1");
 
     // wait for other events to be received
     std::this_thread::sleep_for(1s);
@@ -397,30 +374,30 @@ BOOST_AUTO_TEST_CASE(testWaitForEventDiscard)
 
     // discard old events
     for (int i = 0; i < iterations - 1; ++i) {
-        testWaitForEvent(w, 1500ms, Runner::EventRead::Discard,
-            toIntegral(Worker::EventType::Delivery), "hello1");
+        testWaitForEvent(w, 1500ms, Event::Notification::Discard,
+            Event::Type::Delivery, "hello1");
     }
 
     // discard old stop event
-    testWaitForEvent(w, 1500ms, Runner::EventRead::Discard, toIntegral(Worker::EventType::Offline));
-    testWaitForEvent(w, 1500ms, Runner::EventRead::Discard, toIntegral(Runner::EventType::Stopped));
+    testWaitForEvent(w, 1500ms, Event::Notification::Discard, Event::Type::Offline);
+    testWaitForEvent(w, 1500ms, Event::Notification::Discard, Event::Type::Stopped);
 
     // receive new start event
-    testWaitForEvent(w, 1500ms, Runner::EventRead::Success, toIntegral(Runner::EventType::Started));
-    testWaitForEvent(w, 1500ms, Runner::EventRead::Success, toIntegral(Worker::EventType::Online));
+    testWaitForEvent(w, 1500ms, Event::Notification::Success, Event::Type::Started);
+    testWaitForEvent(w, 1500ms, Event::Notification::Success, Event::Type::Online);
 
     // produce a new event
     w.dispatch(zmq::Part{"hello2"sv});
 
     // receive new events
-    testWaitForEvent(w, 1500ms, Runner::EventRead::Success,
-        toIntegral(Worker::EventType::Delivery), "hello2");
+    testWaitForEvent(w, 1500ms, Event::Notification::Success,
+        Event::Type::Delivery, "hello2");
 
     w.stop();
     b.stop();
 
-    testWaitForEvent(w, 2s, Runner::EventRead::Success, toIntegral(Worker::EventType::Offline));
-    testWaitForEvent(w, 2s, Runner::EventRead::Success, toIntegral(Runner::EventType::Stopped));
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Offline);
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Stopped);
 }
 
 
