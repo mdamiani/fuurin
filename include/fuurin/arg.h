@@ -286,6 +286,11 @@ private:
  */
 std::ostream& operator<<(std::ostream& os, const Arg& arg);
 
+/**
+ * \brief Prints an array of arguments.
+ */
+void printArgs(std::ostream& os, const Arg args[], size_t num);
+
 
 } // namespace log
 } // namespace fuurin

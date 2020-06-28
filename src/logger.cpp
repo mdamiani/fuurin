@@ -88,6 +88,12 @@ std::ostream& operator<<(std::ostream& os, const Arg& arg)
 }
 
 
+void printArgs(std::ostream& os, const Arg args[], size_t num)
+{
+    println(os, args, num);
+}
+
+
 /**
  * Handler
  */
