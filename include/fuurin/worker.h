@@ -24,6 +24,7 @@ class Part;
 } // namespace zmq
 
 class ConnMachine;
+class SyncMachine;
 
 
 /**
@@ -132,9 +133,22 @@ protected:
         ///@}
 
         /**
+         * \brief Closes/Opens the sockets for synchronization.
+         */
+        ///{@
+        void snapClose();
+        void snapOpen();
+        ///@}
+
+        /**
          * \brief Sends announce message to the remote party.
          */
         void sendAnnounce();
+
+        /**
+         * \brief Sends sync message to the remote party.
+         */
+        void sendSync();
 
         /**
          * \brief Collects a message which was published by a broker.
@@ -150,14 +164,23 @@ protected:
          */
         void notifyConnectionUpdate(bool isUp);
 
+        /**
+         * \brief Notifies for any change of snapshot download.
+         *
+         * \param[in] isSync Whether the snaphost is being synced.
+         */
+        void notifySnapshotDownload(bool isSync);
+
 
     protected:
         const std::unique_ptr<zmq::Socket> zsnapshot_; ///< ZMQ socket to receive snapshots.
         const std::unique_ptr<zmq::Socket> zdelivery_; ///< ZMQ socket to receive data.
         const std::unique_ptr<zmq::Socket> zdispatch_; ///< ZMQ socket to send data.
         const std::unique_ptr<ConnMachine> conn_;      ///< Connection state machine.
+        const std::unique_ptr<SyncMachine> sync_;      ///< Connection sync machine.
 
-        bool isOnline_; ///< Whether the worker's connection is up.
+        bool isOnline_;   ///< Whether the worker's connection is up.
+        bool isSnapshot_; ///< Whether for workers is syncing its snapshot.
     };
 };
 

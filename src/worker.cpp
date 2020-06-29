@@ -15,6 +15,7 @@
 #include "fuurin/zmqpart.h"
 #include "fuurin/zmqtimer.h"
 #include "connmachine.h"
+#include "syncmachine.h"
 #include "types.h"
 #include "log.h"
 
@@ -99,9 +100,11 @@ Worker::WorkerSession::WorkerSession(token_type_t token, CompletionFunc onComple
           std::make_unique<ConnMachine>("worker"sv, zctx.get(),
               500ms,  // TODO: make configurable
               3000ms, // TODO: make configurable
-              std::bind(&Worker::WorkerSession::connClose, this),
-              std::bind(&Worker::WorkerSession::connOpen, this),
-              std::bind(&Worker::WorkerSession::sendAnnounce, this),
+
+              std::bind(&Worker::WorkerSession::connClose, this),    //
+              std::bind(&Worker::WorkerSession::connOpen, this),     //
+              std::bind(&Worker::WorkerSession::sendAnnounce, this), //
+
               [this](ConnMachine::State s) {
                   switch (s) {
                   case ConnMachine::State::Halted:
@@ -115,10 +118,32 @@ Worker::WorkerSession::WorkerSession(token_type_t token, CompletionFunc onComple
                   };
               }),
       }
+    , sync_{
+          std::make_unique<SyncMachine>("worker"sv, zctx.get(),
+              0,      // TODO: depends on number of endpoints
+              0,      // TODO: make configurable
+              3000ms, // TODO: make configurable
+
+              std::bind(&Worker::WorkerSession::snapClose, this), //
+              std::bind(&Worker::WorkerSession::snapOpen, this),  //
+              std::bind(&Worker::WorkerSession::sendSync, this),  //
+
+              [this](SyncMachine::State s) {
+                  switch (s) {
+                  case SyncMachine::State::Halted:
+                  case SyncMachine::State::Synced:
+                      notifySnapshotDownload(false);
+                      break;
+
+                  case SyncMachine::State::Download:
+                      notifySnapshotDownload(true);
+                      break;
+                  };
+              }),
+      }
     , isOnline_{false}
+    , isSnapshot_{false}
 {
-    zsnapshot_->setEndpoints({"ipc:///tmp/broker_snapshot"});
-    zsnapshot_->connect();
 }
 
 
@@ -134,7 +159,9 @@ bool Worker::WorkerSession::isOnline() const noexcept
 std::unique_ptr<zmq::PollerWaiter> Worker::WorkerSession::createPoller()
 {
     return std::unique_ptr<zmq::PollerWaiter>{new zmq::PollerAuto{zmq::PollerEvents::Type::Read,
-        zopr_.get(), zsnapshot_.get(), zdelivery_.get(), conn_->timerRetry(), conn_->timerTimeout()}};
+        zopr_.get(), zsnapshot_.get(), zdelivery_.get(),
+        conn_->timerRetry(), conn_->timerTimeout(),
+        sync_->timerTimeout()}};
 }
 
 
@@ -194,6 +221,9 @@ void Worker::WorkerSession::socketReady(zmq::Pollable* pble)
     } else if (pble == conn_->timerTimeout()) {
         conn_->onTimerTimeoutFired();
 
+    } else if (pble == sync_->timerTimeout()) {
+        sync_->onTimerTimeoutFired();
+
     } else {
         LOG_FATAL(log::Arg{"worker"sv}, log::Arg{"could not read ready socket"sv},
             log::Arg{"unknown socket"sv});
@@ -223,9 +253,28 @@ void Worker::WorkerSession::connOpen()
 }
 
 
+void Worker::WorkerSession::snapClose()
+{
+    zsnapshot_->close();
+}
+
+
+void Worker::WorkerSession::snapOpen()
+{
+    zsnapshot_->setEndpoints({"ipc:///tmp/broker_snapshot"});
+    zsnapshot_->connect();
+}
+
+
 void Worker::WorkerSession::sendAnnounce()
 {
     zdispatch_->send(zmq::Part{}.withGroup(WORKER_HUGZ));
+}
+
+
+void Worker::WorkerSession::sendSync()
+{
+    // TODO: send sync
 }
 
 
@@ -256,6 +305,18 @@ void Worker::WorkerSession::notifyConnectionUpdate(bool isUp)
 
     isOnline_ = isUp;
     sendEvent(isUp ? Event::Type::Online : Event::Type::Offline, zmq::Part{});
+}
+
+
+void Worker::WorkerSession::notifySnapshotDownload(bool isSync)
+{
+    if (isSync == isSnapshot_)
+        return;
+
+    LOG_DEBUG(log::Arg{"worker"sv}, log::Arg{"snapshot"sv, isSync ? "sync"sv : "done"sv});
+
+    isSnapshot_ = isSync;
+    // TODO: send snapshot event
 }
 
 } // namespace fuurin
