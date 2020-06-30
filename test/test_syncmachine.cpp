@@ -175,7 +175,7 @@ auto setupMach(int maxIndex, int maxRetry)
         BOOST_TEST(t->mach.timerTimeout()->isSingleShot() == true);
         BOOST_TEST(t->mach.timerTimeout()->interval() == 2s);
         BOOST_TEST(t->mach.timerTimeout()->isActive() == isTimeoutActive);
-        BOOST_TEST(t->mach.timerTimeout()->description() == "mach_tmr_timeout"s);
+        BOOST_TEST(t->mach.timerTimeout()->description() == "mach_sync_tmr_timeout"s);
         BOOST_TEST(t->mach.currentIndex() == currIndex);
         BOOST_TEST(t->mach.nextIndex() == nextIndex);
         BOOST_TEST(t->mach.retryCount() == retryCount);

@@ -118,8 +118,8 @@ auto setupConn()
         BOOST_TEST(t->conn.timerTimeout()->interval() == 2s);
         BOOST_TEST(t->conn.timerRetry()->isActive() == isRetryActive);
         BOOST_TEST(t->conn.timerTimeout()->isActive() == isTimeoutActive);
-        BOOST_TEST(t->conn.timerRetry()->description() == "conn_tmr_retry"s);
-        BOOST_TEST(t->conn.timerTimeout()->description() == "conn_tmr_timeout"s);
+        BOOST_TEST(t->conn.timerRetry()->description() == "conn_conn_tmr_retry"s);
+        BOOST_TEST(t->conn.timerTimeout()->description() == "conn_conn_tmr_timeout"s);
         BOOST_TEST(t->closeCnt == close);
         BOOST_TEST(t->openCnt == open);
         BOOST_TEST(t->pongCnt == pong);

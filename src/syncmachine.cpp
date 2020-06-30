@@ -29,7 +29,7 @@ SyncMachine::SyncMachine(std::string_view name, zmq::Context* zctx,
     , doOpen_{open}
     , doSync_{sync}
     , onChange_{change}
-    , timerTmo_{std::make_unique<zmq::Timer>(zctx, log::format("%s_tmr_timeout", name.data()))}
+    , timerTmo_{std::make_unique<zmq::Timer>(zctx, log::format("%s_sync_tmr_timeout", name.data()))}
     , state_{State::Halted}
     , indexCurr_{0}
     , indexNext_{0}

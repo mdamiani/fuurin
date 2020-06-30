@@ -25,8 +25,8 @@ ConnMachine::ConnMachine(std::string_view name, zmq::Context* zctx,
     , doOpen_{doOpen}
     , doPong_{doPong}
     , onChange_{onChange}
-    , timerTry_{std::make_unique<zmq::Timer>(zctx, log::format("%s_tmr_retry", name.data()))}
-    , timerTmo_{std::make_unique<zmq::Timer>(zctx, log::format("%s_tmr_timeout", name.data()))}
+    , timerTry_{std::make_unique<zmq::Timer>(zctx, log::format("%s_conn_tmr_retry", name.data()))}
+    , timerTmo_{std::make_unique<zmq::Timer>(zctx, log::format("%s_conn_tmr_timeout", name.data()))}
     , state_{State::Halted}
 {
     timerTry_->setSingleShot(false);
