@@ -49,6 +49,7 @@ set(LIB_SOURCES
     src/fuurin.cpp
     src/errors.cpp
     src/event.cpp
+    src/operation.cpp
     src/logger.cpp
     src/zmqcontext.cpp
     src/zmqsocket.cpp
@@ -73,6 +74,7 @@ set(LIB_PUBLIC_HEADERS
     include/fuurin/errors.h
     include/fuurin/elapser.h
     include/fuurin/event.h
+    include/fuurin/opearation.h
     include/fuurin/logger.h
     include/fuurin/stopwatch.h
     include/fuurin/zmqcontext.h
