@@ -56,7 +56,7 @@ void Worker::dispatch(zmq::Part&& data)
             log::Arg{"reason"sv, "worker is not running"sv});
     }
 
-    sendOperation(toIntegral(Operation::Dispatch), std::forward<zmq::Part>(data));
+    sendOperation(Operation::Type::Dispatch, std::forward<zmq::Part>(data));
 }
 
 
@@ -165,32 +165,32 @@ std::unique_ptr<zmq::PollerWaiter> Worker::WorkerSession::createPoller()
 }
 
 
-void Worker::WorkerSession::operationReady(oper_type_t oper, zmq::Part&& payload)
+void Worker::WorkerSession::operationReady(Operation* oper)
 {
-    const auto paysz = payload.size();
+    const auto paysz = oper->payload().size();
     UNUSED(paysz);
 
-    switch (oper) {
-    case toIntegral(Runner::Operation::Start):
+    switch (oper->type()) {
+    case Operation::Type::Start:
         LOG_DEBUG(log::Arg{"worker"sv}, log::Arg{"started"sv});
-        sendEvent(Event::Type::Started, std::move(payload));
+        sendEvent(Event::Type::Started, std::move(oper->payload()));
         conn_->onStart();
         break;
 
-    case toIntegral(Runner::Operation::Stop):
+    case Operation::Type::Stop:
         conn_->onStop();
-        sendEvent(Event::Type::Stopped, std::move(payload));
+        sendEvent(Event::Type::Stopped, std::move(oper->payload()));
         LOG_DEBUG(log::Arg{"worker"sv}, log::Arg{"stopped"sv});
         break;
 
-    case toIntegral(Worker::Operation::Dispatch):
-        zdispatch_->send(payload.withGroup(WORKER_UPDT));
+    case Operation::Type::Dispatch:
+        zdispatch_->send(oper->payload().withGroup(WORKER_UPDT));
         LOG_DEBUG(log::Arg{"worker"sv}, log::Arg{"dispatch"sv},
             log::Arg{"size"sv, int(paysz)});
         break;
 
     default:
-        LOG_ERROR(log::Arg{"worker"sv}, log::Arg{"operation"sv, oper},
+        LOG_ERROR(log::Arg{"worker"sv}, log::Arg{"operation"sv, Operation::toString(oper->type())},
             log::Arg{"unknown"sv});
         break;
     }

@@ -86,19 +86,19 @@ std::unique_ptr<zmq::PollerWaiter> Broker::BrokerSession::createPoller()
 }
 
 
-void Broker::BrokerSession::operationReady(oper_type_t oper, zmq::Part&&)
+void Broker::BrokerSession::operationReady(Operation* oper)
 {
-    switch (oper) {
-    case toIntegral(Runner::Operation::Start):
+    switch (oper->type()) {
+    case Operation::Type::Start:
         LOG_DEBUG(log::Arg{"broker"sv}, log::Arg{"started"sv});
         break;
 
-    case toIntegral(Runner::Operation::Stop):
+    case Operation::Type::Stop:
         LOG_DEBUG(log::Arg{"broker"sv}, log::Arg{"stopped"sv});
         break;
 
     default:
-        LOG_ERROR(log::Arg{"broker"sv}, log::Arg{"operation"sv, oper},
+        LOG_ERROR(log::Arg{"broker"sv}, log::Arg{"operation"sv, Operation::toString(oper->type())},
             log::Arg{"unknown"sv});
         break;
     }

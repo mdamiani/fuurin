@@ -111,7 +111,7 @@ bool Runner::stop() noexcept
     if (!isRunning())
         return false;
 
-    sendOperation(toIntegral(Operation::Stop));
+    sendOperation(Operation::Type::Stop);
     return true;
 }
 
@@ -169,16 +169,20 @@ Event Runner::recvEvent()
 }
 
 
-void Runner::sendOperation(oper_type_t oper) noexcept
+void Runner::sendOperation(Operation::Type oper) noexcept
 {
     sendOperation(oper, zmq::Part());
 }
 
 
-void Runner::sendOperation(oper_type_t oper, zmq::Part&& payload) noexcept
+void Runner::sendOperation(Operation::Type oper, zmq::Part&& payload) noexcept
 {
+    const auto opt = Operation::type_t(oper);
+    ASSERT(opt >= toIntegral(Operation::Type::Invalid) && opt < toIntegral(Operation::Type::COUNT),
+        "Runner::sendOperation: bad operation type");
+
     try {
-        zops_->send(zmq::Part{token_}, zmq::Part{oper}, payload);
+        zops_->send(zmq::Part{token_}, zmq::Part{opt}, payload);
     } catch (const std::exception& e) {
         LOG_FATAL(log::Arg{"runner"sv}, log::Arg{"operation send threw exception"sv},
             log::Arg{std::string_view(e.what())});
@@ -222,7 +226,10 @@ void Runner::Session::run()
     auto poll = createPoller();
 
     // generate a start operation
-    operationReady(toIntegral(Operation::Start), zmq::Part{});
+    {
+        auto oper = Operation{Operation::Type::Start, Operation::Notification::Success};
+        operationReady(&oper);
+    }
 
     for (;;) {
         for (auto s : poll->wait()) {
@@ -231,15 +238,15 @@ void Runner::Session::run()
                 continue;
             }
 
-            auto [oper, payload, valid] = recvOperation();
+            auto oper = recvOperation();
 
             // filter out old operations
-            if (!valid)
+            if (oper.notification() == Operation::Notification::Discard)
                 continue;
 
-            operationReady(oper, std::move(payload));
+            operationReady(&oper);
 
-            if (oper == toIntegral(Operation::Stop))
+            if (oper.type() == Operation::Type::Stop)
                 return;
         }
     }
@@ -253,7 +260,7 @@ std::unique_ptr<zmq::PollerWaiter> Runner::Session::createPoller()
 }
 
 
-void Runner::Session::operationReady(oper_type_t, zmq::Part&&)
+void Runner::Session::operationReady(Operation*)
 {
 }
 
@@ -263,7 +270,7 @@ void Runner::Session::socketReady(zmq::Pollable*)
 }
 
 
-std::tuple<Runner::oper_type_t, zmq::Part, bool> Runner::Session::recvOperation() noexcept
+Operation Runner::Session::recvOperation() noexcept
 {
     zmq::Part tok, oper, payload;
 
@@ -274,7 +281,13 @@ std::tuple<Runner::oper_type_t, zmq::Part, bool> Runner::Session::recvOperation(
             log::Arg{std::string_view(e.what())});
     }
 
-    return std::make_tuple(oper.toUint8(), std::move(payload), tok.toUint8() == token_);
+    const Operation::type_t opt = oper.toUint8();
+    ASSERT(opt >= toIntegral(Operation::Type::Invalid) && opt < toIntegral(Operation::Type::COUNT),
+        "Runner::recvOperation: bad operation type");
+
+    return Operation{Operation::Type(opt),
+        tok.toUint8() == token_ ? Operation::Notification::Success : Operation::Notification::Discard,
+        std::move(payload)};
 }
 
 

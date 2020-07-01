@@ -12,11 +12,11 @@
 #define FUURIN_RUNNER_H
 
 #include "fuurin/event.h"
+#include "fuurin/operation.h"
 
 #include <memory>
 #include <future>
 #include <atomic>
-#include <tuple>
 #include <chrono>
 #include <functional>
 
@@ -93,7 +93,7 @@ public:
      *
      * \see start()
      * \see isRunning()
-     * \see sendOperation(oper_type_t)
+     * \see sendOperation(Operation::Type, zmq::Part&&)
      * \see Session::run()
      */
     bool stop() noexcept;
@@ -112,23 +112,6 @@ public:
 
 protected:
     typedef uint8_t token_type_t; ///< Type of the execution token.
-    typedef uint8_t oper_type_t;  ///< Type of operation.
-
-    /**
-     * \brief Type of operation to issue to the asynchronous task.
-     *
-     * \see sendOperation(Operation)
-     * \see recvOperation()
-     * \see operationReady(oper_type_t, zmq::Part&&)
-     */
-    enum struct Operation : oper_type_t
-    {
-        Invalid, ///< Invalid command.
-        Start,   ///< Request to start the asynchronous task.
-        Stop,    ///< Request to stop the asynchronous task.
-
-        COUNT, ///< Number of operations.
-    };
 
     ///< Function type to call when a sessions ends.
     using CompletionFunc = std::function<void()>;
@@ -174,8 +157,8 @@ protected:
      * by the inter-thread socket, otherwise a fatal error is raised.
      */
     ///{@
-    void sendOperation(oper_type_t oper) noexcept;
-    void sendOperation(oper_type_t oper, zmq::Part&& payload) noexcept;
+    void sendOperation(Operation::Type oper) noexcept;
+    void sendOperation(Operation::Type oper, zmq::Part&& payload) noexcept;
     ///@}
 
     ///< Type used for function to receive an event;
@@ -207,7 +190,7 @@ private:
      * \param[in] recv Function used to actually receive and event.
      * \param[in] timeout Waiting deadline.
      *
-     * \return A tuple representing the (optionally) received event.
+     * \return An \ref Event representing the (optionally) received event.
      *
      * \see waitForEvent(std::chrono::milliseconds)
      */
@@ -223,8 +206,7 @@ private:
      * In case the received event's token doesn't match the current one,
      * then the returned value is marked as invalid.
      *
-     * \return A tuple with the event and whether it's valid or not and
-     *         whether the read should be retried.
+     * \return An \ref Event with its type, the payload and whether it's valid or not.
      *
      * \see waitForEvent(std::chrono::milliseconds)
      */
@@ -286,7 +268,7 @@ protected:
          * \exception Throws exceptions in case of unexpected errors.
          *
          * \see createPoller()
-         * \see operationReady(oper_type_t, zmq::Part&&)
+         * \see operationReady(Operation*)
          * \see socketReady(zmq::Pollable*)
          * \see recvOperation()
          */
@@ -318,7 +300,7 @@ protected:
          * Concrete classes shall override this virtual method in order to
          * handle and define any other specific tasks than \ref Operation::Stop.
          */
-        virtual void operationReady(oper_type_t oper, zmq::Part&& payload);
+        virtual void operationReady(Operation* oper);
 
         /**
          * \brief Notifies whenever any item being polled is ready to be accessed by the asynchronous task.
@@ -359,12 +341,11 @@ protected:
          * In case the received operation's token doesn't match session \ref token_,
          * then the returned values are marked as invalid.
          *
-         * \return A tuple with the type of operation, the payload and
-         *      whether they are valid or not.
+         * \return An \ref Operation with its type, the payload and whether it's valid or not.
          *
          * \see run()
          */
-        std::tuple<oper_type_t, zmq::Part, bool> recvOperation() noexcept;
+        Operation recvOperation() noexcept;
 
 
     protected:
