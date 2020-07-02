@@ -45,24 +45,6 @@ inline std::ostream& operator<<(std::ostream& os, const std::chrono::millisecond
     return os;
 }
 } // namespace chrono
-} // namespace std
-
-namespace fuurin {
-inline std::ostream& operator<<(std::ostream& os, const ConnMachine::State& st)
-{
-    switch (st) {
-    case ConnMachine::State::Halted:
-        os << "halted";
-        break;
-    case ConnMachine::State::Trying:
-        os << "trying";
-        break;
-    case ConnMachine::State::Stable:
-        os << "stable";
-        break;
-    }
-    return os;
-}
 
 inline std::ostream& operator<<(std::ostream& os, const std::vector<ConnMachine::State>& v)
 {
@@ -78,7 +60,7 @@ inline std::ostream& operator<<(std::ostream& os, const std::vector<ConnMachine:
 
     return os;
 }
-} // namespace fuurin
+} // namespace std
 
 
 auto setupConn()

@@ -62,24 +62,6 @@ inline std::ostream& operator<<(std::ostream& os, const std::unordered_map<int, 
 
     return os;
 }
-} // namespace std
-
-namespace fuurin {
-inline std::ostream& operator<<(std::ostream& os, const SyncMachine::State& en)
-{
-    switch (en) {
-    case SyncMachine::State::Halted:
-        os << "halted";
-        break;
-    case SyncMachine::State::Download:
-        os << "download";
-        break;
-    case SyncMachine::State::Synced:
-        os << "synced";
-        break;
-    }
-    return os;
-}
 
 inline std::ostream& operator<<(std::ostream& os, const std::vector<SyncMachine::State>& v)
 {
@@ -95,36 +77,7 @@ inline std::ostream& operator<<(std::ostream& os, const std::vector<SyncMachine:
 
     return os;
 }
-
-inline std::ostream& operator<<(std::ostream& os, const SyncMachine::ReplyType en)
-{
-    switch (en) {
-    case SyncMachine::ReplyType::Snapshot:
-        os << "snapshot";
-        break;
-    case SyncMachine::ReplyType::Complete:
-        os << "complete";
-        break;
-    }
-    return os;
-}
-
-inline std::ostream& operator<<(std::ostream& os, const SyncMachine::ReplyResult en)
-{
-    switch (en) {
-    case SyncMachine::ReplyResult::Unexpected:
-        os << "unexpected";
-        break;
-    case SyncMachine::ReplyResult::Discarded:
-        os << "discarded";
-        break;
-    case SyncMachine::ReplyResult::Accepted:
-        os << "accepted";
-        break;
-    }
-    return os;
-}
-} // namespace fuurin
+} // namespace std
 
 
 auto setupMach(int maxIndex, int maxRetry)

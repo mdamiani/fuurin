@@ -15,6 +15,7 @@
 #include <chrono>
 #include <memory>
 #include <string_view>
+#include <ostream>
 
 
 namespace fuurin {
@@ -319,6 +320,16 @@ private:
     int retryCurr_; ///< Retry number.
     seqn_t seqNum_; ///< Sequence number of request.
 };
+
+
+///< Streams to printable form a \ref SyncMachine::State value.
+std::ostream& operator<<(std::ostream& os, const SyncMachine::State& en);
+
+///< Streams to printable form a \ref SyncMachine::ReplyType value.
+std::ostream& operator<<(std::ostream& os, const SyncMachine::ReplyType& en);
+
+///< Streams to printable form a \ref SyncMachine::ReplyResult value.
+std::ostream& operator<<(std::ostream& os, const SyncMachine::ReplyResult& en);
 
 } // namespace fuurin
 

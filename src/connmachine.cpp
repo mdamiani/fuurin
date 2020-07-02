@@ -181,4 +181,21 @@ void ConnMachine::change(State state)
     onChange_(state);
 }
 
+
+std::ostream& operator<<(std::ostream& os, const ConnMachine::State& st)
+{
+    switch (st) {
+    case ConnMachine::State::Halted:
+        os << "halted";
+        break;
+    case ConnMachine::State::Trying:
+        os << "trying";
+        break;
+    case ConnMachine::State::Stable:
+        os << "stable";
+        break;
+    }
+    return os;
+}
+
 } // namespace fuurin

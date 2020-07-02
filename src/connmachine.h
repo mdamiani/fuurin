@@ -213,6 +213,10 @@ private:
     State state_; ///< Connection state.
 };
 
+
+///< Streams to printable form a \ref ConnMachine::State value.
+std::ostream& operator<<(std::ostream& os, const ConnMachine::State& en);
+
 } // namespace fuurin
 
 #endif // CONNMACHINE_H

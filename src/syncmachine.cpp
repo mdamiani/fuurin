@@ -17,6 +17,9 @@
 #include <limits>
 
 
+using namespace std::literals::string_view_literals;
+
+
 namespace fuurin {
 
 SyncMachine::SyncMachine(std::string_view name, zmq::Context* zctx,
@@ -272,6 +275,54 @@ void SyncMachine::change(State state)
 
     state_ = state;
     onChange_(state);
+}
+
+
+std::ostream& operator<<(std::ostream& os, const SyncMachine::State& en)
+{
+    switch (en) {
+    case SyncMachine::State::Halted:
+        os << "halted"sv;
+        break;
+    case SyncMachine::State::Download:
+        os << "download"sv;
+        break;
+    case SyncMachine::State::Synced:
+        os << "synced"sv;
+        break;
+    }
+    return os;
+}
+
+
+std::ostream& operator<<(std::ostream& os, const SyncMachine::ReplyType& en)
+{
+    switch (en) {
+    case SyncMachine::ReplyType::Snapshot:
+        os << "snapshot"sv;
+        break;
+    case SyncMachine::ReplyType::Complete:
+        os << "complete"sv;
+        break;
+    }
+    return os;
+}
+
+
+std::ostream& operator<<(std::ostream& os, const SyncMachine::ReplyResult& en)
+{
+    switch (en) {
+    case SyncMachine::ReplyResult::Unexpected:
+        os << "unexpected"sv;
+        break;
+    case SyncMachine::ReplyResult::Discarded:
+        os << "discarded"sv;
+        break;
+    case SyncMachine::ReplyResult::Accepted:
+        os << "accepted"sv;
+        break;
+    }
+    return os;
 }
 
 } // namespace fuurin
