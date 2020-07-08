@@ -46,6 +46,9 @@ class Timer;
  *
  *   - \ref State::Synced:
  *     Synchronization is completed.
+ *
+ *   - \ref State::Failed:
+ *     Synchronization is failed.
  */
 class SyncMachine
 {
@@ -57,6 +60,7 @@ public:
     {
         Halted,   ///< Initial state.
         Download, ///< Dowloading data.
+        Failed,   ///< Synchronization failure.
         Synced,   ///< Synchronization complete.
     };
 
@@ -193,7 +197,8 @@ public:
     /**
      * \brief Notifies that the syncing is being halted.
      *
-     * When either in \ref State::Download or \ref State::Synced, it causes:
+     * When either in \ref State::Download, \ref State::Synced or \ref State::Failed,
+     * it causes:
      *   - A transition to \ref State::Halted.
      *   - Resets the internal state, e.g. \ref currentIndex()
      *     is cleared to 0.
@@ -203,7 +208,8 @@ public:
     /**
      * \brief Notifies that the syncing is being requested.
      *
-     * When either in \ref State::Halted or \ref State::Synced, it causes:
+     * When either in \ref State::Halted, \ref State::Synced or \ref State::Failed,
+     * it causes:
      *   - A transition to \ref State:Download.
      *   - Synchronization starts.
      *
@@ -261,6 +267,15 @@ private:
      * \see close(int)
      */
     void halt(int indexClose);
+
+    /**
+     * \brief Fails the state machine.
+     *
+     * \param[in] indexClose Index to close.
+     *
+     * \see close(int)
+     */
+    void fail(int indexClose);
 
     /**
      * \brief Sends a synchronization request.

@@ -205,6 +205,19 @@ BOOST_AUTO_TEST_CASE(testOnSyncInSynced)
 }
 
 
+BOOST_AUTO_TEST_CASE(testOnSyncInFailed)
+{
+    auto [mach, test] = setupMach(1, 0);
+    mach.onSync();
+    mach.onTimerTimeoutFired();
+    BOOST_TEST(mach.state() == SyncMachine::State::Failed);
+
+    mach.onSync();
+    test({SyncMachine::State::Download, SyncMachine::State::Failed, SyncMachine::State::Download},
+        {{0, 2}, {1, 1}}, {{0, 1}, {1, 1}}, {{0, 1}, {1, 2}}, true, 1, 0, 0, 2);
+}
+
+
 /**
  * HALT
  */
@@ -251,6 +264,19 @@ BOOST_AUTO_TEST_CASE(testOnHaltInSynced)
 
     mach.onHalt();
     test({SyncMachine::State::Download, SyncMachine::State::Synced, SyncMachine::State::Halted},
+        {{0, 2}, {1, 1}}, {{0, 1}}, {{0, 1}}, false, 0, 1, 0, 0);
+}
+
+
+BOOST_AUTO_TEST_CASE(testOnHaltInFailed)
+{
+    auto [mach, test] = setupMach(1, 0);
+    mach.onSync();
+    mach.onTimerTimeoutFired();
+    BOOST_TEST(mach.state() == SyncMachine::State::Failed);
+
+    mach.onHalt();
+    test({SyncMachine::State::Download, SyncMachine::State::Failed, SyncMachine::State::Halted},
         {{0, 2}, {1, 1}}, {{0, 1}}, {{0, 1}}, false, 0, 1, 0, 0);
 }
 
@@ -336,6 +362,30 @@ BOOST_DATA_TEST_CASE(testOnReplyInSynced,
 }
 
 
+BOOST_DATA_TEST_CASE(testOnReplyInFailed,
+    bdata::make({
+        std::make_tuple(0, 0, SyncMachine::ReplyType::Complete),
+        std::make_tuple(1, 0, SyncMachine::ReplyType::Complete),
+        std::make_tuple(0, 1, SyncMachine::ReplyType::Complete),
+        std::make_tuple(1, 1, SyncMachine::ReplyType::Complete),
+        std::make_tuple(0, 0, SyncMachine::ReplyType::Snapshot),
+        std::make_tuple(1, 0, SyncMachine::ReplyType::Snapshot),
+        std::make_tuple(0, 1, SyncMachine::ReplyType::Snapshot),
+        std::make_tuple(1, 1, SyncMachine::ReplyType::Snapshot),
+    }),
+    index, seqn, reply)
+{
+    auto [mach, test] = setupMach(1, 0);
+    mach.onSync();
+    mach.onTimerTimeoutFired();
+    BOOST_TEST(mach.state() == SyncMachine::State::Failed);
+
+    BOOST_TEST(mach.onReply(index, seqn, reply) == SyncMachine::ReplyResult::Unexpected);
+    test({SyncMachine::State::Download, SyncMachine::State::Failed},
+        {{0, 2}, {1, 1}}, {{0, 1}}, {{0, 1}}, false, 0, 1, 0, 1);
+}
+
+
 /**
  * TIMEOUT
  */
@@ -361,9 +411,9 @@ using MS = std::unordered_map<int, SyncMachine::seqn_t>;
 BOOST_DATA_TEST_CASE(testOnTimeoutInDownload,
     bdata::make({
         std::make_tuple("timeout, no retry",
-            1, 0, 1, -1, SS::Halted, VT{SS::Download, SS::Halted},
+            1, 0, 1, -1, SS::Failed, VT{SS::Download, SS::Failed},
             MC{{0, 2}, {1, 1}}, MO{{0, 1}}, MS{{0, 1}},
-            false, 0, 1, 0, 0),
+            false, 0, 1, 0, 1),
         std::make_tuple("timeout, retry",
             1, 1, 1, -1, SS::Download, VT{SS::Download},
             MC{{0, 2}, {1, 1}}, MO{{0, 1}, {1, 1}}, MS{{0, 1}, {1, 2}},
@@ -373,13 +423,13 @@ BOOST_DATA_TEST_CASE(testOnTimeoutInDownload,
             MC{{0, 2}, {1, 2}, {2, 2}}, MO{{0, 2}, {1, 1}, {2, 1}}, MS{{0, 4}, {1, 2}, {2, 3}},
             true, 0, 1, 3, 4),
         std::make_tuple("timeout, fail",
-            1, 1, 2, -1, SS::Halted, VT{SS::Download, SS::Halted},
+            1, 1, 2, -1, SS::Failed, VT{SS::Download, SS::Failed},
             MC{{0, 2}, {1, 2}}, MO{{0, 1}, {1, 1}}, MS{{0, 1}, {1, 2}},
-            false, 0, 1, 0, 0),
+            false, 1, 0, 1, 2),
         std::make_tuple("timeout, fail more",
-            2, 2, 4, -1, SS::Halted, VT{SS::Download, SS::Halted},
+            2, 2, 4, -1, SS::Failed, VT{SS::Download, SS::Failed},
             MC{{0, 2}, {1, 2}, {2, 2}}, MO{{0, 1}, {1, 1}, {2, 1}}, MS{{0, 1}, {1, 2}, {2, 3}},
-            false, 0, 1, 0, 0),
+            false, 2, 0, 2, 3),
         std::make_tuple("timeout, change next",
             2, 3, 1, 2, SS::Download, VT{SS::Download},
             MC{{0, 2}, {1, 1}, {2, 1}}, MO{{0, 1}, {2, 1}}, MS{{0, 1}, {2, 2}},
@@ -420,6 +470,19 @@ BOOST_AUTO_TEST_CASE(testOnTimeoutInSynced)
     mach.onTimerTimeoutFired();
     test({SyncMachine::State::Download, SyncMachine::State::Synced},
         {{0, 1}, {1, 1}}, {{0, 1}}, {{0, 1}}, false, 0, 1, 0, 1);
+}
+
+
+BOOST_AUTO_TEST_CASE(testOnTimeoutInFailed)
+{
+    auto [mach, test] = setupMach(1, 0);
+    mach.onSync();
+    mach.onTimerTimeoutFired();
+    BOOST_TEST(mach.state() == SyncMachine::State::Failed);
+
+    mach.onTimerTimeoutFired();
+    test({SyncMachine::State::Download, SyncMachine::State::Failed},
+        {{0, 2}, {1, 1}}, {{0, 1}}, {{0, 1}}, false, 0, 1, 0, 1);
 }
 
 

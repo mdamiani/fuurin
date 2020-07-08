@@ -127,7 +127,19 @@ void SyncMachine::onHalt()
 
     LOG_DEBUG(log::Arg{name_}, log::Arg{"event"sv, "halt"sv});
 
-    halt(indexCurr_);
+    switch (state_) {
+    case State::Failed:
+        halt(-1);
+        break;
+
+    case State::Download:
+    case State::Synced:
+        halt(indexCurr_);
+        break;
+
+    default:
+        break;
+    };
 }
 
 
@@ -140,7 +152,23 @@ void SyncMachine::onSync()
 
     retryCurr_ = 0;
 
-    sync(-1, state_ == State::Halted ? indexCurr_ : -1);
+    switch (state_) {
+    case State::Failed:
+        indexCurr_ = indexNext_;
+        setNextIndex(indexCurr_ + 1);
+        // fallthrough
+
+    case State::Halted:
+        sync(-1, indexCurr_);
+        break;
+
+    case State::Synced:
+        sync(-1, -1);
+        break;
+
+    default:
+        break;
+    };
 }
 
 
@@ -186,7 +214,7 @@ void SyncMachine::onTimerTimeoutFired()
     LOG_DEBUG(log::Arg{name_}, log::Arg{"event"sv, "timeout"sv});
 
     if (retryCurr_ + 1 > retryMax_) {
-        halt(indexCurr_);
+        fail(indexCurr_);
         return;
     }
 
@@ -210,6 +238,15 @@ void SyncMachine::halt(int indexClose)
 
     close(indexClose);
     change(State::Halted);
+}
+
+
+void SyncMachine::fail(int indexClose)
+{
+    timerTmo_->stop();
+
+    close(indexClose);
+    change(State::Failed);
 }
 
 
@@ -268,6 +305,10 @@ void SyncMachine::change(State state)
         LOG_DEBUG(log::Arg{name_}, log::Arg{"trans"sv, "download"sv});
         break;
 
+    case State::Failed:
+        LOG_DEBUG(log::Arg{name_}, log::Arg{"trans"sv, "failed"sv});
+        break;
+
     case State::Synced:
         LOG_DEBUG(log::Arg{name_}, log::Arg{"trans"sv, "synced"sv});
         break;
@@ -286,6 +327,9 @@ std::ostream& operator<<(std::ostream& os, const SyncMachine::State& en)
         break;
     case SyncMachine::State::Download:
         os << "download"sv;
+        break;
+    case SyncMachine::State::Failed:
+        os << "failed"sv;
         break;
     case SyncMachine::State::Synced:
         os << "synced"sv;
