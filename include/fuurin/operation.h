@@ -55,6 +55,7 @@ public:
         Start,    ///< Operation for \ref Runner::start().
         Stop,     ///< Operation for \ref Runner::stop().
         Dispatch, ///< Operation for \ref Worker::dispatch(zmq::Part&&).
+        Sync,     ///< Operation for \ref Worker::sync().
 
         COUNT, ///< Number of operations.
     };

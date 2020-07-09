@@ -91,6 +91,8 @@ std::string_view Operation::toString(Operation::Type v) noexcept
         return "stop"sv;
     case Operation::Type::Dispatch:
         return "dispatch"sv;
+    case Operation::Type::Sync:
+        return "sync"sv;
     case Operation::Type::COUNT:
         break;
     }

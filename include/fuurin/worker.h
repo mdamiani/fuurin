@@ -55,6 +55,13 @@ public:
     void dispatch(zmq::Part&& data);
 
     /**
+     * \brief Sends a synchronization request to the broker.
+     *
+     * \see isRunning()
+     */
+    void sync();
+
+    /**
      * \see Runner::waitForEvent(std::chrono::milliseconds)
      */
     Event waitForEvent(std::chrono::milliseconds timeout = std::chrono::milliseconds(-1));
@@ -137,7 +144,7 @@ protected:
         /**
          * \brief Sends sync message to the remote party.
          */
-        void sendSync();
+        void sendSync(uint8_t seqn);
 
         /**
          * \brief Collects a message which was published by a broker.
@@ -145,6 +152,13 @@ protected:
          * \param[in] payload Message payload.
          */
         void collectBrokerMessage(zmq::Part&& payload);
+
+        /**
+         * \brief Receives snapshot data from broker.
+         *
+         * \param[in] payload Payload received from broker.
+         */
+        void recvBrokerSnapshot(zmq::Part&& payload);
 
         /**
          * \brief Notifies for any change of connection state.
