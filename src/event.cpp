@@ -105,6 +105,10 @@ std::string_view Event::toString(Event::Type v) noexcept
         return "sync/success"sv;
     case Event::Type::SyncError:
         return "sync/error"sv;
+    case Event::Type::SyncDownloadOn:
+        return "sync/download/on"sv;
+    case Event::Type::SyncDownloadOff:
+        return "sync/download/off"sv;
     case Event::Type::COUNT:
         break;
     }

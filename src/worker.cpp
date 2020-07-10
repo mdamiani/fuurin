@@ -139,7 +139,7 @@ Worker::WorkerSession::WorkerSession(token_type_t token, CompletionFunc onComple
     , sync_{
           std::make_unique<SyncMachine>("worker"sv, zctx.get(),
               0,      // TODO: depends on number of endpoints
-              0,      // TODO: make configurable
+              1,      // TODO: make configurable
               3000ms, // TODO: make configurable
 
               std::bind(&Worker::WorkerSession::snapClose, this),                       //
@@ -326,7 +326,7 @@ void Worker::WorkerSession::sendSync(uint8_t seqn)
 
     LOG_DEBUG(log::Arg{"worker"sv},
         log::Arg{"snapshot"sv, "request"sv},
-        log::Arg{"status"sv, Event::toString(Event::Type::SyncSuccess)});
+        log::Arg{"status"sv, Event::toString(Event::Type::SyncBegin)});
 
     // TODO: pass other sync params.
     zsnapshot_->trySend(zmq::PartMulti::pack(BROKER_SYNC_REQST, seqn, zmq::Part{}));
@@ -366,8 +366,8 @@ void Worker::WorkerSession::recvBrokerSnapshot(zmq::Part&& payload)
             log::Arg{"snapshot"sv, "recv"sv},
             log::Arg{"status"sv, Event::toString(Event::Type::SyncElement)});
 
-        sync_->onReply(0, seqn, SyncMachine::ReplyType::Snapshot);
         sendEvent(Event::Type::SyncElement, std::move(params));
+        sync_->onReply(0, seqn, SyncMachine::ReplyType::Snapshot);
 
     } else if (reply == BROKER_SYNC_COMPL) {
         sync_->onReply(0, seqn, SyncMachine::ReplyType::Complete);
@@ -401,6 +401,7 @@ void Worker::WorkerSession::notifySnapshotDownload(bool isSync)
     LOG_DEBUG(log::Arg{"worker"sv}, log::Arg{"snapshot"sv, isSync ? "download"sv : "done"sv});
 
     isSnapshot_ = isSync;
+    sendEvent(isSync ? Event::Type::SyncDownloadOn : Event::Type::SyncDownloadOff, zmq::Part{});
 }
 
 } // namespace fuurin

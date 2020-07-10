@@ -196,6 +196,34 @@ void testWaitForEvent(Worker& w, std::chrono::milliseconds timeout, Event::Notif
 }
 
 
+struct WorkerFixture
+{
+    WorkerFixture()
+    {
+        wf = w.start();
+        bf = b.start();
+
+        testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Started);
+        testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Online);
+    }
+
+    ~WorkerFixture()
+    {
+        w.stop();
+        b.stop();
+
+        testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Offline);
+        testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Stopped);
+    }
+
+    Worker w;
+    Broker b;
+
+    std::future<void> wf;
+    std::future<void> bf;
+};
+
+
 typedef boost::mpl::list<Broker, Worker> runnerTypes;
 BOOST_AUTO_TEST_CASE_TEMPLATE(workerStart, T, runnerTypes)
 {
@@ -231,86 +259,33 @@ BOOST_AUTO_TEST_CASE(testWaitForStart)
 }
 
 
-BOOST_AUTO_TEST_CASE(testWaitForOnline)
+BOOST_FIXTURE_TEST_CASE(testWaitForOnline, WorkerFixture)
 {
-    Worker w;
-    Broker b;
-
-    auto wf = w.start();
-    auto bf = b.start();
-
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Started);
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Online);
-
-    w.stop();
-    b.stop();
-
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Offline);
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Stopped);
 }
 
 
-BOOST_AUTO_TEST_CASE(testWaitForOffline)
+BOOST_FIXTURE_TEST_CASE(testWaitForOffline, WorkerFixture)
 {
-    Worker w;
-    Broker b;
-
-    auto wf = w.start();
-    auto bf = b.start();
-
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Started);
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Online);
-
     b.stop();
     bf.get();
     testWaitForEvent(w, 6s, Event::Notification::Success, Event::Type::Offline);
 
     bf = b.start();
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Online);
-
-    w.stop();
-    b.stop();
-
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Offline);
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Stopped);
 }
 
 
-BOOST_AUTO_TEST_CASE(testSimpleDispatch)
+BOOST_FIXTURE_TEST_CASE(testSimpleDispatch, WorkerFixture)
 {
-    Worker w;
-    Broker b;
-
-    auto wf = w.start();
-    auto bf = b.start();
-
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Started);
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Online);
-
     w.dispatch(zmq::Part{"hello"sv});
 
     testWaitForEvent(w, 5s, Event::Notification::Success, Event::Type::Delivery, "hello");
-
-    w.stop();
-    b.stop();
-
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Offline);
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Stopped);
 }
 
 
-BOOST_AUTO_TEST_CASE(testWaitForEventThreadSafe)
+BOOST_FIXTURE_TEST_CASE(testWaitForEventThreadSafe, WorkerFixture)
 {
-    Worker w;
-    Broker b;
-
-    auto wf = w.start();
-    auto bf = b.start();
-
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Started);
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Online);
-
-    const auto recvEvent = [&w]() {
+    const auto recvEvent = [this]() {
         int cnt = 0;
         for (;;) {
             const auto& ev = w.waitForEvent(1500ms);
@@ -335,26 +310,11 @@ BOOST_AUTO_TEST_CASE(testWaitForEventThreadSafe)
     BOOST_TEST(cnt1 != 0);
     BOOST_TEST(cnt2 != 0);
     BOOST_TEST(cnt1 + cnt2 == iterations);
-
-    w.stop();
-    b.stop();
-
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Offline);
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Stopped);
 }
 
 
-BOOST_AUTO_TEST_CASE(testWaitForEventDiscard)
+BOOST_FIXTURE_TEST_CASE(testWaitForEventDiscard, WorkerFixture)
 {
-    Worker w;
-    Broker b;
-
-    auto wf = w.start();
-    auto bf = b.start();
-
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Started);
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Online);
-
     // produce some events
     const int iterations = 3;
     for (int i = 0; i < iterations; ++i)
@@ -392,12 +352,77 @@ BOOST_AUTO_TEST_CASE(testWaitForEventDiscard)
     // receive new events
     testWaitForEvent(w, 1500ms, Event::Notification::Success,
         Event::Type::Delivery, "hello2");
+}
+
+
+BOOST_FIXTURE_TEST_CASE(testSyncEmpty, WorkerFixture)
+{
+    w.sync();
+
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncDownloadOn);
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncBegin);
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncSuccess);
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncDownloadOff);
+}
+
+
+BOOST_FIXTURE_TEST_CASE(testSyncElement, WorkerFixture)
+{
+    w.dispatch(zmq::Part{"hello1"sv});
+    w.dispatch(zmq::Part{"hello2"sv});
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Delivery, "hello1");
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Delivery, "hello2");
+
+    w.sync();
+
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncDownloadOn);
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncBegin);
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncElement, "hello1");
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncElement, "hello2");
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncSuccess);
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncDownloadOff);
+}
+
+
+BOOST_AUTO_TEST_CASE(testSyncError_Halt)
+{
+    Worker w;
+
+    auto wf = w.start();
+
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Started);
+
+    w.sync();
+
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncDownloadOn);
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncBegin);
 
     w.stop();
-    b.stop();
 
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Offline);
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncError);
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncDownloadOff);
+
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Stopped);
+}
+
+
+BOOST_AUTO_TEST_CASE(testSyncError_Timeout)
+{
+    Worker w;
+
+    auto wf = w.start();
+
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Started);
+
+    w.sync();
+
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncDownloadOn);
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncBegin);
+    testWaitForEvent(w, 5s, Event::Notification::Success, Event::Type::SyncBegin);
+    testWaitForEvent(w, 5s, Event::Notification::Success, Event::Type::SyncError);
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncDownloadOff);
+
+    w.stop();
 }
 
 
