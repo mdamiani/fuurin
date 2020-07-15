@@ -16,9 +16,17 @@
 namespace fuurin {
 namespace err {
 
+Error::Error() noexcept
+    : empty_(true)
+    , what_(nullptr)
+    , loc_({nullptr, 0})
+{
+}
+
 
 Error::Error(const log::Loc& loc, const char* what, const log::Arg& arg) noexcept
-    : what_(what)
+    : empty_(false)
+    , what_(what)
     , loc_(loc)
     , arg_(arg)
 {
@@ -27,6 +35,12 @@ Error::Error(const log::Loc& loc, const char* what, const log::Arg& arg) noexcep
 
 Error::~Error() noexcept
 {
+}
+
+
+bool Error::empty() const noexcept
+{
+    return empty_;
 }
 
 
@@ -46,5 +60,15 @@ const log::Arg& Error::arg() const noexcept
 {
     return arg_;
 }
+
+
+std::ostream& operator<<(std::ostream& os, const Error& e)
+{
+    if (!e.empty())
+        os << e.what() << e.arg();
+
+    return os;
+}
+
 } // namespace err
 } // namespace fuurin
