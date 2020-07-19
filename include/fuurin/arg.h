@@ -55,7 +55,7 @@ public:
     /**
      * \brief Type of this argument.
      */
-    enum Type : uint8_t
+    enum struct Type : uint8_t
     {
         Invalid, ///< Invalid argument.
         Int,     ///< Integer.
@@ -238,7 +238,7 @@ private:
     /**
      * \brief Type of allocation of argument value.
      */
-    enum Alloc : uint8_t
+    enum struct Alloc : uint8_t
     {
         None,  ///< No allocation / pointer to data.
         Stack, ///< Stack allocation.
@@ -285,6 +285,11 @@ private:
  * \brief Outputs an argument.
  */
 std::ostream& operator<<(std::ostream& os, const Arg& arg);
+
+/**
+ * \brief Prints an array of arguments.
+ */
+void printArgs(std::ostream& os, const Arg args[], size_t num);
 
 
 } // namespace log

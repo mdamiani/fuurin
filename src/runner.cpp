@@ -14,9 +14,14 @@
 #include "fuurin/zmqpoller.h"
 #include "fuurin/zmqpart.h"
 #include "fuurin/zmqpartmulti.h"
+#include "fuurin/stopwatch.h"
+#include "failure.h"
+#include "types.h"
 #include "log.h"
 
 #include <boost/scope_exit.hpp>
+
+#include <cstring>
 
 
 #define GROUP_EVENTS "EVN"
@@ -68,9 +73,9 @@ bool Runner::isRunning() const noexcept
 }
 
 
-zmq::Context* Runner::zmqContext() const noexcept
+std::unique_ptr<Runner::Session> Runner::createSession(CompletionFunc onComplete) const
 {
-    return zctx_.get();
+    return makeSession<Session>(onComplete);
 }
 
 
@@ -89,7 +94,12 @@ std::future<void> Runner::start()
             running_ = false;
     };
 
-    auto ret = std::async(std::launch::async, &Runner::run, this);
+    auto ret = std::async(std::launch::async,
+        [s = createSession([this]() {
+            running_ = false;
+        })]() {
+            s->run();
+        });
 
     commit = true;
     return ret;
@@ -101,46 +111,78 @@ bool Runner::stop() noexcept
     if (!isRunning())
         return false;
 
-    sendOperation(Operation::Stop);
+    sendOperation(Operation::Type::Stop);
     return true;
 }
 
 
-std::tuple<zmq::Part, Runner::EventRead> Runner::waitForEvent(std::chrono::milliseconds timeout)
+Event Runner::waitForEvent(std::chrono::milliseconds timeout)
 {
-    zmq::Poller poll{zmq::PollerEvents::Read, timeout, zevr_.get()};
-
-    if (poll.wait().empty())
-        return std::make_tuple(zmq::Part{}, EventRead::Timeout);
-
-    auto [ev, valid] = recvEvent();
-    if (!valid)
-        return std::make_tuple(std::move(ev), EventRead::Discard);
-
-    return std::make_tuple(std::move(ev), EventRead::Success);
+    return waitForEvent(zmq::Poller{zmq::PollerEvents::Read, 0ms, zevr_.get()},
+        fuurin::StopWatch{}, std::bind(&Runner::recvEvent, this), timeout);
 }
 
 
-std::tuple<zmq::Part, bool> Runner::recvEvent()
+Event Runner::waitForEvent(zmq::PollerWaiter&& pw, Elapser&& dt,
+    EventRecvFunc recv, std::chrono::milliseconds timeout)
+{
+    for (;;) {
+        pw.setTimeout(timeout);
+
+        if (pw.wait().empty())
+            break;
+
+        const auto& ev = recv();
+        if (ev.notification() == Event::Notification::Timeout) {
+            timeout -= dt.elapsed();
+            if (timeout <= 0ms)
+                break;
+
+            dt.start();
+            continue;
+        }
+
+        return ev;
+    }
+
+    return Event{Event::Type::Invalid, Event::Notification::Timeout};
+}
+
+
+Event Runner::recvEvent()
 {
     zmq::Part r;
-    zevr_->recv(&r);
-    auto [tok, ev] = zmq::PartMulti::unpack<token_type_t, zmq::Part>(r);
+    const auto n = zevr_->tryRecv(&r);
+    if (n == -1) {
+        return Event{Event::Type::Invalid, Event::Notification::Timeout};
+    }
 
-    return std::make_tuple(std::move(ev), tok == token_);
+    ASSERT(std::strncmp(r.group(), GROUP_EVENTS, sizeof(GROUP_EVENTS)) == 0, "bad event group");
+
+    auto [tok, evt, pay] = zmq::PartMulti::unpack<token_type_t, Event::type_t, zmq::Part>(r);
+    ASSERT(evt >= toIntegral(Event::Type::Invalid) && evt < toIntegral(Event::Type::COUNT),
+        "Runner::recvEvent: bad event type");
+
+    return Event{Event::Type(evt),
+        tok == token_ ? Event::Notification::Success : Event::Notification::Discard,
+        std::move(pay)};
 }
 
 
-void Runner::sendOperation(oper_type_t oper) noexcept
+void Runner::sendOperation(Operation::Type oper) noexcept
 {
     sendOperation(oper, zmq::Part());
 }
 
 
-void Runner::sendOperation(oper_type_t oper, zmq::Part&& payload) noexcept
+void Runner::sendOperation(Operation::Type oper, zmq::Part&& payload) noexcept
 {
+    const auto opt = Operation::type_t(oper);
+    ASSERT(opt >= toIntegral(Operation::Type::Invalid) && opt < toIntegral(Operation::Type::COUNT),
+        "Runner::sendOperation: bad operation type");
+
     try {
-        zops_->send(zmq::Part{token_}, zmq::Part{oper}, payload);
+        zops_->send(zmq::Part{token_}, zmq::Part{opt}, payload);
     } catch (const std::exception& e) {
         LOG_FATAL(log::Arg{"runner"sv}, log::Arg{"operation send threw exception"sv},
             log::Arg{std::string_view(e.what())});
@@ -152,54 +194,83 @@ void Runner::sendOperation(oper_type_t oper, zmq::Part&& payload) noexcept
  * ASYNC TASK
  */
 
-void Runner::run()
+Runner::Session::Session(token_type_t token, CompletionFunc onComplete,
+    const std::unique_ptr<zmq::Context>& zctx,
+    const std::unique_ptr<zmq::Socket>& zoper,
+    const std::unique_ptr<zmq::Socket>& zevent)
+    : token_(token)
+    , docompl_(onComplete)
+    , zctx_(zctx)
+    , zopr_(zoper)
+    , zevs_(zevent)
+{
+}
+
+
+Runner::Session::~Session() noexcept = default;
+
+
+void Runner::Session::run()
 {
     BOOST_SCOPE_EXIT(this)
     {
-        running_ = false;
+        try {
+            if (docompl_)
+                docompl_();
+        } catch (...) {
+            LOG_FATAL(log::Arg{"runner"sv},
+                log::Arg{"session on complete action threw exception"sv});
+        }
     };
 
-    auto poll = createPoller(zopr_.get());
+    auto poll = createPoller();
+
+    // generate a start operation
+    {
+        auto oper = Operation{Operation::Type::Start, Operation::Notification::Success};
+        operationReady(&oper);
+    }
 
     for (;;) {
         for (auto s : poll->wait()) {
             if (s != zopr_.get()) {
-                socketReady(static_cast<zmq::Socket*>(s));
+                socketReady(s);
                 continue;
             }
 
-            auto [oper, payload, valid] = recvOperation();
+            auto oper = recvOperation();
 
             // filter out old operations
-            if (!valid)
+            if (oper.notification() == Operation::Notification::Discard)
                 continue;
 
-            operationReady(oper, payload);
+            operationReady(&oper);
 
-            if (oper == Operation::Stop)
+            if (oper.type() == Operation::Type::Stop)
                 return;
         }
     }
 }
 
 
-std::unique_ptr<zmq::PollerWaiter> Runner::createPoller(zmq::Socket* sock)
+std::unique_ptr<zmq::PollerWaiter> Runner::Session::createPoller()
 {
-    return std::unique_ptr<zmq::PollerWaiter>{new zmq::PollerAuto{zmq::PollerEvents::Type::Read, sock}};
+    auto poll = new zmq::Poller{zmq::PollerEvents::Type::Read, zopr_.get()};
+    return std::unique_ptr<zmq::PollerWaiter>{poll};
 }
 
 
-void Runner::operationReady(oper_type_t, zmq::Part&)
-{
-}
-
-
-void Runner::socketReady(zmq::Socket*)
+void Runner::Session::operationReady(Operation*)
 {
 }
 
 
-std::tuple<Runner::oper_type_t, zmq::Part, bool> Runner::recvOperation() noexcept
+void Runner::Session::socketReady(zmq::Pollable*)
+{
+}
+
+
+Operation Runner::Session::recvOperation() noexcept
 {
     zmq::Part tok, oper, payload;
 
@@ -210,13 +281,23 @@ std::tuple<Runner::oper_type_t, zmq::Part, bool> Runner::recvOperation() noexcep
             log::Arg{std::string_view(e.what())});
     }
 
-    return std::make_tuple(oper.toUint8(), std::move(payload), tok.toUint8() == token_);
+    const Operation::type_t opt = oper.toUint8();
+    ASSERT(opt >= toIntegral(Operation::Type::Invalid) && opt < toIntegral(Operation::Type::COUNT),
+        "Runner::recvOperation: bad operation type");
+
+    return Operation{Operation::Type(opt),
+        tok.toUint8() == token_ ? Operation::Notification::Success : Operation::Notification::Discard,
+        std::move(payload)};
 }
 
 
-void Runner::sendEvent(zmq::Part&& ev)
+void Runner::Session::sendEvent(Event::Type ev, zmq::Part&& pay)
 {
-    zevs_->send(zmq::PartMulti::pack(token_.load(), ev).withGroup(GROUP_EVENTS));
+    const auto evt = Event::type_t(ev);
+    ASSERT(evt >= toIntegral(Event::Type::Invalid) && evt < toIntegral(Event::Type::COUNT),
+        "Runner::sendEvent: bad event type");
+
+    zevs_->send(zmq::PartMulti::pack(token_, evt, pay).withGroup(GROUP_EVENTS));
 }
 
 } // namespace fuurin

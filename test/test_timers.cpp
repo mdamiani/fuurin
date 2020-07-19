@@ -17,6 +17,7 @@
 #include "fuurin/zmqcontext.h"
 #include "fuurin/zmqpoller.h"
 #include "fuurin/zmqtimer.h"
+#include "fuurin/stopwatch.h"
 #include "fuurin/errors.h"
 
 #include <string_view>
@@ -201,4 +202,17 @@ BOOST_AUTO_TEST_CASE(timerSingleConsume)
     BOOST_TEST(!t.isExpired());
     BOOST_TEST(!t.isActive());
     BOOST_TEST(poll.wait().empty());
+}
+
+
+BOOST_AUTO_TEST_CASE(stopwatchElapsed)
+{
+    fuurin::StopWatch t;
+    std::this_thread::sleep_for(1s);
+    auto dt = t.elapsed();
+    BOOST_TEST(dt >= 1s);
+    BOOST_TEST(dt <= 5s);
+
+    t.start();
+    BOOST_TEST(t.elapsed() < 1s);
 }

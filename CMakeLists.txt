@@ -48,6 +48,8 @@ ExternalProject_Add(zeromq
 set(LIB_SOURCES
     src/fuurin.cpp
     src/errors.cpp
+    src/event.cpp
+    src/operation.cpp
     src/logger.cpp
     src/zmqcontext.cpp
     src/zmqsocket.cpp
@@ -61,13 +63,20 @@ set(LIB_SOURCES
     src/runner.cpp
     src/broker.cpp
     src/worker.cpp
+    src/connmachine.cpp
+    src/syncmachine.cpp
+    src/stopwatch.cpp
 )
 
 set(LIB_PUBLIC_HEADERS
     include/fuurin/arg.h
     include/fuurin/fuurin.h
     include/fuurin/errors.h
+    include/fuurin/elapser.h
+    include/fuurin/event.h
+    include/fuurin/opearation.h
     include/fuurin/logger.h
+    include/fuurin/stopwatch.h
     include/fuurin/zmqcontext.h
     include/fuurin/zmqsocket.h
     include/fuurin/zmqpollable.h

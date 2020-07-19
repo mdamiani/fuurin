@@ -268,13 +268,14 @@ public:
      * Every passed message \ref Part is nullified one by one,
      * during the send call.
      *
-     * \param[in] part Last message part to send.
+     * \param[in] part First message part to send.
      * \param[in] args More message parts to send.
      *
      * \return Total number of bytes of every part.
      *
      * \exception ZMQSocketSendFailed A part could not be sent.
      *
+     * \see trySend(Part&&)
      * \see sendMessageMore(Part *)
      * \see sendMessageLast(Part *)
      */
@@ -295,17 +296,57 @@ public:
     ///@}
 
     /**
+     * \brief Sends a ZMQ multipart message, without blocking.
+     *
+     * \param[in] part First message part to send.
+     * \param[in] args More message parts to send.
+     *
+     * \return Total number of bytes of every part,
+     *         or -1 if the write would block.
+     *
+     * \exception ZMQSocketSendFailed A part could not be sent.
+     *
+     * \see send(Part&&)
+     * \see sendMessageTryMore(Part *)
+     * \see sendMessageTryLast(Part *)
+     */
+    ///{@
+    template<typename T, typename... Args>
+    std::enable_if_t<std::is_same_v<std::decay_t<T>, Part>, int>
+    trySend(T&& part, Args&&... args)
+    {
+        const auto n1 = sendMessageTryMore(&part);
+        if (n1 == -1)
+            return -1;
+
+        const auto n2 = trySend(std::forward<Args>(args)...);
+        if (n2 == -1)
+            return -1;
+
+        return n1 + n2;
+    }
+
+    template<typename T>
+    std::enable_if_t<std::is_same_v<std::decay_t<T>, Part>, int>
+    trySend(T&& part)
+    {
+        return sendMessageTryLast(&part);
+    }
+    ///@}
+
+    /**
      * \brief Receives a ZMQ multipart message.
      *
      * Every passed message \ref Part is cleared if the are not empty.
      *
-     * \param[out] part Last message part to fill with the received data.
+     * \param[out] part First message part to fill with the received data.
      * \param[out] args More message parts to receive.
      *
      * \return Total number of bytes of every part.
      *
      * \exception ZMQSocketRecvFailed A part could not be received.
      *
+     * \see tryRecv(Part*)
      * \see recvMessageMore(Part *)
      * \see recvMessageLast(Part *)
      */
@@ -320,6 +361,118 @@ public:
     {
         return recvMessageLast(part);
     }
+    ///@}
+
+    /**
+     * \brief Receives a ZMQ multipart message, without blocking.
+     *
+     * \param[out] part First message part to fill with the received data.
+     * \param[out] args More message parts to receive.
+     *
+     * \return Total number of bytes of every part,
+     *         or -1 if the read would block.
+     *
+     * \exception ZMQSocketRecvFailed A part could not be received.
+     *
+     * \see recv(Part*)
+     * \see recvMessageTryMore(Part *)
+     * \see recvMessageTryLast(Part *)
+     */
+    ///{@
+    template<typename... Args>
+    int tryRecv(Part* part, Args&&... args)
+    {
+        const auto n1 = recvMessageTryMore(part);
+        if (n1 == -1)
+            return -1;
+
+        const auto n2 = tryRecv(std::forward<Args>(args)...);
+        if (n2 == -1)
+            return -1;
+
+        return n1 + n2;
+    }
+
+    int tryRecv(Part* part)
+    {
+        return recvMessageTryLast(part);
+    }
+    ///@}
+
+
+protected:
+    /**
+     * \brief Sends a ZMQ message part to this socket.
+     *
+     * When the more multiple parts are being sent,
+     * then flag ZMQ_SNDMORE is passed to \c zmq_msg_send.
+     *
+     * The part is nullified by \c zmq_msg_send, after the call.
+     *
+     * \param[in] part Message part to send.
+     *
+     * \return Number of bytes of the part.
+     *
+     * \exception ZMQSocketSendFailed The part could not be sent.
+     */
+    ///{@
+    virtual int sendMessageMore(Part* part);
+    virtual int sendMessageLast(Part* part);
+    ///@}
+
+    /**
+     * \brief Sends a ZMQ message part to this socket, without blocking.
+     *
+     * The flag \c ZMQ_DONTWAIT is passed to \c zmq_msg_send.
+     *
+     * \param[in] part Message part to send.
+     *
+     * \return Number of bytes of the part,
+     *         or -1 if the write would block.
+     *
+     * \exception ZMQSocketSendFailed The part could not be sent.
+     *
+     * \see sendMessageMore
+     * \see sendMessageLast
+     */
+    ///{@
+    virtual int sendMessageTryMore(Part* part);
+    virtual int sendMessageTryLast(Part* part);
+    ///@}
+
+    /**
+     * \brief Receives a ZMQ multipart message.
+     *
+     * The behaviour of this function if the same of \c zmq_msg_recv.
+     * The passed part is filled with data read from this socket, as is,
+     * and possibly cleared if its contents is not empty.
+     *
+     * \param[out] part A single message part to fill with the received data.
+     *
+     * \return Number of bytes in the message part.
+     *
+     * \exception ZMQSocketRecvFailed The part could not be received.
+     */
+    ///{@
+    virtual int recvMessageMore(Part* part);
+    virtual int recvMessageLast(Part* part);
+    ///@}
+
+    /**
+     * \brief Receives a ZMQ multipart message, without blocking.
+     *
+     * The flag \c ZMQ_DONTWAIT is passed to \c zmq_msg_recv.
+     *
+     * \param[out] part A single message part to fill with the received data.
+     *
+     * \return Number of bytes in the message part,
+     *         or -1 if the write would block.
+     *
+     * \exception ZMQSocketRecvFailed The part could not be received.
+     */
+    ///{@
+    virtual int recvMessageTryMore(Part* part);
+    virtual int recvMessageTryLast(Part* part);
     ///@}
 
 
@@ -389,41 +542,6 @@ private:
      */
     template<typename T>
     T getOption(int option) const;
-
-    /**
-     * \brief Sends a ZMQ message part to this socket.
-     *
-     * When the more multiple parts are being sent,
-     * then flag ZMQ_SNDMORE is passed to \c zmq_msg_send.
-     *
-     * The part is nullified by \c zmq_msg_send, after the call.
-     *
-     * \param[in] part Message part to send.
-     *
-     * \exception ZMQSocketSendFailed The part could not be sent.
-     */
-    ///{@
-    int sendMessageMore(Part* part);
-    int sendMessageLast(Part* part);
-    ///@}
-
-    /**
-     * \brief Receives a ZMQ multipart message.
-     *
-     * The behaviour of this function if the same of \c zmq_recv_msg.
-     * The passed part is filled with data read from this socket, as is,
-     * and possibly cleared if its contents is not empty.
-     *
-     * \param[out] part A single message part to fill with the received data.
-     *
-     * \return Number of bytes in the message part.
-     *
-     * \exception ZMQSocketRecvFailed The part could not be received.
-     */
-    ///{@
-    int recvMessageMore(Part* part);
-    int recvMessageLast(Part* part);
-    ///@}
 
     /**
      * \brief Joins a RADIO/DISH group.

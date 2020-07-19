@@ -33,7 +33,7 @@ namespace zmq {
  *
  * For every string or \ref Part argument, an additional 4 bytes header is
  * added to the buffer, in order to store the amount of subsequent bytes.
- * Instead the size of any integral type is always well known.
+ * Conversely, the size of any integral type is always well known.
  *
  * This class cannot be instantiated, it is just a helper namespace to
  * manipulate \ref Part objects.

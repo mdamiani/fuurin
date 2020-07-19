@@ -11,19 +11,24 @@
 #ifndef FUURIN_RUNNER_H
 #define FUURIN_RUNNER_H
 
+#include "fuurin/event.h"
+#include "fuurin/operation.h"
+
 #include <memory>
 #include <future>
 #include <atomic>
-#include <tuple>
 #include <chrono>
+#include <functional>
 
 
 namespace fuurin {
+class Elapser;
 
 namespace zmq {
 class Context;
 class Socket;
 class Part;
+class Pollable;
 class PollerWaiter;
 } // namespace zmq
 
@@ -38,20 +43,6 @@ class PollerWaiter;
  */
 class Runner
 {
-public:
-    /**
-     * \brief Type of event read.
-     *
-     * \see waitForEvent(std::chrono::milliseconds)
-     */
-    enum EventRead
-    {
-        Timeout, ///< The read operation timed out.
-        Success, ///< The read operation successfully returned an event.
-        Discard, ///< The read operation returned an old event.
-    };
-
-
 public:
     /**
      * \brief Initializes this runner.
@@ -78,7 +69,7 @@ public:
     ///@}
 
     /**
-     * \brief Starts the backgroud thread of the main task.
+     * \brief Starts the background thread of the main task.
      *
      * \return A future to hold the result (or an exception) of the computation,
      *      or and empty future in case the asynchronous task is already running.
@@ -87,7 +78,7 @@ public:
      *
      * \see stop()
      * \see isRunning()
-     * \see run()
+     * \see Session::run()
      */
     std::future<void> start();
 
@@ -102,8 +93,8 @@ public:
      *
      * \see start()
      * \see isRunning()
-     * \see sendOperation(oper_type_t)
-     * \see run()
+     * \see sendOperation(Operation::Type, zmq::Part&&)
+     * \see Session::run()
      */
     bool stop() noexcept;
 
@@ -114,77 +105,47 @@ public:
      *
      * \see start()
      * \see stop()
-     * \see run()
+     * \see Session::run()
      */
     bool isRunning() const noexcept;
 
 
-private:
+protected:
     typedef uint8_t token_type_t; ///< Type of the execution token.
 
+    ///< Function type to call when a sessions ends.
+    using CompletionFunc = std::function<void()>;
+
 
 protected:
-    typedef uint8_t oper_type_t; ///< Type of operation.
+    class Session;
 
     /**
-     * \brief Type of operation to issue to the asynchronous task.
+     * \brief Instantiates a session which runs the asynchronous task.
      *
-     * \see sendOperation(Operation)
-     * \see recvOperation()
-     * \see operationReady(oper_type_t, zmq::Part&)
+     * This method shall be overridden by subclasses in order to
+     * instantiate a more specific session.
+     *
+     * \param[in] onComplete Function to call when session is completed.
+     *                       It shall not throw exceptions.
+     *
+     * \see Session
+     * \return A pointer to a new session.
+     *
+     * \see makeSession()
      */
-    enum Operation : oper_type_t
+    virtual std::unique_ptr<Session> createSession(CompletionFunc onComplete) const;
+
+    /**
+     * \brief Wrapper to initialize any specific session.
+     *
+     * \see createSession()
+     */
+    template<typename S>
+    std::unique_ptr<Session> makeSession(CompletionFunc onComplete) const
     {
-        Invalid, ///< Invalid command.
-        Stop,    ///< Request to stop the asynchronous task.
-
-        OPER_COUNT, ///< Number of operations.
-    };
-
-
-protected:
-    /**
-     * \brief Returns the ZMQ context to create ZMQ sockets.
-     */
-    zmq::Context* zmqContext() const noexcept;
-
-    /**
-     * \brief Creates the poller to be used in the main asynchronous task.
-     *
-     * Concrete classes shall override this virtual method to create a poller in order to
-     * wait on the passed inter-thread \c sock and any other additional \ref Socket.
-     *
-     * This notification shall be executed in the asynchronous task thread.
-     *
-     * \param[in] sock Inter-thread socket used by the main asynchronous task.
-     *      It shall be added to the list of sockets \ref zmq::PollerWaiter will wait for.
-     *
-     * \exception May throw exceptions.
-     * \return A pointer to a newly created poller.
-     */
-    virtual std::unique_ptr<zmq::PollerWaiter> createPoller(zmq::Socket* sock);
-
-    /**
-     * \brief Notifies whenever any operation request was received by the asynchrnous task.
-     *
-     * This notification shall be executed in the asynchronous task thread.
-     *
-     * Concrete classes shall override this virtual method in order to
-     * handle and define any other specific tasks than \ref Operation::Stop.
-     */
-    virtual void operationReady(oper_type_t oper, zmq::Part& payload);
-
-    /**
-     * \brief Notifies whenever any socket being polled is ready to be read by the asynchronous task.
-     *
-     * This notification shall be executed in the asynchronous task thread.
-     *
-     * Concrete classes shall override this virtual method in order to
-     * handle their specific sockets. In case no additional sockets are
-     * added by \ref createPoller (other than the inter-thread one),
-     * then this nofitication is never issued.
-     */
-    virtual void socketReady(zmq::Socket* sock);
+        return std::make_unique<S>(token_, onComplete, zctx_, zopr_, zevs_);
+    }
 
     /**
      * \brief Sends an operation to perform to the asynchronous task.
@@ -196,19 +157,12 @@ protected:
      * by the inter-thread socket, otherwise a fatal error is raised.
      */
     ///{@
-    void sendOperation(oper_type_t oper) noexcept;
-    void sendOperation(oper_type_t oper, zmq::Part&& payload) noexcept;
+    void sendOperation(Operation::Type oper) noexcept;
+    void sendOperation(Operation::Type oper, zmq::Part&& payload) noexcept;
     ///@}
 
-    /**
-     * \brief Sends an event notification to the main thread.
-     *
-     * This method shall be called from the asynchronous task thread.
-     * The event is send over the inter-thread radio socket.
-     *
-     * \param[in] ev The event to be notified.
-     */
-    void sendEvent(zmq::Part&& ev);
+    ///< Type used for function to receive an event;
+    using EventRecvFunc = std::function<Event()>;
 
     /**
      * \brief Waits for events from the asynchronous task.
@@ -216,32 +170,32 @@ protected:
      * This method shall be called from the main thread.
      * This method is thread-safe.
      *
+     * \param[in] timeout Waiting deadline.
+     *
      * \return The (optionally) received event.
      *
      * \see recvEvent()
      */
-    std::tuple<zmq::Part, Runner::EventRead> waitForEvent(std::chrono::milliseconds timeout = std::chrono::milliseconds(-1));
+    Event waitForEvent(std::chrono::milliseconds timeout = std::chrono::milliseconds(-1));
 
 
 private:
+    friend class TestRunner;
+
     /**
-     * \brief Receives an operation to perform from the main thread.
+     * \brief Waits for events from the asynchronous task.
      *
-     * This method shall be called from the asynchronous task thread.
+     * \param[in] poll Poller interface.
+     * \param[in] dt Elapser interface.
+     * \param[in] recv Function used to actually receive and event.
+     * \param[in] timeout Waiting deadline.
      *
-     * The operation is received from the inter-thread communication socket.
-     * Receive of operation shall not fail, i.e. no exceptions must be thrown
-     * by the inter-thread socket, otherwise a fatal error is raised.
+     * \return An \ref Event representing the (optionally) received event.
      *
-     * In case the received operation's token doesn't match the current one,
-     * then the returned values are marked as invalid.
-     *
-     * \return A tuple with the type of operation, the payload and
-     *      whether they are valid or not.
-     *
-     * \see run()
+     * \see waitForEvent(std::chrono::milliseconds)
      */
-    std::tuple<oper_type_t, zmq::Part, bool> recvOperation() noexcept;
+    static Event waitForEvent(zmq::PollerWaiter&& pw, Elapser&& dt, EventRecvFunc recv,
+        std::chrono::milliseconds timeout);
 
     /**
      * \brief Receives an event notification from the asynchronous task.
@@ -252,41 +206,166 @@ private:
      * In case the received event's token doesn't match the current one,
      * then the returned value is marked as invalid.
      *
-     * \return A tuple with the event and whether it's valid or not.
+     * \return An \ref Event with its type, the payload and whether it's valid or not.
      *
      * \see waitForEvent(std::chrono::milliseconds)
      */
-    std::tuple<zmq::Part, bool> recvEvent();
+    Event recvEvent();
 
+
+protected:
     /**
-     * \brief Main body of the asynchronous task.
+     * \brief Session for the asynchronous task.
      *
-     * This method represents the asynchrous taks, so it will be running
-     * in a different thread than the main one.
+     * This class holds the variables and logic which shall not shared between
+     * the main and asynchronous task. Communication is establish using sockets
+     * at creation time.
      *
-     * \param[in] token Token representing the current execution task,
-     *      in order to filter out potential previous operations
-     *      being read from the inter-thread socket.
+     * Every spawned session has a \ref token_ representing the current execution task,
+     * in order to filter out potential previous operations being read from the
+     * inter-thread socket.
      *
-     * \exception Throws exceptions in case of unexpected errors.
-     *
-     * \see createPoller(zmq::Socket*)
-     * \see operationReady(oper_type_t, zmq::Part&)
-     * \see socketReady(zmq::Socket*)
-     * \see recvOperation()
+     * \see Runner::start()
      */
-    void run();
+    class Session
+    {
+    public:
+        /**
+         * \brief Creates a new session and initializes it.
+         *
+         * Passed sockets must be taken from a \ref Runner instance.
+         *
+         * \param[in] token Session token, it's constant as long as this session is alive.
+         * \param[in] onComplete Function to call when session ends.
+         * \param[in] zctx ZMQ context.
+         * \param[in] zoper ZMQ socket to receive operation commands from main task.
+         * \param[in] zevent ZMQ socket to send events to main task.
+         */
+        Session(token_type_t token, CompletionFunc onComplete,
+            const std::unique_ptr<zmq::Context>& zctx,
+            const std::unique_ptr<zmq::Socket>& zoper,
+            const std::unique_ptr<zmq::Socket>& zevent);
+
+        /**
+         * \brief Destructor.
+         */
+        virtual ~Session() noexcept;
+
+        /**
+         * Disable copy.
+         */
+        ///{@
+        Session(const Session&) = delete;
+        Session& operator=(const Session&) = delete;
+        ///@}
+
+        /**
+         * \brief Main body of the asynchronous task.
+         *
+         * This method represents the asynchrous task session,
+         * so it will be running in a different thread than the main one.
+         *
+         * \exception Throws exceptions in case of unexpected errors.
+         *
+         * \see createPoller()
+         * \see operationReady(Operation*)
+         * \see socketReady(zmq::Pollable*)
+         * \see recvOperation()
+         */
+        void run();
+
+
+    protected:
+        /**
+         * \brief Creates the poller to be used in the main asynchronous task.
+         *
+         * Concrete classes shall override this virtual method to create a poller in order to
+         * wait on the passed inter-thread \c sock and any other additional \ref Socket.
+         *
+         * This notification shall be executed in the asynchronous task thread.
+         *
+         * \remark Inter-thread socket \ref zopr_ shall be added to the list of sockets
+         *      \ref zmq::PollerWaiter will wait for.
+         *
+         * \exception May throw exceptions.
+         * \return A pointer to a newly created poller.
+         */
+        virtual std::unique_ptr<zmq::PollerWaiter> createPoller();
+
+        /**
+         * \brief Notifies whenever any operation request was received by the asynchrnous task.
+         *
+         * This notification shall be executed in the asynchronous task thread.
+         *
+         * Concrete classes shall override this virtual method in order to
+         * handle and define any other specific tasks than \ref Operation::Stop.
+         */
+        virtual void operationReady(Operation* oper);
+
+        /**
+         * \brief Notifies whenever any item being polled is ready to be accessed by the asynchronous task.
+         *
+         * This notification shall be executed in the asynchronous task thread.
+         *
+         * Concrete classes shall override this virtual method in order to
+         * handle their specific sockets. In case no additional sockets are
+         * added by \ref createPoller() (other than the inter-thread \ref zopr_),
+         * then this nofitication is never issued.
+         *
+         * \param[in] pble Ready pollable item.
+         */
+        virtual void socketReady(zmq::Pollable* pble);
+
+        /**
+         * \brief Sends an event notification to the main thread.
+         *
+         * This method shall be called from the asynchronous task thread.
+         * The event is send over the inter-thread radio socket.
+         *
+         * \param[in] event The type of event to be notified.
+         * \param[in] payload The payload of event to be notified.
+         */
+        void sendEvent(Event::Type event, zmq::Part&& payload);
+
+
+    private:
+        /**
+         * \brief Receives an operation to perform from the main thread.
+         *
+         * This method shall be called from the asynchronous task thread.
+         *
+         * The operation is received from the inter-thread communication socket \ref zopr_.
+         * Receive of operation shall not fail, i.e. no exceptions must be thrown
+         * by the inter-thread socket, otherwise a fatal error is raised.
+         *
+         * In case the received operation's token doesn't match session \ref token_,
+         * then the returned values are marked as invalid.
+         *
+         * \return An \ref Operation with its type, the payload and whether it's valid or not.
+         *
+         * \see run()
+         */
+        Operation recvOperation() noexcept;
+
+
+    protected:
+        const token_type_t token_;                  ///< Session token.
+        const CompletionFunc docompl_;              ///< Completion action.
+        const std::unique_ptr<zmq::Context>& zctx_; ///< \see Runner::zctx_.
+        const std::unique_ptr<zmq::Socket>& zopr_;  ///< \see Runner::zopr_.
+        const std::unique_ptr<zmq::Socket>& zevs_;  ///< \see Runner::zevs_.
+    };
 
 
 private:
-    std::unique_ptr<zmq::Context> zctx_; ///< ZMQ context.
-    std::unique_ptr<zmq::Socket> zops_;  ///< Inter-thread sending socket.
-    std::unique_ptr<zmq::Socket> zopr_;  ///< Inter-thread receiving socket.
-    std::unique_ptr<zmq::Socket> zevs_;  ///< Inter-thread events notifications.
-    std::unique_ptr<zmq::Socket> zevr_;  ///< Inter-thread events reception.
-    std::atomic<bool> running_;          ///< Whether the task is running.
-    std::atomic<token_type_t> token_;    ///< Current execution token for the task.
-};
+    const std::unique_ptr<zmq::Context> zctx_; ///< ZMQ context.
+    const std::unique_ptr<zmq::Socket> zops_;  ///< Inter-thread sending socket.
+    const std::unique_ptr<zmq::Socket> zopr_;  ///< Inter-thread receiving socket.
+    const std::unique_ptr<zmq::Socket> zevs_;  ///< Inter-thread events notifications.
+    const std::unique_ptr<zmq::Socket> zevr_;  ///< Inter-thread events reception.
+    std::atomic<bool> running_;                ///< Whether the task is running.
+    std::atomic<token_type_t> token_;          ///< Current execution token for the task.
+};                                             // namespace fuurin
 
 } // namespace fuurin
 

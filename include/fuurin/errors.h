@@ -14,6 +14,7 @@
 #include "fuurin/logger.h"
 
 #include <exception>
+#include <ostream>
 
 
 namespace fuurin {
@@ -25,6 +26,13 @@ namespace err {
 class Error : public std::exception
 {
 public:
+    /**
+     * \brief Initializes an empty default error.
+     *
+     * \see empty()
+     */
+    explicit Error() noexcept;
+
     /**
      * \brief Initializes this error with string description and arguments.
      * \param[in] loc Location of the error.
@@ -38,6 +46,11 @@ public:
      * \brief Destructor.
      */
     virtual ~Error() noexcept;
+
+    /**
+     * \return Whether this is a default empty error.
+     */
+    bool empty() const noexcept;
 
     /**
      * \return Error explanatory string.
@@ -56,6 +69,7 @@ public:
 
 
 private:
+    const bool empty_;       ///< Whether this error is empty.
     const char* const what_; ///< Name of this error.
     const log::Loc loc_;     ///< Location of this error.
     const log::Arg arg_;     ///< Error arguments.
@@ -90,6 +104,9 @@ DECL_ERROR(ZMQPollerWaitFailed)
 
 #define ERROR(type, reason, ...) \
     fuurin::err::type({__FILE__, __LINE__}, reason, ##__VA_ARGS__)
+
+
+std::ostream& operator<<(std::ostream& os, const Error& e);
 
 } // namespace err
 } // namespace fuurin

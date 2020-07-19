@@ -36,6 +36,13 @@ getMillis(std::chrono::milliseconds val)
 }
 
 } // namespace zmq
+
+template<typename Enum>
+constexpr std::underlying_type_t<Enum> toIntegral(Enum e)
+{
+    return static_cast<std::underlying_type_t<Enum>>(e);
+}
+
 } // namespace fuurin
 
 #endif // TYPES_H
