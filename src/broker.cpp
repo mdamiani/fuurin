@@ -159,8 +159,12 @@ void Broker::BrokerSession::collectWorkerMessage(zmq::Part&& payload)
         LOG_DEBUG(log::Arg{"broker"sv}, log::Arg{"dispatch"sv},
             log::Arg{"size"sv, int(paysz)});
 
-        storage_.push_back(std::string(payload.toString()));
-        zdispatch_->send(payload.withGroup(BROKER_UPDT));
+        // TODO: set broker id.
+        const auto t = Topic::fromPart(payload).withBroker(Uuid{});
+
+        storage_.push_back(t);
+
+        zdispatch_->send(t.toPart().withGroup(BROKER_UPDT));
 
     } else {
         LOG_WARN(log::Arg{"broker"sv},
@@ -212,8 +216,8 @@ void Broker::BrokerSession::replySnapshot(uint32_t rouID, uint8_t seqn, zmq::Par
                                     .withRoutingID(rouID)) == -1) {
             throw errWouldBlock;
         }
-        for (const auto& el : storage_) {
-            if (zsnapshot_->trySend(zmq::PartMulti::pack(BROKER_SYNC_ELEMN, seqn, el)
+        for (const auto& t : storage_) {
+            if (zsnapshot_->trySend(zmq::PartMulti::pack(BROKER_SYNC_ELEMN, seqn, t.toPart())
                                         .withRoutingID(rouID)) == -1) {
                 throw errWouldBlock;
             }

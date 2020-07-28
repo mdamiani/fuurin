@@ -179,8 +179,13 @@ BOOST_DATA_TEST_CASE(testWaitForEventTimeout,
 }
 
 
+zmq::Part mkT(const std::string& name, const std::string& pay)
+{
+    return Topic{}.withName(name).withData(zmq::Part{pay}).toPart();
+}
+
 void testWaitForEvent(Worker& w, std::chrono::milliseconds timeout, Event::Notification evRet,
-    Event::Type evType, const std::string& evPay = std::string())
+    Event::Type evType, const zmq::Part& evPay = zmq::Part{})
 {
     const auto& ev = w.waitForEvent(timeout);
 
@@ -189,7 +194,7 @@ void testWaitForEvent(Worker& w, std::chrono::milliseconds timeout, Event::Notif
 
     if (!evPay.empty()) {
         BOOST_TEST(!ev.payload().empty());
-        BOOST_TEST(ev.payload().toString() == std::string_view(evPay));
+        BOOST_TEST(ev.payload() == evPay);
     } else {
         BOOST_TEST(ev.payload().empty());
     }
@@ -277,9 +282,9 @@ BOOST_FIXTURE_TEST_CASE(testWaitForOffline, WorkerFixture)
 
 BOOST_FIXTURE_TEST_CASE(testSimpleDispatch, WorkerFixture)
 {
-    w.dispatch(zmq::Part{"hello"sv});
+    w.dispatch("topic"sv, zmq::Part{"hello"sv});
 
-    testWaitForEvent(w, 5s, Event::Notification::Success, Event::Type::Delivery, "hello");
+    testWaitForEvent(w, 5s, Event::Notification::Success, Event::Type::Delivery, mkT("topic", "hello"));
 }
 
 
@@ -299,7 +304,7 @@ BOOST_FIXTURE_TEST_CASE(testWaitForEventThreadSafe, WorkerFixture)
     const int iterations = 100;
 
     for (int i = 0; i < iterations; ++i)
-        w.dispatch(zmq::Part{"hello"sv});
+        w.dispatch("topic"sv, zmq::Part{"hello"sv});
 
     auto f1 = std::async(std::launch::async, recvEvent);
     auto f2 = std::async(std::launch::async, recvEvent);
@@ -318,11 +323,11 @@ BOOST_FIXTURE_TEST_CASE(testWaitForEventDiscard, WorkerFixture)
     // produce some events
     const int iterations = 3;
     for (int i = 0; i < iterations; ++i)
-        w.dispatch(zmq::Part{"hello1"sv});
+        w.dispatch("t1"sv, zmq::Part{"hello1"sv});
 
     // receive just one event
     testWaitForEvent(w, 1500ms, Event::Notification::Success,
-        Event::Type::Delivery, "hello1");
+        Event::Type::Delivery, mkT("t1", "hello1"));
 
     // wait for other events to be received
     std::this_thread::sleep_for(1s);
@@ -335,7 +340,7 @@ BOOST_FIXTURE_TEST_CASE(testWaitForEventDiscard, WorkerFixture)
     // discard old events
     for (int i = 0; i < iterations - 1; ++i) {
         testWaitForEvent(w, 1500ms, Event::Notification::Discard,
-            Event::Type::Delivery, "hello1");
+            Event::Type::Delivery, mkT("t1", "hello1"));
     }
 
     // discard old stop event
@@ -347,11 +352,11 @@ BOOST_FIXTURE_TEST_CASE(testWaitForEventDiscard, WorkerFixture)
     testWaitForEvent(w, 1500ms, Event::Notification::Success, Event::Type::Online);
 
     // produce a new event
-    w.dispatch(zmq::Part{"hello2"sv});
+    w.dispatch("t2"sv, zmq::Part{"hello2"sv});
 
     // receive new events
     testWaitForEvent(w, 1500ms, Event::Notification::Success,
-        Event::Type::Delivery, "hello2");
+        Event::Type::Delivery, mkT("t2", "hello2"));
 }
 
 
@@ -368,17 +373,17 @@ BOOST_FIXTURE_TEST_CASE(testSyncEmpty, WorkerFixture)
 
 BOOST_FIXTURE_TEST_CASE(testSyncElement, WorkerFixture)
 {
-    w.dispatch(zmq::Part{"hello1"sv});
-    w.dispatch(zmq::Part{"hello2"sv});
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Delivery, "hello1");
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Delivery, "hello2");
+    w.dispatch("t1"sv, zmq::Part{"hello1"sv});
+    w.dispatch("t2"sv, zmq::Part{"hello2"sv});
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Delivery, mkT("t1", "hello1"));
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Delivery, mkT("t2", "hello2"));
 
     w.sync();
 
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncDownloadOn);
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncBegin);
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncElement, "hello1");
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncElement, "hello2");
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncElement, mkT("t1", "hello1"));
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncElement, mkT("t2", "hello2"));
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncSuccess);
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncDownloadOff);
 }

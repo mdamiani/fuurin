@@ -56,14 +56,27 @@ Worker::~Worker() noexcept
 }
 
 
-void Worker::dispatch(zmq::Part&& data)
+void Worker::dispatch(Topic::Name name, const Topic::Data& data)
+{
+    dispatch(name, zmq::Part{data});
+}
+
+
+void Worker::dispatch(Topic::Name name, Topic::Data& data)
+{
+    dispatch(name, std::move(data));
+}
+
+
+void Worker::dispatch(Topic::Name name, Topic::Data&& data)
 {
     if (!isRunning()) {
         throw ERROR(Error, "could not dispatch data",
             log::Arg{"reason"sv, "worker is not running"sv});
     }
 
-    sendOperation(Operation::Type::Dispatch, std::forward<zmq::Part>(data));
+    sendOperation(Operation::Type::Dispatch,
+        zmq::PartMulti::pack(std::string_view(name), data));
 }
 
 

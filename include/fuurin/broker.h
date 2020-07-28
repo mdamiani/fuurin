@@ -12,6 +12,7 @@
 #define FUURIN_BROKER_H
 
 #include "fuurin/runner.h"
+#include "fuurin/topic.h"
 
 #include <memory>
 #include <list>
@@ -128,7 +129,7 @@ protected:
         const std::unique_ptr<zmq::Timer> zhugz_;      ///< ZMQ timer to send keepalives.
 
         // TODO: temporary structure, replace with a proper one.
-        std::list<std::string> storage_; ///< Data storage.
+        std::list<Topic> storage_; ///< Topic storage.
     };
 };
 

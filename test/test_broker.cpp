@@ -100,7 +100,7 @@ protected:
 
         void setSnapshot(std::string data)
         {
-            storage_.push_back(data);
+            storage_.push_back(Topic{}.withData(zmq::Part{data}));
         }
 
 
@@ -185,11 +185,11 @@ BOOST_DATA_TEST_CASE(testReceiverWorkerSync,
 {
     BOOST_TEST_MESSAGE(name);
 
-    const auto testPart = [](const zmq::Part& p, std::string_view id, uint8_t nn, std::string_view vv) {
+    const auto testPart = [](const zmq::Part& p, std::string_view id, uint8_t nn, zmq::Part vv = zmq::Part{}) {
         auto [rep, seq, pay] = zmq::PartMulti::unpack<std::string_view, uint8_t, zmq::Part>(p);
         BOOST_TEST(id == rep);
         BOOST_TEST(nn == seq);
-        BOOST_TEST(vv == pay.toString());
+        BOOST_TEST(vv == pay);
     };
 
     TestBroker b;
@@ -208,11 +208,12 @@ BOOST_DATA_TEST_CASE(testReceiverWorkerSync,
         if (wantSize > 0) {
             BOOST_TEST(int(b.testSocket->sentParts.size()) == wantSize);
             if (b.testSocket->sentParts.size() >= 1)
-                testPart(b.testSocket->sentParts.at(0), BROKER_SYNC_BEGIN, 0, ""sv);
+                testPart(b.testSocket->sentParts.at(0), BROKER_SYNC_BEGIN, 0);
             if (b.testSocket->sentParts.size() >= 2)
-                testPart(b.testSocket->sentParts.at(1), BROKER_SYNC_ELEMN, 0, "hello"sv);
+                testPart(b.testSocket->sentParts.at(1), BROKER_SYNC_ELEMN, 0,
+                    Topic{}.withData(zmq::Part{"hello"sv}).toPart());
             if (b.testSocket->sentParts.size() >= 3)
-                testPart(b.testSocket->sentParts.at(2), BROKER_SYNC_COMPL, 0, ""sv);
+                testPart(b.testSocket->sentParts.at(2), BROKER_SYNC_COMPL, 0);
         } else {
             BOOST_TEST(int(b.testSocket->sentParts.empty()));
         }

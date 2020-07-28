@@ -66,6 +66,7 @@ set(LIB_SOURCES
     src/connmachine.cpp
     src/syncmachine.cpp
     src/stopwatch.cpp
+    src/topic.cpp
 )
 
 set(LIB_PUBLIC_HEADERS
@@ -86,6 +87,7 @@ set(LIB_PUBLIC_HEADERS
     include/fuurin/runner.h
     include/fuurin/broker.h
     include/fuurin/worker.h
+    include/fuurin/topic.h
 )
 
 set(LIB_DEPS

@@ -13,6 +13,7 @@
 
 #include "fuurin/runner.h"
 #include "fuurin/event.h"
+#include "fuurin/topic.h"
 
 #include <memory>
 #include <string_view>
@@ -52,7 +53,11 @@ public:
      *
      * \see isRunning()
      */
-    void dispatch(zmq::Part&& data);
+    ///{@
+    void dispatch(Topic::Name name, const Topic::Data& data);
+    void dispatch(Topic::Name name, Topic::Data& data);
+    void dispatch(Topic::Name name, Topic::Data&& data);
+    ///@}
 
     /**
      * \brief Sends a synchronization request to the broker.
