@@ -15,6 +15,9 @@
 #include <cstring>
 
 
+using namespace std::literals::string_view_literals;
+
+
 namespace fuurin {
 namespace log {
 
@@ -335,6 +338,32 @@ const Arg* Arg::toArray() const noexcept
         return nullptr;
 
     return val_.arr_->buf_;
+}
+
+
+std::ostream& operator<<(std::ostream& os, const Arg::Type& type)
+{
+    switch (type) {
+    case Arg::Type::Invalid:
+        os << "invalid"sv;
+        break;
+    case Arg::Type::Int:
+        os << "int"sv;
+        break;
+    case Arg::Type::Errno:
+        os << "errno"sv;
+        break;
+    case Arg::Type::Double:
+        os << "double"sv;
+        break;
+    case Arg::Type::String:
+        os << "string"sv;
+        break;
+    case Arg::Type::Array:
+        os << "array"sv;
+        break;
+    }
+    return os;
 }
 
 } // namespace log

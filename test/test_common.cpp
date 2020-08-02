@@ -39,20 +39,6 @@ namespace utf = boost::unit_test;
 namespace bdata = utf::data;
 
 
-/**
- * BOOST_TEST print functions.
- */
-namespace fuurin {
-namespace log {
-inline std::ostream& operator<<(std::ostream& os, const Arg::Type& type)
-{
-    os << toIntegral(type);
-    return os;
-}
-} // namespace log
-} // namespace fuurin
-
-
 BOOST_AUTO_TEST_CASE(libVersion)
 {
     char buf[16];

@@ -282,9 +282,16 @@ private:
 
 
 /**
+ * \brief Outputs the type of an argument.
+ */
+std::ostream& operator<<(std::ostream& os, const Arg::Type& type);
+
+
+/**
  * \brief Outputs an argument.
  */
 std::ostream& operator<<(std::ostream& os, const Arg& arg);
+
 
 /**
  * \brief Prints an array of arguments.
