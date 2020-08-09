@@ -13,6 +13,7 @@
 
 #include "fuurin/event.h"
 #include "fuurin/operation.h"
+#include "fuurin/uuid.h"
 
 #include <memory>
 #include <future>
@@ -50,8 +51,10 @@ public:
      * The core sockets for the inter-thread communication is setup,
      * using a runner specific endpoint. Both the sending and receiving
      * ends are created and connected/bound.
+     *
+     * \param[in] id Instance identifier.
      */
-    Runner();
+    Runner(Uuid id = Uuid::createRandomUuid());
 
     /**
      * \brief Stops this runner.
@@ -67,6 +70,11 @@ public:
     Runner(const Runner&) = delete;
     Runner& operator=(const Runner&) = delete;
     ///@}
+
+    /**
+     * \return Return the instance identifier.
+     */
+    Uuid uuid() const;
 
     /**
      * \brief Starts the background thread of the main task.
@@ -358,6 +366,7 @@ protected:
 
 
 private:
+    const Uuid uuid_;                          ///< Identifier.
     const std::unique_ptr<zmq::Context> zctx_; ///< ZMQ context.
     const std::unique_ptr<zmq::Socket> zops_;  ///< Inter-thread sending socket.
     const std::unique_ptr<zmq::Socket> zopr_;  ///< Inter-thread receiving socket.
@@ -365,7 +374,7 @@ private:
     const std::unique_ptr<zmq::Socket> zevr_;  ///< Inter-thread events reception.
     std::atomic<bool> running_;                ///< Whether the task is running.
     std::atomic<token_type_t> token_;          ///< Current execution token for the task.
-};                                             // namespace fuurin
+};
 
 } // namespace fuurin
 

@@ -14,6 +14,7 @@
 #include "fuurin/runner.h"
 #include "fuurin/event.h"
 #include "fuurin/topic.h"
+#include "fuurin/uuid.h"
 
 #include <memory>
 #include <string_view>
@@ -39,7 +40,7 @@ public:
     /**
      * \brief Initializes this worker.
      */
-    Worker();
+    Worker(Uuid id = Uuid::createRandomUuid());
 
     /**
      * \brief Destroys this worker.

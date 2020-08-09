@@ -42,7 +42,8 @@ namespace fuurin {
  * MAIN TASK
  */
 
-Broker::Broker()
+Broker::Broker(Uuid id)
+    : Runner(id)
 {
 }
 

@@ -59,6 +59,15 @@ inline std::ostream& operator<<(std::ostream& os, const std::list<T>& l)
 } // namespace std
 
 
+BOOST_AUTO_TEST_CASE(testUuid)
+{
+    const Uuid id = Uuid::createNamespaceUuid(Uuid::fromString(Uuid::Ns::Dns), "test.edu"sv);
+    Worker w(id);
+
+    BOOST_TEST(w.uuid() == id);
+}
+
+
 namespace fuurin {
 class TestRunner : public zmq::PollerWaiter, public Elapser
 {

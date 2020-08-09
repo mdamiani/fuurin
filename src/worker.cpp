@@ -46,7 +46,8 @@ namespace fuurin {
  * MAIN TASK
  */
 
-Worker::Worker()
+Worker::Worker(Uuid id)
+    : Runner(id)
 {
 }
 

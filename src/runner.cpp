@@ -33,8 +33,9 @@ namespace fuurin {
  * MAIN TASK
  */
 
-Runner::Runner()
-    : zctx_(std::make_unique<zmq::Context>())
+Runner::Runner(Uuid id)
+    : uuid_(id)
+    , zctx_(std::make_unique<zmq::Context>())
     , zops_(std::make_unique<zmq::Socket>(zctx_.get(), zmq::Socket::PAIR))
     , zopr_(std::make_unique<zmq::Socket>(zctx_.get(), zmq::Socket::PAIR))
     , zevs_(std::make_unique<zmq::Socket>(zctx_.get(), zmq::Socket::RADIO))
@@ -64,6 +65,12 @@ Runner::Runner()
 Runner::~Runner() noexcept
 {
     stop();
+}
+
+
+Uuid Runner::uuid() const
+{
+    return uuid_;
 }
 
 

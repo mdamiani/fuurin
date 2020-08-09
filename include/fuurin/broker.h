@@ -13,6 +13,7 @@
 
 #include "fuurin/runner.h"
 #include "fuurin/topic.h"
+#include "fuurin/uuid.h"
 
 #include <memory>
 #include <list>
@@ -37,7 +38,7 @@ public:
     /**
      * \brief Initializes this broker.
      */
-    Broker();
+    Broker(Uuid id = Uuid::createRandomUuid());
 
     /**
      * \brief Destroys this broker.

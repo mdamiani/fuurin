@@ -20,6 +20,7 @@
 #include "fuurin/zmqpart.h"
 #include "fuurin/zmqpartmulti.h"
 #include "fuurin/errors.h"
+#include "fuurin/uuid.h"
 
 #include <string_view>
 #include <chrono>
@@ -136,6 +137,15 @@ public:
     }
 };
 } // namespace fuurin
+
+
+BOOST_AUTO_TEST_CASE(testUuid)
+{
+    const Uuid id = Uuid::createNamespaceUuid(Uuid::fromString(Uuid::Ns::Dns), "test.edu"sv);
+    Broker b(id);
+
+    BOOST_TEST(b.uuid() == id);
+}
 
 
 BOOST_DATA_TEST_CASE(testReceiverWorkerSync,
