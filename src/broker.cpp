@@ -63,11 +63,11 @@ std::unique_ptr<Runner::Session> Broker::createSession(CompletionFunc onComplete
  * ASYNC TASK
  */
 
-Broker::BrokerSession::BrokerSession(token_type_t token, CompletionFunc onComplete,
+Broker::BrokerSession::BrokerSession(Uuid id, token_type_t token, CompletionFunc onComplete,
     const std::unique_ptr<zmq::Context>& zctx,
     const std::unique_ptr<zmq::Socket>& zoper,
     const std::unique_ptr<zmq::Socket>& zevent)
-    : Session(token, onComplete, zctx, zoper, zevent)
+    : Session(id, token, onComplete, zctx, zoper, zevent)
     , zsnapshot_{std::make_unique<zmq::Socket>(zctx.get(), zmq::Socket::SERVER)}
     , zdelivery_{std::make_unique<zmq::Socket>(zctx.get(), zmq::Socket::DISH)}
     , zdispatch_{std::make_unique<zmq::Socket>(zctx.get(), zmq::Socket::RADIO)}
@@ -160,8 +160,7 @@ void Broker::BrokerSession::collectWorkerMessage(zmq::Part&& payload)
         LOG_DEBUG(log::Arg{"broker"sv}, log::Arg{"dispatch"sv},
             log::Arg{"size"sv, int(paysz)});
 
-        // TODO: set broker id.
-        const auto t = Topic::fromPart(payload).withBroker(Uuid{});
+        const auto t = Topic::fromPart(payload).withBroker(uuid_);
 
         storage_.push_back(t);
 

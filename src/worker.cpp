@@ -77,7 +77,7 @@ void Worker::dispatch(Topic::Name name, Topic::Data&& data)
     }
 
     sendOperation(Operation::Type::Dispatch,
-        zmq::PartMulti::pack(std::string_view(name), data));
+        Topic{Uuid{}, uuid(), Topic::SeqN{}, name, data}.toPart());
 }
 
 
@@ -120,11 +120,11 @@ std::unique_ptr<Runner::Session> Worker::createSession(CompletionFunc onComplete
  * ASYNC TASK
  */
 
-Worker::WorkerSession::WorkerSession(token_type_t token, CompletionFunc onComplete,
+Worker::WorkerSession::WorkerSession(Uuid id, token_type_t token, CompletionFunc onComplete,
     const std::unique_ptr<zmq::Context>& zctx,
     const std::unique_ptr<zmq::Socket>& zoper,
     const std::unique_ptr<zmq::Socket>& zevent)
-    : Session(token, onComplete, zctx, zoper, zevent)
+    : Session(id, token, onComplete, zctx, zoper, zevent)
     , zsnapshot_{std::make_unique<zmq::Socket>(zctx.get(), zmq::Socket::CLIENT)}
     , zdelivery_{std::make_unique<zmq::Socket>(zctx.get(), zmq::Socket::DISH)}
     , zdispatch_{std::make_unique<zmq::Socket>(zctx.get(), zmq::Socket::RADIO)}

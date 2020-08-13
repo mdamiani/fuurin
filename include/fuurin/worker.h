@@ -98,7 +98,7 @@ protected:
          *
          * \see Runner::Session::Session(...)
          */
-        WorkerSession(token_type_t token, CompletionFunc onComplete,
+        WorkerSession(Uuid id, token_type_t token, CompletionFunc onComplete,
             const std::unique_ptr<zmq::Context>& zctx,
             const std::unique_ptr<zmq::Socket>& zoper,
             const std::unique_ptr<zmq::Socket>& zevent);

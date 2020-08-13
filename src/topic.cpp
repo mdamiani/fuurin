@@ -229,34 +229,31 @@ Topic& Topic::withData(Data&& v)
 
 Topic Topic::fromPart(const zmq::Part& part)
 {
-    // TODO: unpack broker uuid
-    // TODO: unpack worker uuid
     // TODO: unpack sequence number
-    auto [name, data] = zmq::PartMulti::unpack<std::string_view, zmq::Part>(part);
+    auto [brok, work, seqn, name, data] = zmq::PartMulti::unpack<Uuid::Bytes, Uuid::Bytes,
+        Topic::SeqN, std::string_view, zmq::Part>(part);
 
-    Topic t;
-    t.name_ = name;
-    t.data_ = data;
-
-    return t;
+    return Topic{Uuid::fromBytes(brok), Uuid::fromBytes(work), Topic::SeqN{}, name, data};
 }
 
 
 zmq::Part Topic::toPart() const
 {
-    // TODO: pack broker uuid
-    // TODO: pack worker uuid
     // TODO: pack sequence number
-    return zmq::PartMulti::pack(std::string_view(name_), data_);
+    return zmq::PartMulti::pack(broker_.bytes(), worker_.bytes(), Topic::SeqN{}, std::string_view(name_), data_);
 }
 
 
 std::ostream& operator<<(std::ostream& os, const Topic& t)
 {
-    // TODO: output broker uuid
-    // TODO: output worker uuid
-    // TODO: output sequence number
-    os << "[" << std::string_view(t.name()) << ", " << t.data().size() << "]";
+    os << "["
+       << t.broker() << ", "
+       << t.worker() << ", "
+       << t.seqNum() << ", "
+       << std::string_view(t.name()) << ", "
+       << t.data().size()
+       << "]";
+
     return os;
 }
 

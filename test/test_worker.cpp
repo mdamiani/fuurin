@@ -213,10 +213,11 @@ void testWaitForEvent(Worker& w, std::chrono::milliseconds timeout, Event::Notif
 struct WorkerFixture
 {
     WorkerFixture()
+        : w{Uuid{}}
+        , b{Uuid{}}
+        , wf{w.start()}
+        , bf{b.start()}
     {
-        wf = w.start();
-        bf = b.start();
-
         testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Started);
         testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Online);
     }

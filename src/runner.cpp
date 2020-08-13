@@ -201,11 +201,12 @@ void Runner::sendOperation(Operation::Type oper, zmq::Part&& payload) noexcept
  * ASYNC TASK
  */
 
-Runner::Session::Session(token_type_t token, CompletionFunc onComplete,
+Runner::Session::Session(Uuid id, token_type_t token, CompletionFunc onComplete,
     const std::unique_ptr<zmq::Context>& zctx,
     const std::unique_ptr<zmq::Socket>& zoper,
     const std::unique_ptr<zmq::Socket>& zevent)
-    : token_(token)
+    : uuid_(id)
+    , token_(token)
     , docompl_(onComplete)
     , zctx_(zctx)
     , zopr_(zoper)

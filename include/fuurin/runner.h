@@ -152,7 +152,7 @@ protected:
     template<typename S>
     std::unique_ptr<Session> makeSession(CompletionFunc onComplete) const
     {
-        return std::make_unique<S>(token_, onComplete, zctx_, zopr_, zevs_);
+        return std::make_unique<S>(uuid_, token_, onComplete, zctx_, zopr_, zevs_);
     }
 
     /**
@@ -249,7 +249,7 @@ protected:
          * \param[in] zoper ZMQ socket to receive operation commands from main task.
          * \param[in] zevent ZMQ socket to send events to main task.
          */
-        Session(token_type_t token, CompletionFunc onComplete,
+        Session(Uuid id, token_type_t token, CompletionFunc onComplete,
             const std::unique_ptr<zmq::Context>& zctx,
             const std::unique_ptr<zmq::Socket>& zoper,
             const std::unique_ptr<zmq::Socket>& zevent);
@@ -357,6 +357,7 @@ protected:
 
 
     protected:
+        const Uuid uuid_;                           ///< Identifier.
         const token_type_t token_;                  ///< Session token.
         const CompletionFunc docompl_;              ///< Completion action.
         const std::unique_ptr<zmq::Context>& zctx_; ///< \see Runner::zctx_.
