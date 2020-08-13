@@ -13,6 +13,7 @@
 #include <string>
 #include <string_view>
 #include <tuple>
+#include <array>
 #include <functional>
 
 
@@ -27,13 +28,13 @@ namespace zmq {
  * which can be sent as it were just one single part to a \ref Socket.
  *
  * Allowed arguments are the same as the ones supported by any \ref Part,
- * plus a \ref Part object itself. Integral types are potentially endianess
- * converted, instead string or \ref Part arguments are copied without any
- * convertion.
+ * plus char arrays and a \ref Part object itself. Integral types are potentially
+ * endianess converted, instead string, char array or \ref Part arguments are
+ * copied without any convertion.
  *
  * For every string or \ref Part argument, an additional 4 bytes header is
  * added to the buffer, in order to store the amount of subsequent bytes.
- * Conversely, the size of any integral type is always well known.
+ * Conversely, the size of any integral type or char arrays is always well known.
  *
  * This class cannot be instantiated, it is just a helper namespace to
  * manipulate \ref Part objects.
@@ -140,6 +141,12 @@ private:
             if (part.size() > 0) {
                 std::memcpy(buf + sizeof(string_length_t), part.data(), sz - sizeof(string_length_t));
             }
+
+        } else if constexpr (isCharArrayType<T>()) {
+            if (part.size() > 0) {
+                std::copy_n(part.data(), sz, buf);
+            }
+
         } else {
             assertFalseType<T>();
         }
@@ -215,6 +222,17 @@ private:
 
             return std::tuple(T{buf + sizeof(string_length_t), len});
 
+        } else if constexpr (isCharArrayType<T>()) {
+            const size_t len = std::tuple_size<T>::value;
+
+            if (accessOutOfBoundary(pm, pos, len))
+                throwAccessError("could not extract contents of array type");
+
+            T arr;
+            std::copy_n(buf, len, arr.begin());
+
+            return std::tuple(std::move(arr));
+
         } else {
             assertFalseType<T>();
         }
@@ -237,6 +255,8 @@ private:
             return sizeof(s);
         } else if constexpr (isStringType<T>()) {
             return sizeof(string_length_t) + s.size();
+        } else if constexpr (isCharArrayType<T>()) {
+            return s.size();
         } else {
             assertFalseType<T>();
         }
@@ -266,6 +286,36 @@ private:
             std::is_same_v<type, std::string> ||
             std::is_same_v<type, Part>);
     }
+
+
+    /**
+     * \brief Statical check whether the type is char array.
+     */
+    ///{@
+    template<typename T>
+    struct isCharArrayType : std::false_type
+    {};
+    template<typename I>
+    struct mustCharArrayItem : std::enable_if<std::is_same_v<I, char> ||
+                                       std::is_same_v<I, unsigned char>,
+                                   std::size_t>
+    {};
+    template<typename I, typename mustCharArrayItem<I>::type N>
+    struct isCharArrayType<std::array<I, N> const&> : std::true_type
+    {};
+    template<typename I, typename mustCharArrayItem<I>::type N>
+    struct isCharArrayType<std::array<I, N>&> : std::true_type
+    {};
+    template<typename I, typename mustCharArrayItem<I>::type N>
+    struct isCharArrayType<std::array<I, N> const> : std::true_type
+    {};
+    template<typename I, typename mustCharArrayItem<I>::type N>
+    struct isCharArrayType<std::array<I, N>> : std::true_type
+    {};
+    template<typename I, typename mustCharArrayItem<I>::type N>
+    struct isCharArrayType<std::array<I, N>&&> : std::true_type
+    {};
+    ///@}
 
 
     /**

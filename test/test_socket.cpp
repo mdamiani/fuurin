@@ -246,6 +246,44 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(partMultiStringType, T, partMultiStringTypes)
 }
 
 
+typedef boost::mpl::list<char, unsigned char> partMultiArrayItemTypes;
+
+BOOST_AUTO_TEST_CASE_TEMPLATE(partMultiCharArray, T, partMultiArrayItemTypes)
+{
+    using A = std::array<T, 5>;
+
+    auto mkArr = []() {
+        return A{'a', 'b', 'c', 'd', 'e'};
+    };
+
+    auto val = mkArr();
+    Part a = PartMulti::pack(val);
+    std::tuple<A> t = PartMulti::unpack<A>(a);
+
+    BOOST_TEST(a.size() == val.size());
+    BOOST_TEST(std::tuple_size_v<decltype(t)> == size_t(1));
+    BOOST_TEST(std::get<0>(t).size() == val.size());
+    BOOST_TEST(std::memcmp(std::get<0>(t).data(), val.data(), val.size()) == 0);
+
+    // pack template variations
+    auto val1 = mkArr();
+    auto const val2 = mkArr();
+    auto& val3 = val1;
+    auto const& val4 = mkArr();
+    Part a1 = PartMulti::pack(val1);
+    Part a2 = PartMulti::pack(val2);
+    Part a3 = PartMulti::pack(val3);
+    Part a4 = PartMulti::pack(val4);
+    Part a5 = PartMulti::pack(mkArr());
+
+    BOOST_TEST(std::memcmp(a1.data(), val.data(), val.size()) == 0);
+    BOOST_TEST(std::memcmp(a2.data(), val.data(), val.size()) == 0);
+    BOOST_TEST(std::memcmp(a3.data(), val.data(), val.size()) == 0);
+    BOOST_TEST(std::memcmp(a4.data(), val.data(), val.size()) == 0);
+    BOOST_TEST(std::memcmp(a5.data(), val.data(), val.size()) == 0);
+}
+
+
 BOOST_AUTO_TEST_CASE(partMultiMore)
 {
     Part a = PartMulti::pack(uint32_t(3), uint32_t(14),
