@@ -130,6 +130,15 @@ public:
     ///@}
 
     /**
+     * \brief Create an UUID object from bytes.
+     *
+     * \param[in] b Raw bytes.
+     *
+     * \return A new UUID object.
+     */
+    static Uuid fromBytes(const Bytes& b);
+
+    /**
      * \brief Creates a random V4 UUID.
      *
      * \return A new UUID object.
@@ -152,17 +161,6 @@ public:
     static Uuid createNamespaceUuid(const Uuid& ns, std::string_view name);
     static Uuid createNamespaceUuid(const Uuid& ns, const std::string& name);
     ///@}
-
-
-private:
-    /**
-     * \brief Create an UUID object from bytes.
-     *
-     * \param[in] b Raw bytes.
-     *
-     * \return A new UUID object.
-     */
-    static Uuid createFromBytes(const Bytes& b);
 
 
 private:

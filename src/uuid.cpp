@@ -90,7 +90,7 @@ Uuid Uuid::fromString(std::string_view str)
 {
     boost::uuids::string_generator gen;
     const auto& u = gen(str.begin(), str.end());
-    return createFromBytes(bytesFromUuid(u));
+    return fromBytes(bytesFromUuid(u));
 }
 
 
@@ -104,14 +104,14 @@ Uuid Uuid::createRandomUuid()
 {
     boost::uuids::random_generator gen;
     const auto& u = gen();
-    return createFromBytes(bytesFromUuid(u));
+    return fromBytes(bytesFromUuid(u));
 }
 
 
 Uuid Uuid::createNamespaceUuid(const Uuid& ns, std::string_view name)
 {
     boost::uuids::name_generator_sha1 gen(uuidFromBytes(ns.bytes()));
-    return createFromBytes(bytesFromUuid(gen(name.data(), name.size())));
+    return fromBytes(bytesFromUuid(gen(name.data(), name.size())));
 }
 
 
@@ -121,7 +121,7 @@ Uuid Uuid::createNamespaceUuid(const Uuid& ns, const std::string& name)
 }
 
 
-Uuid Uuid::createFromBytes(const Bytes& b)
+Uuid Uuid::fromBytes(const Bytes& b)
 {
     Uuid ret;
     ret.bytes_ = b;
