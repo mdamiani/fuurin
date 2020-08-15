@@ -69,27 +69,40 @@ Topic::Name::operator std::string() const
 }
 
 
+bool Topic::Name::operator==(const Name& rhs) const
+{
+    return sz_ == rhs.sz_ && dd_ == rhs.dd_;
+}
+
+
+bool Topic::Name::operator!=(const Name& rhs) const
+{
+    return !(*this == rhs);
+}
+
+
 Topic::Topic()
+    : seqn_{0}
 {
 }
 
 
 Topic::Topic(const Uuid& broker, const Uuid& worker, const SeqN& seqn, const Name& name, const Data& data)
-    : broker_(broker)
-    , worker_(worker)
-    , seqn_(seqn)
-    , name_(name)
-    , data_(data)
+    : broker_{broker}
+    , worker_{worker}
+    , seqn_{seqn}
+    , name_{name}
+    , data_{data}
 {
 }
 
 
 Topic::Topic(Uuid&& broker, Uuid&& worker, SeqN&& seqn, Name&& name, Data&& data)
-    : broker_(broker)
-    , worker_(worker)
-    , seqn_(seqn)
-    , name_(name)
-    , data_(data)
+    : broker_{broker}
+    , worker_{worker}
+    , seqn_{seqn}
+    , name_{name}
+    , data_{data}
 {
 }
 
@@ -227,20 +240,34 @@ Topic& Topic::withData(Data&& v)
 }
 
 
+bool Topic::operator==(const Topic& rhs) const
+{
+    return broker_ == rhs.broker_ &&
+        worker_ == rhs.worker_ &&
+        seqn_ == rhs.seqn_ &&
+        name_ == rhs.name_ &&
+        data_ == rhs.data_;
+}
+
+
+bool Topic::operator!=(const Topic& rhs) const
+{
+    return !(*this == rhs);
+}
+
+
 Topic Topic::fromPart(const zmq::Part& part)
 {
-    // TODO: unpack sequence number
     auto [brok, work, seqn, name, data] = zmq::PartMulti::unpack<Uuid::Bytes, Uuid::Bytes,
         Topic::SeqN, std::string_view, zmq::Part>(part);
 
-    return Topic{Uuid::fromBytes(brok), Uuid::fromBytes(work), Topic::SeqN{}, name, data};
+    return Topic{Uuid::fromBytes(brok), Uuid::fromBytes(work), seqn, name, data};
 }
 
 
 zmq::Part Topic::toPart() const
 {
-    // TODO: pack sequence number
-    return zmq::PartMulti::pack(broker_.bytes(), worker_.bytes(), Topic::SeqN{}, std::string_view(name_), data_);
+    return zmq::PartMulti::pack(broker_.bytes(), worker_.bytes(), seqn_, std::string_view(name_), data_);
 }
 
 

@@ -55,7 +55,7 @@ public:
         Stopped,         ///< Event delivered when \ref Runner::stop() was acknowledged.
         Offline,         ///< Event for \ref Worker disconnection.
         Online,          ///< Event for \ref Worker connection.
-        Delivery,        ///< Event for any \ref Worker::dispatch(zmq::Part&&).
+        Delivery,        ///< Event for any \ref Worker::dispatch(Topic::Name, zmq::Part&&).
         SyncBegin,       ///< Event for start of \ref Worker::sync().
         SyncElement,     ///< Event for any element of \ref Worker::sync().
         SyncSuccess,     ///< Event for \ref Worker::sync() success.

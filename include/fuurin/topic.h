@@ -83,6 +83,15 @@ public:
         operator std::string() const;
         ///@}
 
+        /**
+         * \brief Comparison operator.
+         * \param[in] rhs Another name.
+         */
+        ///{@
+        bool operator==(const Name& rhs) const;
+        bool operator!=(const Name& rhs) const;
+        ///@}
+
 
     private:
         size_t sz_;               ///< Actual size of the name.
@@ -198,6 +207,15 @@ public:
     ///{@
     Topic& withData(const Data& v);
     Topic& withData(Data&& v);
+    ///@}
+
+    /**
+     * \brief Comparison operator.
+     * \param[in] rhs Another topic.
+     */
+    ///{@
+    bool operator==(const Topic& rhs) const;
+    bool operator!=(const Topic& rhs) const;
     ///@}
 
 

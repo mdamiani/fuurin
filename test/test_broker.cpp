@@ -78,10 +78,16 @@ protected:
 
 class TestBroker : public Broker
 {
+public:
+    TestBroker()
+        : Broker{bid}
+    {}
+
 protected:
     class TestBrokerSession;
 
 public:
+    static const Uuid bid;
     TestSocket* testSocket = nullptr;
     TestBrokerSession* testSession;
 
@@ -136,17 +142,21 @@ public:
         return testSession;
     }
 };
+
+const Uuid TestBroker::bid = Uuid::createNamespaceUuid(Uuid::fromString(Uuid::Ns::Dns), "broker.net"sv);
+
 } // namespace fuurin
 
 
 BOOST_AUTO_TEST_CASE(testUuid)
 {
-    const Uuid id = Uuid::createNamespaceUuid(Uuid::fromString(Uuid::Ns::Dns), "test.edu"sv);
-    Broker b(id);
-
+    auto id = TestBroker::bid;
+    Broker b{id};
     BOOST_TEST(b.uuid() == id);
 }
 
+
+const zmq::Part SREQ = zmq::PartMulti::pack(BROKER_SYNC_REQST, uint8_t(0), zmq::Part{}).withRoutingID(1);
 
 BOOST_DATA_TEST_CASE(testReceiverWorkerSync,
     bdata::make({
@@ -159,35 +169,35 @@ BOOST_DATA_TEST_CASE(testReceiverWorkerSync,
             -1, false, false,
             0, ""sv),
         std::make_tuple("payload ok",
-            zmq::PartMulti::pack(BROKER_SYNC_REQST, uint8_t(0), zmq::Part{}).withRoutingID(1),
+            SREQ,
             -1, false, false,
             3, ""sv),
         std::make_tuple("begin would block",
-            zmq::PartMulti::pack(BROKER_SYNC_REQST, uint8_t(0), zmq::Part{}).withRoutingID(1),
+            SREQ,
             1, true, false,
             0, ""sv),
         std::make_tuple("elemn would block",
-            zmq::PartMulti::pack(BROKER_SYNC_REQST, uint8_t(0), zmq::Part{}).withRoutingID(1),
+            SREQ,
             2, true, false,
             1, ""sv),
         std::make_tuple("compl would block",
-            zmq::PartMulti::pack(BROKER_SYNC_REQST, uint8_t(0), zmq::Part{}).withRoutingID(1),
+            SREQ,
             3, true, false,
             2, ""sv),
         std::make_tuple("begin host unreach",
-            zmq::PartMulti::pack(BROKER_SYNC_REQST, uint8_t(0), zmq::Part{}).withRoutingID(1),
+            SREQ,
             1, false, true,
             0, ""sv),
         std::make_tuple("elemn host unreach",
-            zmq::PartMulti::pack(BROKER_SYNC_REQST, uint8_t(0), zmq::Part{}).withRoutingID(1),
+            SREQ,
             2, false, true,
             1, ""sv),
         std::make_tuple("compl host unreach",
-            zmq::PartMulti::pack(BROKER_SYNC_REQST, uint8_t(0), zmq::Part{}).withRoutingID(1),
+            SREQ,
             3, false, true,
             2, ""sv),
         std::make_tuple("other exception",
-            zmq::PartMulti::pack(BROKER_SYNC_REQST, uint8_t(0), zmq::Part{}).withRoutingID(1),
+            SREQ,
             1, false, false,
             0, "ZMQSocketSendFailed"sv),
     }),
@@ -195,11 +205,17 @@ BOOST_DATA_TEST_CASE(testReceiverWorkerSync,
 {
     BOOST_TEST_MESSAGE(name);
 
-    const auto testPart = [](const zmq::Part& p, std::string_view id, uint8_t nn, zmq::Part vv = zmq::Part{}) {
+    const auto testNotif = [](const zmq::Part& p, std::string_view id, uint8_t nn) {
         auto [rep, seq, pay] = zmq::PartMulti::unpack<std::string_view, uint8_t, zmq::Part>(p);
         BOOST_TEST(id == rep);
         BOOST_TEST(nn == seq);
-        BOOST_TEST(vv == pay);
+        BOOST_TEST(pay.empty());
+    };
+    const auto testTopic = [](const zmq::Part& p, std::string_view id, uint8_t nn, Topic tt) {
+        auto [rep, seq, pay] = zmq::PartMulti::unpack<std::string_view, uint8_t, zmq::Part>(p);
+        BOOST_TEST(id == rep);
+        BOOST_TEST(nn == seq);
+        BOOST_TEST(tt == Topic::fromPart(pay));
     };
 
     TestBroker b;
@@ -218,12 +234,12 @@ BOOST_DATA_TEST_CASE(testReceiverWorkerSync,
         if (wantSize > 0) {
             BOOST_TEST(int(b.testSocket->sentParts.size()) == wantSize);
             if (b.testSocket->sentParts.size() >= 1)
-                testPart(b.testSocket->sentParts.at(0), BROKER_SYNC_BEGIN, 0);
+                testNotif(b.testSocket->sentParts.at(0), BROKER_SYNC_BEGIN, 0);
             if (b.testSocket->sentParts.size() >= 2)
-                testPart(b.testSocket->sentParts.at(1), BROKER_SYNC_ELEMN, 0,
-                    Topic{}.withData(zmq::Part{"hello"sv}).toPart());
+                testTopic(b.testSocket->sentParts.at(1), BROKER_SYNC_ELEMN, 0,
+                    Topic{}.withData(zmq::Part{"hello"sv}));
             if (b.testSocket->sentParts.size() >= 3)
-                testPart(b.testSocket->sentParts.at(2), BROKER_SYNC_COMPL, 0);
+                testNotif(b.testSocket->sentParts.at(2), BROKER_SYNC_COMPL, 0);
         } else {
             BOOST_TEST(int(b.testSocket->sentParts.empty()));
         }

@@ -59,12 +59,108 @@ inline std::ostream& operator<<(std::ostream& os, const std::list<T>& l)
 } // namespace std
 
 
+Event testWaitForEvent(Worker& w, std::chrono::milliseconds timeout, Event::Notification evRet,
+    Event::Type evType, const zmq::Part& evPay = zmq::Part{})
+{
+    const auto& ev = w.waitForEvent(timeout);
+
+    BOOST_TEST(ev.notification() == evRet);
+    BOOST_TEST(ev.type() == evType);
+
+    if (!evPay.empty()) {
+        BOOST_TEST(!ev.payload().empty());
+        BOOST_TEST(ev.payload() == evPay);
+    } else {
+        BOOST_TEST(ev.payload().empty());
+    }
+
+    return ev;
+}
+
+
+struct WorkerFixture
+{
+    WorkerFixture()
+        : w(wid)
+        , b(bid)
+        , wf(w.start())
+        , bf(b.start())
+    {
+        testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Started);
+        testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Online);
+    }
+
+    ~WorkerFixture()
+    {
+        w.stop();
+        b.stop();
+
+        testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Offline);
+        testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Stopped);
+    }
+
+    static const Uuid wid;
+    static const Uuid bid;
+
+    Worker w;
+    Broker b;
+
+    std::future<void> wf;
+    std::future<void> bf;
+};
+
+const Uuid WorkerFixture::wid = Uuid::createNamespaceUuid(Uuid::fromString(Uuid::Ns::Dns), "worker.net"sv);
+const Uuid WorkerFixture::bid = Uuid::createNamespaceUuid(Uuid::fromString(Uuid::Ns::Dns), "broker.net"sv);
+
+
+zmq::Part mkT(const std::string& name, const std::string& pay)
+{
+    using f = WorkerFixture;
+    return Topic{f::bid, f::wid, Topic::SeqN{}, name, zmq::Part{pay}}.toPart();
+}
+
+
 BOOST_AUTO_TEST_CASE(testUuid)
 {
-    const Uuid id = Uuid::createNamespaceUuid(Uuid::fromString(Uuid::Ns::Dns), "test.edu"sv);
+    auto id = WorkerFixture::wid;
     Worker w(id);
-
     BOOST_TEST(w.uuid() == id);
+}
+
+
+BOOST_AUTO_TEST_CASE(testDeliverUuid)
+{
+    Worker w(WorkerFixture::wid);
+    Broker b(WorkerFixture::bid);
+
+    auto wf = w.start();
+    auto bf = b.start();
+
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Started);
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Online);
+
+    w.dispatch("topic"sv, zmq::Part{"hello"sv});
+
+    auto ev = testWaitForEvent(w, 5s, Event::Notification::Success,
+        Event::Type::Delivery, mkT("topic", "hello"));
+
+    auto t = Topic::fromPart(ev.payload());
+
+    BOOST_TEST(t.worker() == WorkerFixture::wid);
+    BOOST_TEST(t.broker() == WorkerFixture::bid);
+
+    w.stop();
+    b.stop();
+}
+
+
+BOOST_AUTO_TEST_CASE(testTopicPart)
+{
+    using f = WorkerFixture;
+    const Topic t1{f::bid, f::wid, 256, "topic/test"sv, zmq::Part{"topic/data"sv}};
+    const Topic t2{Topic::fromPart(t1.toPart())};
+
+    BOOST_TEST(t1 == t2);
 }
 
 
@@ -186,57 +282,6 @@ BOOST_DATA_TEST_CASE(testWaitForEventTimeout,
     BOOST_TEST(r.timeout_ == wantTimeout);
     BOOST_TEST(ev.notification() == wantEvent);
 }
-
-
-zmq::Part mkT(const std::string& name, const std::string& pay)
-{
-    return Topic{}.withName(name).withData(zmq::Part{pay}).toPart();
-}
-
-void testWaitForEvent(Worker& w, std::chrono::milliseconds timeout, Event::Notification evRet,
-    Event::Type evType, const zmq::Part& evPay = zmq::Part{})
-{
-    const auto& ev = w.waitForEvent(timeout);
-
-    BOOST_TEST(ev.notification() == evRet);
-    BOOST_TEST(ev.type() == evType);
-
-    if (!evPay.empty()) {
-        BOOST_TEST(!ev.payload().empty());
-        BOOST_TEST(ev.payload() == evPay);
-    } else {
-        BOOST_TEST(ev.payload().empty());
-    }
-}
-
-
-struct WorkerFixture
-{
-    WorkerFixture()
-        : w{Uuid{}}
-        , b{Uuid{}}
-        , wf{w.start()}
-        , bf{b.start()}
-    {
-        testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Started);
-        testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Online);
-    }
-
-    ~WorkerFixture()
-    {
-        w.stop();
-        b.stop();
-
-        testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Offline);
-        testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Stopped);
-    }
-
-    Worker w;
-    Broker b;
-
-    std::future<void> wf;
-    std::future<void> bf;
-};
 
 
 typedef boost::mpl::list<Broker, Worker> runnerTypes;
