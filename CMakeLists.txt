@@ -90,6 +90,7 @@ set(LIB_PUBLIC_HEADERS
     include/fuurin/worker.h
     include/fuurin/topic.h
     include/fuurin/uuid.h
+    include/fuurin/lrucache.h
 )
 
 set(LIB_DEPS
