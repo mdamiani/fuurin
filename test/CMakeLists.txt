@@ -47,6 +47,7 @@ function (AddTest TEST)
 endfunction (AddTest)
 
 AddTest(test_common)
+AddTest(test_logarg)
 AddTest(test_socket)
 AddTest(test_timers)
 AddTest(test_worker)
