@@ -109,8 +109,8 @@ struct WorkerFixture
     std::future<void> bf;
 };
 
-const Uuid WorkerFixture::wid = Uuid::createNamespaceUuid(Uuid::fromString(Uuid::Ns::Dns), "worker.net"sv);
-const Uuid WorkerFixture::bid = Uuid::createNamespaceUuid(Uuid::fromString(Uuid::Ns::Dns), "broker.net"sv);
+const Uuid WorkerFixture::wid = Uuid::createNamespaceUuid(Uuid::Ns::Dns, "worker.net"sv);
+const Uuid WorkerFixture::bid = Uuid::createNamespaceUuid(Uuid::Ns::Dns, "broker.net"sv);
 
 
 zmq::Part mkT(const std::string& name, const std::string& pay)

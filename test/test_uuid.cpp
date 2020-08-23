@@ -32,8 +32,8 @@ BOOST_AUTO_TEST_CASE(testInit)
     BOOST_TEST(u.size() == size_t(16));
     BOOST_TEST(u.size() == u.bytes().size());
     BOOST_TEST(u.isNull());
-    BOOST_TEST(u.toString() == Uuid::Null);
-    BOOST_TEST(u.toShortString() == std::string_view(Uuid::Null.data(), 8));
+    BOOST_TEST(u.toString() == Uuid::NullFmt);
+    BOOST_TEST(u.toShortString() == std::string_view(Uuid::NullFmt.data(), 8));
     BOOST_TEST(std::equal(u.bytes().begin(), u.bytes().end(),
         Uuid::Bytes{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}.begin()));
 }
@@ -72,7 +72,7 @@ BOOST_AUTO_TEST_CASE(testRandom)
 
 BOOST_AUTO_TEST_CASE(testNamespace)
 {
-    Uuid u = Uuid::createNamespaceUuid(Uuid::fromString(Uuid::Ns::Dns), "test.com"sv);
+    Uuid u = Uuid::createNamespaceUuid(Uuid::Ns::Dns, "test.com"sv);
     BOOST_TEST(u.size() == size_t(16));
     BOOST_TEST(!u.isNull());
     BOOST_TEST(u.toString() == "1c39b279-6010-55d9-b677-859bffab8081"sv);

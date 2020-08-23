@@ -21,6 +21,9 @@
 #include <algorithm>
 
 
+using namespace std::literals::string_view_literals;
+
+
 namespace {
 inline boost::uuids::uuid uuidFromBytes(const fuurin::Uuid::Bytes& b)
 {
@@ -42,7 +45,7 @@ inline fuurin::Uuid::Bytes bytesFromUuid(const boost::uuids::uuid& u)
 
 inline fuurin::Uuid::Srepr sreprFromBytes(const fuurin::Uuid::Bytes& b)
 {
-    static_assert(fuurin::Uuid::Srepr{}.size() == std::string_view("hhhhhhhh-hhhh-hhhh-hhhh-hhhhhhhhhhhh").size());
+    static_assert(fuurin::Uuid::Srepr{}.size() == std::string_view(fuurin::Uuid::NullFmt).size());
     fuurin::Uuid::Srepr r;
     const auto& s = boost::uuids::to_string(uuidFromBytes(b));
     std::copy(s.begin(), s.end(), r.begin());
@@ -53,10 +56,16 @@ inline fuurin::Uuid::Srepr sreprFromBytes(const fuurin::Uuid::Bytes& b)
 
 namespace fuurin {
 
+const Uuid Uuid::Ns::Dns{Uuid::fromString("6ba7b810-9dad-11d1-80b4-00c04fd430c8"sv)};
+const Uuid Uuid::Ns::Url{Uuid::fromString("6ba7b811-9dad-11d1-80b4-00c04fd430c8"sv)};
+const Uuid Uuid::Ns::Oid{Uuid::fromString("6ba7b812-9dad-11d1-80b4-00c04fd430c8"sv)};
+const Uuid Uuid::Ns::X500dn{Uuid::fromString("6ba7b814-9dad-11d1-80b4-00c04fd430c8"sv)};
+
+
 Uuid::Uuid()
 {
     std::fill(bytes_.begin(), bytes_.end(), 0);
-    std::copy(Null.begin(), Null.end(), srepr_.begin());
+    std::copy(NullFmt.begin(), NullFmt.end(), srepr_.begin());
 }
 
 
@@ -81,7 +90,7 @@ std::string_view Uuid::toString() const
 std::string_view Uuid::toShortString() const
 {
     const size_t sz = 8;
-    static_assert(sz <= Null.size());
+    static_assert(sz <= NullFmt.size());
     return std::string_view(srepr_.data(), sz);
 }
 

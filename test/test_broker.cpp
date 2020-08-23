@@ -150,8 +150,8 @@ public:
     }
 };
 
-const Uuid TestBroker::wid = Uuid::createNamespaceUuid(Uuid::fromString(Uuid::Ns::Dns), "worker.net"sv);
-const Uuid TestBroker::bid = Uuid::createNamespaceUuid(Uuid::fromString(Uuid::Ns::Dns), "broker.net"sv);
+const Uuid TestBroker::wid = Uuid::createNamespaceUuid(Uuid::Ns::Dns, "worker.net"sv);
+const Uuid TestBroker::bid = Uuid::createNamespaceUuid(Uuid::Ns::Dns, "broker.net"sv);
 
 } // namespace fuurin
 

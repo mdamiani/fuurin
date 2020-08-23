@@ -33,22 +33,22 @@ public:
     using Srepr = std::array<char, Bytes{}.size() * 2 + 4>;
 
     /// UUID string representation for null value.
-    static constexpr std::string_view Null = "00000000-0000-0000-0000-000000000000";
+    static constexpr std::string_view NullFmt = "00000000-0000-0000-0000-000000000000";
 
     /// Namespace values.
     struct Ns
     {
         /// Namespace for fully-qualified domain names.
-        static constexpr std::string_view Dns = "6ba7b810-9dad-11d1-80b4-00c04fd430c8";
+        static const Uuid Dns;
 
         /// Namespace for URLs.
-        static constexpr std::string_view Url = "6ba7b811-9dad-11d1-80b4-00c04fd430c8";
+        static const Uuid Url;
 
         /// Namespace for ISO Object IDs.
-        static constexpr std::string_view Oid = "6ba7b812-9dad-11d1-80b4-00c04fd430c8";
+        static const Uuid Oid;
 
         /// Namespace for X.500 Distinguished Names.
-        static constexpr std::string_view X500dn = "6ba7b814-9dad-11d1-80b4-00c04fd430c8";
+        static const Uuid X500dn;
     };
 
     /**
