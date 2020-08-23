@@ -15,6 +15,7 @@
 #include "fuurin/zmqpart.h"
 
 #include <array>
+#include <functional>
 #include <string>
 #include <string_view>
 #include <ostream>
@@ -254,5 +255,19 @@ private:
 std::ostream& operator<<(std::ostream& os, const Topic& t);
 
 } // namespace fuurin
+
+
+namespace std {
+
+/**
+ * \brief Makes \ref Topic::Name hashable.
+ */
+template<>
+struct hash<fuurin::Topic::Name>
+{
+    size_t operator()(const fuurin::Topic::Name& n) const;
+};
+
+} // namespace std
 
 #endif // FUURIN_TOPIC_H

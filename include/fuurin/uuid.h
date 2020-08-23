@@ -12,6 +12,7 @@
 #define FUURIN_UUID_H
 
 #include <array>
+#include <functional>
 #include <string_view>
 #include <ostream>
 
@@ -173,5 +174,19 @@ private:
 std::ostream& operator<<(std::ostream& os, const Uuid& v);
 
 } // namespace fuurin
+
+
+namespace std {
+
+/**
+ * \brief Makes \ref Uuid hashable.
+ */
+template<>
+struct hash<fuurin::Uuid>
+{
+    size_t operator()(const fuurin::Uuid& n) const;
+};
+
+} // namespace std
 
 #endif // FUURIN_UUID_H

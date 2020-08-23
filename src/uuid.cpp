@@ -149,3 +149,14 @@ std::ostream& operator<<(std::ostream& os, const Uuid& v)
 }
 
 } // namespace fuurin
+
+
+namespace std {
+
+size_t hash<fuurin::Uuid>::operator()(const fuurin::Uuid& u) const
+{
+    const auto& b = u.bytes();
+    return std::hash<std::string_view>{}(std::string_view(reinterpret_cast<const char*>(b.data()), b.size()));
+}
+
+} // namespace std

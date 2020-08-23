@@ -285,3 +285,13 @@ std::ostream& operator<<(std::ostream& os, const Topic& t)
 }
 
 } // namespace fuurin
+
+
+namespace std {
+
+size_t hash<fuurin::Topic::Name>::operator()(const fuurin::Topic::Name& n) const
+{
+    return std::hash<std::string_view>{}(n);
+}
+
+} // namespace std
