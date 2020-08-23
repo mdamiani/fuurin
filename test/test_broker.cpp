@@ -87,6 +87,7 @@ protected:
     class TestBrokerSession;
 
 public:
+    static const Uuid wid;
     static const Uuid bid;
     TestSocket* testSocket = nullptr;
     TestBrokerSession* testSession;
@@ -105,9 +106,15 @@ protected:
         }
 
 
-        void setSnapshot(std::string data)
+        void storeTopic(const Topic& t)
         {
-            storage_.push_back(Topic{}.withData(zmq::Part{data}));
+            BrokerSession::storeTopic(t);
+        }
+
+
+        auto getStorage() -> decltype(storage_)*
+        {
+            return &storage_;
         }
 
 
@@ -143,6 +150,7 @@ public:
     }
 };
 
+const Uuid TestBroker::wid = Uuid::createNamespaceUuid(Uuid::fromString(Uuid::Ns::Dns), "worker.net"sv);
 const Uuid TestBroker::bid = Uuid::createNamespaceUuid(Uuid::fromString(Uuid::Ns::Dns), "broker.net"sv);
 
 } // namespace fuurin
@@ -153,6 +161,29 @@ BOOST_AUTO_TEST_CASE(testUuid)
     auto id = TestBroker::bid;
     Broker b{id};
     BOOST_TEST(b.uuid() == id);
+}
+
+
+BOOST_AUTO_TEST_CASE(testStoreTopic)
+{
+    TestBroker b;
+    auto bf = b.start();
+    auto st = b.testSession->getStorage();
+
+    Topic::Name nm("hello"sv);
+    Topic t{Uuid{}, TestBroker::wid, 0, nm, zmq::Part{"data"sv}};
+
+    BOOST_TEST(st->empty());
+    BOOST_TEST((st->find(nm) == st->list().end()));
+
+    b.testSession->storeTopic(t);
+
+    BOOST_TEST(st->size() == 1u);
+    BOOST_TEST((st->find(nm) != st->list().end()));
+    BOOST_TEST((st->find(nm)->first == nm));
+    BOOST_TEST((st->find(nm)->second.find(TestBroker::wid) != st->find(nm)->second.list().end()));
+    BOOST_TEST((st->find(nm)->second.find(TestBroker::wid)->first == TestBroker::wid));
+    BOOST_TEST((st->find(nm)->second.find(TestBroker::wid)->second == t));
 }
 
 
@@ -221,7 +252,7 @@ BOOST_DATA_TEST_CASE(testReceiverWorkerSync,
     TestBroker b;
     auto bf = b.start();
 
-    b.testSession->setSnapshot("hello");
+    b.testSession->storeTopic(Topic{}.withData(zmq::Part{"hello"sv}));
     b.testSocket->errAfter = errAfter;
     if (!errWouldBlock) {
         b.testSocket->errHostUnreach = errHostUnreach;

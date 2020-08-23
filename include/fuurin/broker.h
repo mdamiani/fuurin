@@ -14,6 +14,7 @@
 #include "fuurin/runner.h"
 #include "fuurin/topic.h"
 #include "fuurin/uuid.h"
+#include "fuurin/lrucache.h"
 
 #include <memory>
 #include <list>
@@ -107,6 +108,13 @@ protected:
         void collectWorkerMessage(zmq::Part&& payload);
 
         /**
+         * \brief Stores a topic into local storage.
+         *
+         * \param[in] t Topic to store.
+         */
+        void storeTopic(const Topic& t);
+
+        /**
          * \brief Receives a synchronous command requested by a worker.
          *
          * \param[in] payload Message payload.
@@ -129,8 +137,7 @@ protected:
         const std::unique_ptr<zmq::Socket> zdispatch_; ///< ZMQ socket send data.
         const std::unique_ptr<zmq::Timer> zhugz_;      ///< ZMQ timer to send keepalives.
 
-        // TODO: temporary structure, replace with a proper one.
-        std::list<Topic> storage_; ///< Topic storage.
+        LRUCache<Topic::Name, LRUCache<Uuid, Topic>> storage_; ///< Topic storage.
     };
 };
 

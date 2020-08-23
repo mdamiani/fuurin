@@ -15,6 +15,7 @@
 #include "fuurin/zmqpartmulti.h"
 #include "fuurin/zmqtimer.h"
 #include "syncmachine.h"
+#include "failure.h"
 #include "types.h"
 #include "log.h"
 
@@ -72,6 +73,7 @@ Broker::BrokerSession::BrokerSession(Uuid id, token_type_t token, CompletionFunc
     , zdelivery_{std::make_unique<zmq::Socket>(zctx.get(), zmq::Socket::DISH)}
     , zdispatch_{std::make_unique<zmq::Socket>(zctx.get(), zmq::Socket::RADIO)}
     , zhugz_{std::make_unique<zmq::Timer>(zctx.get(), "hugz")}
+    , storage_{1024} // TODO: configure capacity.
 {
     zsnapshot_->setEndpoints({"ipc:///tmp/broker_snapshot"});
     zdelivery_->setEndpoints({"ipc:///tmp/worker_dispatch"});
@@ -161,9 +163,7 @@ void Broker::BrokerSession::collectWorkerMessage(zmq::Part&& payload)
             log::Arg{"size"sv, int(paysz)});
 
         const auto t = Topic::fromPart(payload).withBroker(uuid_);
-
-        storage_.push_back(t);
-
+        storeTopic(t);
         zdispatch_->send(t.toPart().withGroup(BROKER_UPDT));
 
     } else {
@@ -172,6 +172,23 @@ void Broker::BrokerSession::collectWorkerMessage(zmq::Part&& payload)
             log::Arg{"group"sv, std::string(payload.group())},
             log::Arg{"unknown message"sv});
     }
+}
+
+
+void Broker::BrokerSession::storeTopic(const Topic& t)
+{
+    auto it = storage_.find(t.name());
+
+    if (it == storage_.list().end()) {
+        // TODO: configure capacity.
+        it = storage_.put(t.name(), LRUCache<Uuid, Topic>{8});
+    }
+
+    ASSERT(it != storage_.list().end(), "broker storage topic cache is null");
+
+    auto it2 = it->second.put(t.worker(), t);
+
+    ASSERT(it2 != it->second.list().end(), "broker storage uuid cache is null");
 }
 
 
@@ -216,7 +233,10 @@ void Broker::BrokerSession::replySnapshot(uint32_t rouID, uint8_t seqn, zmq::Par
                                     .withRoutingID(rouID)) == -1) {
             throw errWouldBlock;
         }
-        for (const auto& t : storage_) {
+        for (const auto& el : storage_.list()) {
+            ASSERT(!el.second.list().empty(), "topic entry has empty cache");
+            const auto& t = el.second.list().back().second;
+
             if (zsnapshot_->trySend(zmq::PartMulti::pack(BROKER_SYNC_ELEMN, seqn, t.toPart())
                                         .withRoutingID(rouID)) == -1) {
                 throw errWouldBlock;
