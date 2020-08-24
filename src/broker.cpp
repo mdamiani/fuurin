@@ -104,15 +104,16 @@ void Broker::BrokerSession::operationReady(Operation* oper)
 {
     switch (oper->type()) {
     case Operation::Type::Start:
-        LOG_DEBUG(log::Arg{"broker"sv}, log::Arg{"started"sv});
+        LOG_DEBUG(log::Arg{"broker"sv, uuid_.toShortString()}, log::Arg{"started"sv});
         break;
 
     case Operation::Type::Stop:
-        LOG_DEBUG(log::Arg{"broker"sv}, log::Arg{"stopped"sv});
+        LOG_DEBUG(log::Arg{"broker"sv, uuid_.toShortString()}, log::Arg{"stopped"sv});
         break;
 
     default:
-        LOG_ERROR(log::Arg{"broker"sv}, log::Arg{"operation"sv, Operation::toString(oper->type())},
+        LOG_ERROR(log::Arg{"broker"sv, uuid_.toShortString()},
+            log::Arg{"operation"sv, Operation::toString(oper->type())},
             log::Arg{"unknown"sv});
         break;
     }
@@ -124,7 +125,7 @@ void Broker::BrokerSession::socketReady(zmq::Pollable* pble)
     if (pble == zsnapshot_.get()) {
         zmq::Part payload;
         zsnapshot_->recv(&payload);
-        LOG_DEBUG(log::Arg{"broker"sv}, log::Arg{"snapshot"sv},
+        LOG_DEBUG(log::Arg{"broker"sv, uuid_.toShortString()}, log::Arg{"snapshot"sv},
             log::Arg{"size"sv, int(payload.size())});
 
         receiveWorkerCommand(std::move(payload));
@@ -132,7 +133,7 @@ void Broker::BrokerSession::socketReady(zmq::Pollable* pble)
     } else if (pble == zdelivery_.get()) {
         zmq::Part payload;
         zdelivery_->recv(&payload);
-        LOG_DEBUG(log::Arg{"broker"sv}, log::Arg{"delivery"sv},
+        LOG_DEBUG(log::Arg{"broker"sv, uuid_.toShortString()}, log::Arg{"delivery"sv},
             log::Arg{"size"sv, int(payload.size())});
 
         collectWorkerMessage(std::move(payload));
@@ -142,7 +143,8 @@ void Broker::BrokerSession::socketReady(zmq::Pollable* pble)
         sendHugz();
 
     } else {
-        LOG_FATAL(log::Arg{"broker"sv}, log::Arg{"could not read ready socket"sv},
+        LOG_FATAL(log::Arg{"broker"sv, uuid_.toShortString()},
+            log::Arg{"could not read ready socket"sv},
             log::Arg{"unknown socket"sv});
     }
 }
@@ -159,7 +161,7 @@ void Broker::BrokerSession::collectWorkerMessage(zmq::Part&& payload)
             zhugz_->start();
 
     } else if (std::strncmp(payload.group(), WORKER_UPDT, sizeof(WORKER_UPDT)) == 0) {
-        LOG_DEBUG(log::Arg{"broker"sv}, log::Arg{"dispatch"sv},
+        LOG_DEBUG(log::Arg{"broker"sv, uuid_.toShortString()}, log::Arg{"dispatch"sv},
             log::Arg{"size"sv, int(paysz)});
 
         const auto t = Topic::fromPart(payload).withBroker(uuid_);
@@ -167,7 +169,7 @@ void Broker::BrokerSession::collectWorkerMessage(zmq::Part&& payload)
         zdispatch_->send(t.toPart().withGroup(BROKER_UPDT));
 
     } else {
-        LOG_WARN(log::Arg{"broker"sv},
+        LOG_WARN(log::Arg{"broker"sv, uuid_.toShortString()},
             log::Arg{"collect"sv, "recv"sv},
             log::Arg{"group"sv, std::string(payload.group())},
             log::Arg{"unknown message"sv});
@@ -205,7 +207,7 @@ void Broker::BrokerSession::receiveWorkerCommand(zmq::Part&& payload)
     auto [req, seqn, params] = zmq::PartMulti::unpack<std::string_view, SyncMachine::seqn_t, zmq::Part>(payload);
 
     if (req != BROKER_SYNC_REQST) {
-        LOG_WARN(log::Arg{"broker"sv},
+        LOG_WARN(log::Arg{"broker"sv, uuid_.toShortString()},
             log::Arg{"snapshot"sv, "recv"sv},
             log::Arg{"request"sv, req},
             log::Arg{"seqn"sv, seqn},
@@ -222,7 +224,7 @@ void Broker::BrokerSession::replySnapshot(uint32_t rouID, uint8_t seqn, zmq::Par
 {
     static_assert(std::is_same_v<SyncMachine::seqn_t, decltype(seqn)>);
 
-    LOG_DEBUG(log::Arg{"broker"sv}, log::Arg{"sync"sv, "reply"sv},
+    LOG_DEBUG(log::Arg{"broker"sv, uuid_.toShortString()}, log::Arg{"sync"sv, "reply"sv},
         log::Arg{"elements"sv, int(storage_.size())});
 
     try {
@@ -251,12 +253,14 @@ void Broker::BrokerSession::replySnapshot(uint32_t rouID, uint8_t seqn, zmq::Par
     catch (const err::ZMQSocketSendFailed& e) {
         switch (e.arg().toInt()) {
         case EHOSTUNREACH:
-            LOG_WARN(log::Arg{"broker"sv}, log::Arg{"sync"sv, "abort"sv},
+            LOG_WARN(log::Arg{"broker"sv, uuid_.toShortString()},
+                log::Arg{"sync"sv, "abort"sv},
                 log::Arg{"reason"sv, "host unreachable"sv});
             break;
 
         case EAGAIN:
-            LOG_WARN(log::Arg{"broker"sv}, log::Arg{"sync"sv, "abort"sv},
+            LOG_WARN(log::Arg{"broker"sv, uuid_.toShortString()},
+                log::Arg{"sync"sv, "abort"sv},
                 log::Arg{"reason"sv, "send would block"sv});
             break;
 

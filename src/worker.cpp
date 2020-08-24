@@ -97,11 +97,13 @@ Event Worker::waitForEvent(std::chrono::milliseconds timeout)
     const auto& ev = Runner::waitForEvent(timeout);
 
     if (ev.notification() == Event::Notification::Success) {
-        LOG_DEBUG(log::Arg{"worker"sv}, log::Arg{"event"sv, "recv"sv},
+        LOG_DEBUG(log::Arg{"worker"sv, uuid().toShortString()},
+            log::Arg{"event"sv, "recv"sv},
             log::Arg{"type"sv, Event::toString(ev.type())},
             log::Arg{"size"sv, int(ev.payload().size())});
     } else {
-        LOG_DEBUG(log::Arg{"worker"sv}, log::Arg{"event"sv, "recv"sv},
+        LOG_DEBUG(log::Arg{"worker"sv, uuid().toShortString()},
+            log::Arg{"event"sv, "recv"sv},
             log::Arg{"type"sv, "n/a"sv},
             log::Arg{"size"sv, "n/a"sv});
     }
@@ -129,7 +131,7 @@ Worker::WorkerSession::WorkerSession(Uuid id, token_type_t token, CompletionFunc
     , zdelivery_{std::make_unique<zmq::Socket>(zctx.get(), zmq::Socket::DISH)}
     , zdispatch_{std::make_unique<zmq::Socket>(zctx.get(), zmq::Socket::RADIO)}
     , conn_{
-          std::make_unique<ConnMachine>("worker"sv, zctx.get(),
+          std::make_unique<ConnMachine>("worker"sv, id, zctx.get(),
               500ms,  // TODO: make configurable
               3000ms, // TODO: make configurable
 
@@ -151,7 +153,7 @@ Worker::WorkerSession::WorkerSession(Uuid id, token_type_t token, CompletionFunc
               }),
       }
     , sync_{
-          std::make_unique<SyncMachine>("worker"sv, zctx.get(),
+          std::make_unique<SyncMachine>("worker"sv, id, zctx.get(),
               0,      // TODO: depends on number of endpoints
               1,      // TODO: make configurable
               3000ms, // TODO: make configurable
@@ -164,7 +166,7 @@ Worker::WorkerSession::WorkerSession(Uuid id, token_type_t token, CompletionFunc
                   switch (s) {
                   case SyncMachine::State::Halted:
                       if (isSnapshot_) {
-                          LOG_DEBUG(log::Arg{"worker"sv},
+                          LOG_DEBUG(log::Arg{"worker"sv, uuid_.toShortString()},
                               log::Arg{"snapshot"sv, "halt"sv},
                               log::Arg{"status"sv, Event::toString(Event::Type::SyncError)});
 
@@ -174,7 +176,7 @@ Worker::WorkerSession::WorkerSession(Uuid id, token_type_t token, CompletionFunc
                       break;
 
                   case SyncMachine::State::Synced:
-                      LOG_DEBUG(log::Arg{"worker"sv},
+                      LOG_DEBUG(log::Arg{"worker"sv, uuid_.toShortString()},
                           log::Arg{"snapshot"sv, "recv"sv},
                           log::Arg{"status"sv, Event::toString(Event::Type::SyncSuccess)});
 
@@ -183,7 +185,7 @@ Worker::WorkerSession::WorkerSession(Uuid id, token_type_t token, CompletionFunc
                       break;
 
                   case SyncMachine::State::Failed:
-                      LOG_DEBUG(log::Arg{"worker"sv},
+                      LOG_DEBUG(log::Arg{"worker"sv, uuid_.toShortString()},
                           log::Arg{"snapshot"sv, "timeout"sv},
                           log::Arg{"status"sv, Event::toString(Event::Type::SyncError)});
 
@@ -228,7 +230,7 @@ void Worker::WorkerSession::operationReady(Operation* oper)
 
     switch (oper->type()) {
     case Operation::Type::Start:
-        LOG_DEBUG(log::Arg{"worker"sv}, log::Arg{"started"sv});
+        LOG_DEBUG(log::Arg{"worker"sv, uuid_.toShortString()}, log::Arg{"started"sv});
         sendEvent(Event::Type::Started, std::move(oper->payload()));
         conn_->onStart();
         break;
@@ -237,22 +239,23 @@ void Worker::WorkerSession::operationReady(Operation* oper)
         conn_->onStop();
         sync_->onHalt();
         sendEvent(Event::Type::Stopped, std::move(oper->payload()));
-        LOG_DEBUG(log::Arg{"worker"sv}, log::Arg{"stopped"sv});
+        LOG_DEBUG(log::Arg{"worker"sv, uuid_.toShortString()}, log::Arg{"stopped"sv});
         break;
 
     case Operation::Type::Dispatch:
-        LOG_DEBUG(log::Arg{"worker"sv}, log::Arg{"dispatch"sv},
+        LOG_DEBUG(log::Arg{"worker"sv, uuid_.toShortString()}, log::Arg{"dispatch"sv},
             log::Arg{"size"sv, int(paysz)});
         zdispatch_->send(oper->payload().withGroup(WORKER_UPDT));
         break;
 
     case Operation::Type::Sync:
-        LOG_DEBUG(log::Arg{"worker"sv}, log::Arg{"sync"sv});
+        LOG_DEBUG(log::Arg{"worker"sv, uuid_.toShortString()}, log::Arg{"sync"sv});
         sync_->onSync();
         break;
 
     default:
-        LOG_ERROR(log::Arg{"worker"sv}, log::Arg{"operation"sv, Operation::toString(oper->type())},
+        LOG_ERROR(log::Arg{"worker"sv, uuid_.toShortString()},
+            log::Arg{"operation"sv, Operation::toString(oper->type())},
             log::Arg{"unknown"sv});
         break;
     }
@@ -264,7 +267,7 @@ void Worker::WorkerSession::socketReady(zmq::Pollable* pble)
     if (pble == zsnapshot_.get()) {
         zmq::Part payload;
         zsnapshot_->recv(&payload);
-        LOG_DEBUG(log::Arg{"worker"sv}, log::Arg{"snapshot"sv},
+        LOG_DEBUG(log::Arg{"worker"sv, uuid_.toShortString()}, log::Arg{"snapshot"sv},
             log::Arg{"size"sv, int(payload.size())});
 
         recvBrokerSnapshot(std::move(payload));
@@ -272,7 +275,7 @@ void Worker::WorkerSession::socketReady(zmq::Pollable* pble)
     } else if (pble == zdelivery_.get()) {
         zmq::Part payload;
         zdelivery_->recv(&payload);
-        LOG_DEBUG(log::Arg{"worker"sv}, log::Arg{"delivery"sv},
+        LOG_DEBUG(log::Arg{"worker"sv, uuid_.toShortString()}, log::Arg{"delivery"sv},
             log::Arg{"size"sv, int(payload.size())});
 
         collectBrokerMessage(std::move(payload));
@@ -287,7 +290,8 @@ void Worker::WorkerSession::socketReady(zmq::Pollable* pble)
         sync_->onTimerTimeoutFired();
 
     } else {
-        LOG_FATAL(log::Arg{"worker"sv}, log::Arg{"could not read ready socket"sv},
+        LOG_FATAL(log::Arg{"worker"sv, uuid_.toShortString()},
+            log::Arg{"could not read ready socket"sv},
             log::Arg{"unknown socket"sv});
     }
 }
@@ -338,7 +342,7 @@ void Worker::WorkerSession::sendSync(uint8_t seqn)
 {
     static_assert(std::is_same_v<SyncMachine::seqn_t, decltype(seqn)>);
 
-    LOG_DEBUG(log::Arg{"worker"sv},
+    LOG_DEBUG(log::Arg{"worker"sv, uuid_.toShortString()},
         log::Arg{"snapshot"sv, "request"sv},
         log::Arg{"status"sv, Event::toString(Event::Type::SyncBegin)});
 
@@ -358,7 +362,7 @@ void Worker::WorkerSession::collectBrokerMessage(zmq::Part&& payload)
         sendEvent(Event::Type::Delivery, std::move(payload));
 
     } else {
-        LOG_WARN(log::Arg{"worker"sv},
+        LOG_WARN(log::Arg{"worker"sv, uuid_.toShortString()},
             log::Arg{"collect"sv, "recv"sv},
             log::Arg{"group"sv, std::string(payload.group())},
             log::Arg{"unknown message"sv});
@@ -371,12 +375,12 @@ void Worker::WorkerSession::recvBrokerSnapshot(zmq::Part&& payload)
     auto [reply, seqn, params] = zmq::PartMulti::unpack<std::string_view, SyncMachine::seqn_t, zmq::Part>(payload);
 
     if (reply == BROKER_SYNC_BEGIN) {
-        LOG_DEBUG(log::Arg{"worker"sv},
+        LOG_DEBUG(log::Arg{"worker"sv, uuid_.toShortString()},
             log::Arg{"snapshot"sv, "recv"sv},
             log::Arg{"status"sv, Event::toString(Event::Type::SyncBegin)});
 
     } else if (reply == BROKER_SYNC_ELEMN) {
-        LOG_DEBUG(log::Arg{"worker"sv},
+        LOG_DEBUG(log::Arg{"worker"sv, uuid_.toShortString()},
             log::Arg{"snapshot"sv, "recv"sv},
             log::Arg{"status"sv, Event::toString(Event::Type::SyncElement)});
 
@@ -387,7 +391,7 @@ void Worker::WorkerSession::recvBrokerSnapshot(zmq::Part&& payload)
         sync_->onReply(0, seqn, SyncMachine::ReplyType::Complete);
 
     } else {
-        LOG_WARN(log::Arg{"worker"sv},
+        LOG_WARN(log::Arg{"worker"sv, uuid_.toShortString()},
             log::Arg{"snapshot"sv, "recv"sv},
             log::Arg{"reply"sv, reply},
             log::Arg{"unknown reply"sv});
@@ -400,7 +404,8 @@ void Worker::WorkerSession::notifyConnectionUpdate(bool isUp)
     if (isUp == isOnline_)
         return;
 
-    LOG_DEBUG(log::Arg{"worker"sv}, log::Arg{"connection"sv, isUp ? "up"sv : "down"sv});
+    LOG_DEBUG(log::Arg{"worker"sv, uuid_.toShortString()},
+        log::Arg{"connection"sv, isUp ? "up"sv : "down"sv});
 
     isOnline_ = isUp;
     sendEvent(isUp ? Event::Type::Online : Event::Type::Offline, zmq::Part{});
@@ -412,7 +417,8 @@ void Worker::WorkerSession::notifySnapshotDownload(bool isSync)
     if (isSync == isSnapshot_)
         return;
 
-    LOG_DEBUG(log::Arg{"worker"sv}, log::Arg{"snapshot"sv, isSync ? "download"sv : "done"sv});
+    LOG_DEBUG(log::Arg{"worker"sv, uuid_.toShortString()},
+        log::Arg{"snapshot"sv, isSync ? "download"sv : "done"sv});
 
     isSnapshot_ = isSync;
     sendEvent(isSync ? Event::Type::SyncDownloadOn : Event::Type::SyncDownloadOff, zmq::Part{});

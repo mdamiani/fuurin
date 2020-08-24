@@ -89,12 +89,14 @@ auto setupMach(int maxIndex, int maxRetry)
         std::unordered_map<int, SyncMachine::seqn_t> sync;
         std::vector<SyncMachine::State> state;
 
+        const Uuid id = Uuid::createNamespaceUuid(Uuid::Ns::Dns, "mach.fsm"sv);
         zmq::Context ctx;
         SyncMachine mach;
 
         T(int maxIndex, int maxRetry)
             : mach{SyncMachine{
                   "mach"sv,
+                  id,
                   &ctx,
                   maxIndex,
                   maxRetry,
@@ -122,6 +124,7 @@ auto setupMach(int maxIndex, int maxRetry)
                               SyncMachine::seqn_t seqNum) //
     {
         BOOST_TEST(t->mach.name() == "mach"sv);
+        BOOST_TEST(t->mach.uuid() == t->id);
         BOOST_TEST(t->mach.maxRetry() == maxRetry);
         BOOST_TEST(t->mach.maxIndex() == maxIndex);
         BOOST_TEST(t->mach.timerTimeout() != nullptr);
@@ -494,6 +497,7 @@ BOOST_AUTO_TEST_CASE(testConsumeTimerTimeout)
     zmq::Context ctx;
     SyncMachine mach{
         "mach"sv,
+        Uuid{},
         &ctx,
         0,
         0,
