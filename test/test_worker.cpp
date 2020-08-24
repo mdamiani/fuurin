@@ -78,6 +78,21 @@ Event testWaitForEvent(Worker& w, std::chrono::milliseconds timeout, Event::Noti
 }
 
 
+Event testWaitForEvent(Worker& w, std::chrono::milliseconds timeout, Event::Notification evRet,
+    Event::Type evType, const Topic& evT)
+{
+    const auto& ev = w.waitForEvent(timeout);
+
+    BOOST_TEST(ev.notification() == evRet);
+    BOOST_TEST(ev.type() == evType);
+
+    BOOST_TEST(!ev.payload().empty());
+    BOOST_TEST(Topic::fromPart(ev.payload()) == evT);
+
+    return ev;
+}
+
+
 struct WorkerFixture
 {
     WorkerFixture()
@@ -113,10 +128,10 @@ const Uuid WorkerFixture::wid = Uuid::createNamespaceUuid(Uuid::Ns::Dns, "worker
 const Uuid WorkerFixture::bid = Uuid::createNamespaceUuid(Uuid::Ns::Dns, "broker.net"sv);
 
 
-zmq::Part mkT(const std::string& name, const std::string& pay)
+Topic mkT(const std::string& name, const std::string& pay)
 {
     using f = WorkerFixture;
-    return Topic{f::bid, f::wid, Topic::SeqN{}, name, zmq::Part{pay}}.toPart();
+    return Topic{f::bid, f::wid, Topic::SeqN{}, name, zmq::Part{pay}};
 }
 
 
@@ -483,6 +498,58 @@ BOOST_AUTO_TEST_CASE(testSyncError_Timeout)
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncDownloadOff);
 
     w.stop();
+}
+
+
+BOOST_FIXTURE_TEST_CASE(testSyncTopicRecentSameWorker, WorkerFixture)
+{
+    w.dispatch("topic"sv, zmq::Part{"hello1"sv});
+    w.dispatch("topic"sv, zmq::Part{"hello2"sv});
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Delivery, mkT("topic", "hello1"));
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Delivery, mkT("topic", "hello2"));
+
+    w.sync();
+
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncDownloadOn);
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncBegin);
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncElement, mkT("topic", "hello2"));
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncSuccess);
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncDownloadOff);
+}
+
+
+BOOST_FIXTURE_TEST_CASE(testSyncTopicRecentAnotherWorker, WorkerFixture)
+{
+    auto wid2 = Uuid::createNamespaceUuid(Uuid::Ns::Dns, "worker2.net"sv);
+    Worker w2(wid2);
+    auto wf2 = w2.start();
+
+    testWaitForEvent(w2, 2s, Event::Notification::Success, Event::Type::Started);
+    testWaitForEvent(w2, 2s, Event::Notification::Success, Event::Type::Online);
+
+    w.dispatch("topic"sv, zmq::Part{"hello1"sv});
+    w2.dispatch("topic"sv, zmq::Part{"hello2"sv});
+
+    auto t1 = mkT("topic", "hello1");
+    auto t2 = mkT("topic", "hello2").withWorker(wid2);
+
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Delivery, t1);
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Delivery, t2);
+    testWaitForEvent(w2, 2s, Event::Notification::Success, Event::Type::Delivery, t1);
+    testWaitForEvent(w2, 2s, Event::Notification::Success, Event::Type::Delivery, t2);
+
+    w.sync();
+
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncDownloadOn);
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncBegin);
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncElement, t2);
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncSuccess);
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncDownloadOff);
+
+    w2.stop();
+
+    testWaitForEvent(w2, 2s, Event::Notification::Success, Event::Type::Offline);
+    testWaitForEvent(w2, 2s, Event::Notification::Success, Event::Type::Stopped);
 }
 
 
