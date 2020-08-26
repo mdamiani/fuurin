@@ -15,6 +15,7 @@
 #include <tuple>
 #include <array>
 #include <functional>
+#include <iterator>
 
 
 namespace fuurin {
@@ -41,9 +42,44 @@ namespace zmq {
  */
 class PartMulti final : private Part
 {
+private:
+    /**
+     * \brief Static check whether the type is an iterator type.
+     */
+    ///{@
+    template<typename T, typename = void>
+    struct isIteratorType : std::false_type
+    {};
+    template<typename T>
+    struct isIteratorType<T, typename std::enable_if_t<!std::is_same_v<             //
+                                 typename std::iterator_traits<T>::value_type, void //
+                                 >>> : std::true_type                               //
+    {
+        using iterator_type = typename std::iterator_traits<T>::value_type;
+    };
+    template<typename T>
+    struct isIteratorType<std::back_insert_iterator<T>> : std::true_type
+    {
+        using iterator_type = typename T::value_type;
+    };
+    template<typename T>
+    struct isIteratorType<std::front_insert_iterator<T>> : std::true_type
+    {
+        using iterator_type = typename T::value_type;
+    };
+    template<typename T>
+    struct isIteratorType<std::insert_iterator<T>> : std::true_type
+    {
+        using iterator_type = typename T::value_type;
+    };
+    ///@}
+
+
 public:
     /// Type to store the length of a string part.
     using string_length_t = uint32_t;
+    /// Type to store the length of an iterable part.
+    using iterable_length_t = uint32_t;
 
 
     /**
@@ -53,12 +89,14 @@ public:
 
 
     /**
-     * \brief Creates and packs a multi part message.
+     * \brief Creates and packs a multi part message, from arguments.
      *
      * It can store integral type and string objects which size does not
      * exceeds exceeds 4 GiB.
      *
      * \param[in] args Variable number of arguments to store.
+     *
+     * \return A \ref Part with packed parameters.
      *
      * \exception ZMQPartCreateFailed The multi part could not be created.
      *
@@ -76,13 +114,15 @@ public:
     /**
      * \brief Extract a multi parts message to a tuple.
      *
+     * \param[in] pm Part to unpack.
+     *
      * \retrun A tuple of the requested types.
      *
      * \exception ZMQPartAccessFailed The multi part buffer could not be extracted,
      *      with the requested types.
      *
-     * \see unpack2(size_t)
-     * \see unpack1(size_t)
+     * \see unpack2(const Part&, size_t)
+     * \see unpack1(const Part&, size_t)
      */
     template<typename... Args>
     static std::tuple<Args...> unpack(const Part& pm)
@@ -98,6 +138,82 @@ public:
     }
 
 
+    /**
+     * \brief Creates and pack a multi part message, iterating over a container.
+     *
+     * \param[in] first The beginning of the input iterator to the first element.
+     * \param[in] list Input iterator to the end.
+     *
+     * \return A \ref Part with packed parameters.
+     *
+     * \exception ZMQPartCreateFailed The multi part could not be created.
+     *
+     * \see pack(Args&&...)
+     * \see pack2(Part&, size_t, T&&)
+     */
+    template<typename InputIt>
+    static std::enable_if_t<isIteratorType<InputIt>::value, Part>
+    pack(InputIt first, InputIt last)
+    {
+        static_assert(sizeof(string_length_t) < sizeof(uint64_t),
+            "string_length_t must be less than uint64_t");
+        static_assert(sizeof(iterable_length_t) < sizeof(uint64_t),
+            "iterable_length_t must be less than uint64_t");
+
+        string_length_t size = sizeof(string_length_t) + sizeof(iterable_length_t);
+        iterable_length_t count = 0;
+
+        for (auto item = first; item != last; ++item) {
+            const size_t sz = tsize(*item);
+            if (uint64_t(size) + sz < size ||
+                uint64_t(size) + sz > std::numeric_limits<string_length_t>::max()) {
+                throwCreateError("size exceeds uint32_t max");
+            }
+            if (uint64_t(count) + 1 > std::numeric_limits<iterable_length_t>::max()) {
+                throwCreateError("number of elements exceeds uint32_t max");
+            }
+            size += sz;
+            ++count;
+        }
+
+        Part pm{Part::msg_init_size, size};
+        size_t pos = pack2(pm, 0, size);
+        pos += pack2(pm, pos, count);
+
+        for (auto item = first; item != last; ++item) {
+            pos += pack2(pm, pos, *item);
+        }
+
+        return pm;
+    }
+
+
+    /**
+     * \brief Extract a multi parts message to a tuple.
+     *
+     * \param[in] pm Part to unpack.
+     * \param[out] d_first The beginning of the destination range.
+     *
+     * \exception ZMQPartAccessFailed The multi part buffer could not be extracted.
+     *
+     * \see unpack2(const Part&, size_t)
+     * \see unpack1(const Part&, size_t)
+     */
+    template<typename OutputIt>
+    static std::enable_if_t<isIteratorType<OutputIt>::value, void>
+    unpack(const Part& pm, OutputIt d_first)
+    {
+        auto [size, count] = unpack2<string_length_t, iterable_length_t>(pm, 0);
+        size_t pos = sizeof(size) + sizeof(count);
+
+        for (iterable_length_t i = 0; i < count; ++i, ++d_first) {
+            auto [item] = unpack1<typename isIteratorType<OutputIt>::iterator_type>(pm, pos);
+            pos += tsize(item);
+            *d_first = std::move(item);
+        }
+    }
+
+
 private:
     friend class TestPartMulti;
 
@@ -108,6 +224,8 @@ private:
      * \param[in] pos Starting position in the internal buffer.
      * \param[in] part Part to pack at the passed position.
      * \param[in] args Other arguments to pack.
+     *
+     * \return Size of the last packed argument.
      *
      * \exception ZMQPartCreateFailed Either \c position exceeds the buffer size or
      *     \c part size exceeds 4 GiB.
@@ -192,23 +310,28 @@ private:
      * \brief Unpacks a tuple of a single type, from the internal buffer.
      *
      * \param[in] pos Position within the internal buffer, where to unpack the tuple.
+     *
      * \return The tuple with the object of the requested type,
      *      extracted from the internal buffer.
+     *
      * \exception ZMQPartAccessFailed The the integral type,
      *      or the size of the string type, exceeds the length of the internal buffer,
      *      from the specified starting position.
+     *
      * \see unpack2
      */
     template<typename T>
-    static std::tuple<T> unpack1(const Part& pm, size_t pos)
+    static std::tuple<std::remove_cv_t<std::remove_reference_t<T>>>
+    unpack1(const Part& pm, size_t pos)
     {
+        using TT = std::remove_cv_t<std::remove_reference_t<T>>;
         const char* const buf = &pm.data()[pos];
 
         if constexpr (isIntegralType<T>()) {
             if (accessOutOfBoundary(pm, pos, sizeof(T)))
                 throwAccessError("could not extract integral type");
 
-            return std::tuple(Part::memcpyWithEndian<T>(buf));
+            return {Part::memcpyWithEndian<TT>(buf)};
 
         } else if constexpr (isStringType<T>()) {
             if (accessOutOfBoundary(pm, pos, sizeof(string_length_t)))
@@ -220,7 +343,7 @@ private:
             if (accessOutOfBoundary(pm, pos, len))
                 throwAccessError("could not extract contents of string type");
 
-            return std::tuple(T{buf + sizeof(string_length_t), len});
+            return {TT{buf + sizeof(string_length_t), len}};
 
         } else if constexpr (isCharArrayType<T>()) {
             const size_t len = std::tuple_size<T>::value;
@@ -228,10 +351,10 @@ private:
             if (accessOutOfBoundary(pm, pos, len))
                 throwAccessError("could not extract contents of array type");
 
-            T arr;
+            TT arr;
             std::copy_n(buf, len, arr.begin());
 
-            return std::tuple(std::move(arr));
+            return {std::move(arr)};
 
         } else {
             assertFalseType<T>();
@@ -246,7 +369,7 @@ private:
      * Instead the size of a string argument is its \c size() itself,
      * plus 4 bytes.
      *
-     * \param[in]a s Argument to query for size.
+     * \param[in] s Argument to query for size.
      */
     template<typename T>
     static size_t tsize(T&& s)
@@ -289,7 +412,7 @@ private:
 
 
     /**
-     * \brief Statical check whether the type is char array.
+     * \brief Static check whether the type is char array.
      */
     ///{@
     template<typename T>

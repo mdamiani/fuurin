@@ -345,6 +345,55 @@ BOOST_AUTO_TEST_CASE(partMultiUnpackStringErr)
 }
 
 
+BOOST_AUTO_TEST_CASE(partMultiPackIter)
+{
+    // Pack same data from a container.
+    std::list<std::string> src = {"rosemary", "basil", "pepper"};
+    Part a = PartMulti::pack(src.begin(), src.end());
+    BOOST_TEST(a.size() == 20u + 19u);
+
+    std::list<std::string> dst1{3};
+    PartMulti::unpack(a, dst1.begin());
+
+    std::string dst2[3];
+    PartMulti::unpack(a, &dst2[0]);
+
+    std::list<std::string> dst3;
+    PartMulti::unpack(a, std::back_inserter(dst3));
+
+    std::list<std::string> dst4;
+    PartMulti::unpack(a, std::front_inserter(dst4));
+    std::reverse(dst4.begin(), dst4.end());
+
+    std::list<std::string> dst5;
+    PartMulti::unpack(a, std::inserter(dst5, dst5.begin()));
+
+    BOOST_TEST(src == dst1);
+    BOOST_TEST(src == dst2);
+    BOOST_TEST(src == dst3);
+    BOOST_TEST(src == dst4);
+    BOOST_TEST(src == dst5);
+
+
+    // This one should stress the pack template type inference,
+    // it must not pick the iterator version.
+    Part b = PartMulti::pack<uint8_t, uint8_t>(10u, 20u);
+    auto [n1, n2] = PartMulti::unpack<uint8_t, uint8_t>(b);
+    BOOST_TEST(n1 == 10u);
+    BOOST_TEST(n2 == 20u);
+
+
+    // Pack an empty container.
+    std::list<std::string> empty1;
+    Part c = PartMulti::pack(empty1.begin(), empty1.end());
+    BOOST_TEST(c.size() == 8u);
+
+    std::list<std::string> empty2;
+    PartMulti::unpack(c, std::back_inserter(empty2));
+    BOOST_TEST(empty2.empty());
+}
+
+
 namespace fuurin {
 namespace zmq {
 class TestPartMulti
