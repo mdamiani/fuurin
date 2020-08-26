@@ -37,12 +37,76 @@ namespace zmq {
  * added to the buffer, in order to store the amount of subsequent bytes.
  * Conversely, the size of any integral type or char arrays is always well known.
  *
+ * Objects of the same type can be packed into an iterable \ref Part, that is
+ * data with a variable number of items. Item's data is packed one by one,
+ * after a header which is made up of 4 bytes for the total length and
+ * other 4 bytes for actual number of items.
+ *
  * This class cannot be instantiated, it is just a helper namespace to
  * manipulate \ref Part objects.
  */
 class PartMulti final : private Part
 {
 private:
+    /**
+     * TYPE TRAITS.
+     */
+
+    /**
+     * \return Whether the type is integral and unsigned.
+     */
+    template<typename T>
+    static constexpr bool isIntegralType()
+    {
+        using type = std::decay_t<T>;
+        return std::is_integral_v<type> && !std::is_signed_v<type>;
+    }
+
+
+    /**
+     * \return Whether the type is a string or a \ref Part.
+     */
+    template<typename T>
+    static constexpr bool isStringType()
+    {
+        using type = std::decay_t<T>;
+        return (false ||
+            std::is_same_v<type, std::string_view> ||
+            std::is_same_v<type, std::string> ||
+            std::is_same_v<type, Part>);
+    }
+
+
+    /**
+     * \brief Static check whether the type is char array.
+     */
+    ///{@
+    template<typename T>
+    struct isCharArrayType : std::false_type
+    {};
+    template<typename I>
+    struct mustCharArrayItem : std::enable_if<std::is_same_v<I, char> ||
+                                       std::is_same_v<I, unsigned char>,
+                                   std::size_t>
+    {};
+    template<typename I, typename mustCharArrayItem<I>::type N>
+    struct isCharArrayType<std::array<I, N> const&> : std::true_type
+    {};
+    template<typename I, typename mustCharArrayItem<I>::type N>
+    struct isCharArrayType<std::array<I, N>&> : std::true_type
+    {};
+    template<typename I, typename mustCharArrayItem<I>::type N>
+    struct isCharArrayType<std::array<I, N> const> : std::true_type
+    {};
+    template<typename I, typename mustCharArrayItem<I>::type N>
+    struct isCharArrayType<std::array<I, N>> : std::true_type
+    {};
+    template<typename I, typename mustCharArrayItem<I>::type N>
+    struct isCharArrayType<std::array<I, N>&&> : std::true_type
+    {};
+    ///@}
+
+
     /**
      * \brief Static check whether the type is an iterator type.
      */
@@ -75,7 +139,28 @@ private:
     ///@}
 
 
+    /// Helper type for assertions.
+    template<class T>
+    struct dependent_false : std::false_type
+    {};
+
+
+    /**
+     * \brief Causes a compilation error due to unsupported type.
+     */
+    template<typename T>
+    static constexpr void assertFalseType()
+    {
+        using type = std::decay_t<T>;
+        static_assert(dependent_false<type>::value, "type not supported");
+    }
+
+
 public:
+    /**
+     * PUBLIC INTERFACE.
+     */
+
     /// Type to store the length of a string part.
     using string_length_t = uint32_t;
     /// Type to store the length of an iterable part.
@@ -89,10 +174,10 @@ public:
 
 
     /**
-     * \brief Creates and packs a multi part message, from arguments.
+     * \brief Creates and packs a multi part message, by fixed arguments.
      *
-     * It can store integral type and string objects which size does not
-     * exceeds exceeds 4 GiB.
+     * It stores a fixed number of items, both integral types and string objects
+     * which size does not exceeds exceeds 4 GiB.
      *
      * \param[in] args Variable number of arguments to store.
      *
@@ -100,6 +185,7 @@ public:
      *
      * \exception ZMQPartCreateFailed The multi part could not be created.
      *
+     * \see unpack(const Part& pm)
      * \see pack2(size_t, T&&, Args&&...)
      */
     template<typename... Args>
@@ -112,15 +198,18 @@ public:
 
 
     /**
-     * \brief Extract a multi parts message to a tuple.
+     * \brief Extracts a multi parts message to a tuple, by fixed arguments.
+     *
+     * It extracts the fixed amount of requested types, from the passed \ref Part.
      *
      * \param[in] pm Part to unpack.
      *
-     * \retrun A tuple of the requested types.
+     * \return A tuple of the requested types.
      *
      * \exception ZMQPartAccessFailed The multi part buffer could not be extracted,
-     *      with the requested types.
+     *                                with the requested types.
      *
+     * \see pack(Args&&...)
      * \see unpack2(const Part&, size_t)
      * \see unpack1(const Part&, size_t)
      */
@@ -141,6 +230,10 @@ public:
     /**
      * \brief Creates and pack a multi part message, iterating over a container.
      *
+     * Packs data to a \ref Part which will contain a variable number of items,
+     * to be subsequently accessed with the corresponding iterable version of
+     * unpack method.
+     *
      * \param[in] first The beginning of the input iterator to the first element.
      * \param[in] list Input iterator to the end.
      *
@@ -148,6 +241,7 @@ public:
      *
      * \exception ZMQPartCreateFailed The multi part could not be created.
      *
+     * \see unpack(const Part&, OutputIt)
      * \see pack(Args&&...)
      * \see pack2(Part&, size_t, T&&)
      */
@@ -189,13 +283,17 @@ public:
 
 
     /**
-     * \brief Extract a multi parts message to a tuple.
+     * \brief Extract a multi parts message to a tuple, from an iterable data.
+     *
+     * Unpacks data in a \ref Part, which contains a variable number of items,
+     * packed with the corresponding iterable version of pack method.
      *
      * \param[in] pm Part to unpack.
      * \param[out] d_first The beginning of the destination range.
      *
      * \exception ZMQPartAccessFailed The multi part buffer could not be extracted.
      *
+     * \see pack(InputIt, InputIt)
      * \see unpack2(const Part&, size_t)
      * \see unpack1(const Part&, size_t)
      */
@@ -215,6 +313,11 @@ public:
 
 
 private:
+    /**
+     * IMPLEMENTATION.
+     */
+
+    ///< Test class.
     friend class TestPartMulti;
 
 
@@ -387,72 +490,6 @@ private:
 
 
     /**
-     * \return Whether the type is integral and unsigned.
-     */
-    template<typename T>
-    static constexpr bool isIntegralType()
-    {
-        using type = std::decay_t<T>;
-        return std::is_integral_v<type> && !std::is_signed_v<type>;
-    }
-
-
-    /**
-     * \return Whether the type is a string or a \ref Part.
-     */
-    template<typename T>
-    static constexpr bool isStringType()
-    {
-        using type = std::decay_t<T>;
-        return (false ||
-            std::is_same_v<type, std::string_view> ||
-            std::is_same_v<type, std::string> ||
-            std::is_same_v<type, Part>);
-    }
-
-
-    /**
-     * \brief Static check whether the type is char array.
-     */
-    ///{@
-    template<typename T>
-    struct isCharArrayType : std::false_type
-    {};
-    template<typename I>
-    struct mustCharArrayItem : std::enable_if<std::is_same_v<I, char> ||
-                                       std::is_same_v<I, unsigned char>,
-                                   std::size_t>
-    {};
-    template<typename I, typename mustCharArrayItem<I>::type N>
-    struct isCharArrayType<std::array<I, N> const&> : std::true_type
-    {};
-    template<typename I, typename mustCharArrayItem<I>::type N>
-    struct isCharArrayType<std::array<I, N>&> : std::true_type
-    {};
-    template<typename I, typename mustCharArrayItem<I>::type N>
-    struct isCharArrayType<std::array<I, N> const> : std::true_type
-    {};
-    template<typename I, typename mustCharArrayItem<I>::type N>
-    struct isCharArrayType<std::array<I, N>> : std::true_type
-    {};
-    template<typename I, typename mustCharArrayItem<I>::type N>
-    struct isCharArrayType<std::array<I, N>&&> : std::true_type
-    {};
-    ///@}
-
-
-    /**
-     * \brief Causes a compilation error due to unsupported type.
-     */
-    template<typename T>
-    static constexpr void assertFalseType()
-    {
-        using type = std::decay_t<T>;
-        static_assert(dependent_false<type>::value, "type not supported");
-    }
-
-
-    /**
      * \brief Checks whether there is an out of bound access.
      * \param[in] pos Starting position whithin the internal buffer.
      * \param[in] sz Size to access starting from \c pos.
@@ -482,12 +519,6 @@ private:
         throw ERROR(ZMQPartAccessFailed, "could not access multi part",
             log::Arg{std::string_view("reason"), reason});
     }
-
-
-    /// Helper type for assertions.
-    template<class T>
-    struct dependent_false : std::false_type
-    {};
 };
 
 } // namespace zmq
