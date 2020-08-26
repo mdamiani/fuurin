@@ -531,14 +531,16 @@ BOOST_FIXTURE_TEST_CASE(testSyncTopicRecentAnotherWorker, WorkerFixture)
     testWaitForEvent(w2, 2s, Event::Notification::Success, Event::Type::Online);
 
     w.dispatch("topic"sv, zmq::Part{"hello1"sv});
-    w2.dispatch("topic"sv, zmq::Part{"hello2"sv});
 
     auto t1 = mkT("topic", "hello1");
     auto t2 = mkT("topic", "hello2").withWorker(wid2);
 
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Delivery, t1);
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Delivery, t2);
     testWaitForEvent(w2, 2s, Event::Notification::Success, Event::Type::Delivery, t1);
+
+    w2.dispatch("topic"sv, zmq::Part{"hello2"sv});
+
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Delivery, t2);
     testWaitForEvent(w2, 2s, Event::Notification::Success, Event::Type::Delivery, t2);
 
     w.sync();
