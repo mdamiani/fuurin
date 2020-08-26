@@ -9,6 +9,8 @@
  */
 
 #include "fuurin/uuid.h"
+#include "fuurin/zmqpart.h"
+#include "fuurin/zmqpartmulti.h"
 
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_io.hpp>
@@ -136,6 +138,18 @@ Uuid Uuid::fromBytes(const Bytes& b)
     ret.bytes_ = b;
     ret.srepr_ = sreprFromBytes(b);
     return ret;
+}
+
+
+Uuid Uuid::fromPart(const zmq::Part& part)
+{
+    return Uuid::fromBytes(std::get<0>(zmq::PartMulti::unpack<Uuid::Bytes>(part)));
+}
+
+
+zmq::Part Uuid::toPart() const
+{
+    return zmq::PartMulti::pack(bytes_);
 }
 
 

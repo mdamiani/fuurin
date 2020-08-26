@@ -97,6 +97,8 @@ std::string_view Event::toString(Event::Type v) noexcept
         return "online"sv;
     case Event::Type::Delivery:
         return "delivery"sv;
+    case Event::Type::SyncRequest:
+        return "sync/request"sv;
     case Event::Type::SyncBegin:
         return "sync/begin"sv;
     case Event::Type::SyncElement:

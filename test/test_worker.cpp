@@ -435,8 +435,9 @@ BOOST_FIXTURE_TEST_CASE(testSyncEmpty, WorkerFixture)
     w.sync();
 
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncDownloadOn);
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncBegin);
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncSuccess);
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncRequest);
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncBegin, bid.toPart());
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncSuccess, bid.toPart());
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncDownloadOff);
 }
 
@@ -451,10 +452,11 @@ BOOST_FIXTURE_TEST_CASE(testSyncElement, WorkerFixture)
     w.sync();
 
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncDownloadOn);
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncBegin);
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncRequest);
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncBegin, bid.toPart());
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncElement, mkT("t1", "hello1"));
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncElement, mkT("t2", "hello2"));
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncSuccess);
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncSuccess, bid.toPart());
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncDownloadOff);
 }
 
@@ -470,11 +472,11 @@ BOOST_AUTO_TEST_CASE(testSyncError_Halt)
     w.sync();
 
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncDownloadOn);
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncBegin);
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncRequest);
 
     w.stop();
 
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncError);
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncError, Uuid{}.toPart());
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncDownloadOff);
 
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Stopped);
@@ -492,9 +494,9 @@ BOOST_AUTO_TEST_CASE(testSyncError_Timeout)
     w.sync();
 
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncDownloadOn);
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncBegin);
-    testWaitForEvent(w, 5s, Event::Notification::Success, Event::Type::SyncBegin);
-    testWaitForEvent(w, 5s, Event::Notification::Success, Event::Type::SyncError);
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncRequest);
+    testWaitForEvent(w, 5s, Event::Notification::Success, Event::Type::SyncRequest);
+    testWaitForEvent(w, 5s, Event::Notification::Success, Event::Type::SyncError, Uuid{}.toPart());
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncDownloadOff);
 
     w.stop();
@@ -511,9 +513,10 @@ BOOST_FIXTURE_TEST_CASE(testSyncTopicRecentSameWorker, WorkerFixture)
     w.sync();
 
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncDownloadOn);
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncBegin);
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncRequest);
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncBegin, bid.toPart());
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncElement, mkT("topic", "hello2"));
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncSuccess);
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncSuccess, bid.toPart());
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncDownloadOff);
 }
 
@@ -541,9 +544,10 @@ BOOST_FIXTURE_TEST_CASE(testSyncTopicRecentAnotherWorker, WorkerFixture)
     w.sync();
 
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncDownloadOn);
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncBegin);
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncRequest);
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncBegin, bid.toPart());
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncElement, t2);
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncSuccess);
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncSuccess, bid.toPart());
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncDownloadOff);
 
     w2.stop();

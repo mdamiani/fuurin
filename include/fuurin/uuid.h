@@ -19,6 +19,11 @@
 
 namespace fuurin {
 
+namespace zmq {
+class Part;
+} // namespace zmq
+
+
 /**
  * \brief Provides an universally unique identifier (UUID) data type,
  * with some convenient methods.
@@ -162,6 +167,28 @@ public:
     static Uuid createNamespaceUuid(const Uuid& ns, std::string_view name);
     static Uuid createNamespaceUuid(const Uuid& ns, const std::string& name);
     ///@}
+
+
+public:
+    /**
+     * \brief Creates new \ref Uuid from a \ref zmq::PartMulti packed \ref zmq::Part.
+     *
+     * \param[in] part Packed uuid.
+     *
+     * \return A new uuid instance.
+     *
+     * \see zmq::PartMulti::unpack(const Part&)
+     */
+    static Uuid fromPart(const zmq::Part& part);
+
+    /**
+     * \brief Converts this \ref Uuid to a \ref zmq::PartMulti packed \ref zmq::Part.
+     *
+     * \return A packed \ref zmq::Part representing this \ref Uuid.
+     *
+     * \see zmq::PartMulti::pack(Args&&...)
+     */
+    zmq::Part toPart() const;
 
 
 private:

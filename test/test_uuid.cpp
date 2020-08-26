@@ -13,6 +13,7 @@
 #include <boost/test/data/test_case.hpp>
 
 #include "fuurin/uuid.h"
+#include "fuurin/zmqpart.h"
 
 #include <algorithm>
 #include <stdexcept>
@@ -91,4 +92,15 @@ BOOST_AUTO_TEST_CASE(testCopy)
 
     u2 = u1;
     BOOST_TEST(u1 == u2);
+}
+
+
+BOOST_AUTO_TEST_CASE(testPart)
+{
+    Uuid u1 = Uuid::createRandomUuid();
+    auto p1 = u1.toPart();
+    BOOST_TEST(p1.size() == Uuid::Bytes{}.size());
+
+    Uuid u2 = Uuid::fromPart(p1);
+    BOOST_TEST(u2 == u1);
 }

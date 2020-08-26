@@ -96,17 +96,10 @@ Event Worker::waitForEvent(std::chrono::milliseconds timeout)
 {
     const auto& ev = Runner::waitForEvent(timeout);
 
-    if (ev.notification() == Event::Notification::Success) {
-        LOG_DEBUG(log::Arg{"worker"sv, uuid().toShortString()},
-            log::Arg{"event"sv, "recv"sv},
-            log::Arg{"type"sv, Event::toString(ev.type())},
-            log::Arg{"size"sv, int(ev.payload().size())});
-    } else {
-        LOG_DEBUG(log::Arg{"worker"sv, uuid().toShortString()},
-            log::Arg{"event"sv, "recv"sv},
-            log::Arg{"type"sv, "n/a"sv},
-            log::Arg{"size"sv, "n/a"sv});
-    }
+    LOG_DEBUG(log::Arg{"worker"sv, uuid().toShortString()},
+        log::Arg{"event"sv, Event::toString(ev.notification())},
+        log::Arg{"type"sv, Event::toString(ev.type())},
+        log::Arg{"size"sv, int(ev.payload().size())});
 
     return ev;
 }
@@ -168,28 +161,32 @@ Worker::WorkerSession::WorkerSession(Uuid id, token_type_t token, CompletionFunc
                       if (isSnapshot_) {
                           LOG_DEBUG(log::Arg{"worker"sv, uuid_.toShortString()},
                               log::Arg{"snapshot"sv, "halt"sv},
+                              log::Arg{"broker", brokerUuid_.toShortString()},
                               log::Arg{"status"sv, Event::toString(Event::Type::SyncError)});
 
-                          sendEvent(Event::Type::SyncError, zmq::Part{});
+                          sendEvent(Event::Type::SyncError, brokerUuid_.toPart());
                       }
+                      brokerUuid_ = Uuid{};
                       notifySnapshotDownload(false);
                       break;
 
                   case SyncMachine::State::Synced:
                       LOG_DEBUG(log::Arg{"worker"sv, uuid_.toShortString()},
                           log::Arg{"snapshot"sv, "recv"sv},
+                          log::Arg{"broker", brokerUuid_.toShortString()},
                           log::Arg{"status"sv, Event::toString(Event::Type::SyncSuccess)});
 
-                      sendEvent(Event::Type::SyncSuccess, zmq::Part{});
+                      sendEvent(Event::Type::SyncSuccess, brokerUuid_.toPart());
                       notifySnapshotDownload(false);
                       break;
 
                   case SyncMachine::State::Failed:
                       LOG_DEBUG(log::Arg{"worker"sv, uuid_.toShortString()},
                           log::Arg{"snapshot"sv, "timeout"sv},
+                          log::Arg{"broker", brokerUuid_.toShortString()},
                           log::Arg{"status"sv, Event::toString(Event::Type::SyncError)});
 
-                      sendEvent(Event::Type::SyncError, zmq::Part{});
+                      sendEvent(Event::Type::SyncError, brokerUuid_.toPart());
                       notifySnapshotDownload(false);
                       break;
 
@@ -250,6 +247,7 @@ void Worker::WorkerSession::operationReady(Operation* oper)
 
     case Operation::Type::Sync:
         LOG_DEBUG(log::Arg{"worker"sv, uuid_.toShortString()}, log::Arg{"sync"sv});
+        brokerUuid_ = Uuid{};
         sync_->onSync();
         break;
 
@@ -344,11 +342,11 @@ void Worker::WorkerSession::sendSync(uint8_t seqn)
 
     LOG_DEBUG(log::Arg{"worker"sv, uuid_.toShortString()},
         log::Arg{"snapshot"sv, "request"sv},
-        log::Arg{"status"sv, Event::toString(Event::Type::SyncBegin)});
+        log::Arg{"status"sv, Event::toString(Event::Type::SyncRequest)});
 
     // TODO: pass other sync params.
     zsnapshot_->trySend(zmq::PartMulti::pack(BROKER_SYNC_REQST, seqn, zmq::Part{}));
-    sendEvent(Event::Type::SyncBegin, zmq::Part{});
+    sendEvent(Event::Type::SyncRequest, zmq::Part{});
 }
 
 
@@ -375,19 +373,35 @@ void Worker::WorkerSession::recvBrokerSnapshot(zmq::Part&& payload)
     auto [reply, seqn, params] = zmq::PartMulti::unpack<std::string_view, SyncMachine::seqn_t, zmq::Part>(payload);
 
     if (reply == BROKER_SYNC_BEGIN) {
+        brokerUuid_ = Uuid::fromPart(params);
+
         LOG_DEBUG(log::Arg{"worker"sv, uuid_.toShortString()},
             log::Arg{"snapshot"sv, "recv"sv},
+            log::Arg{"broker", brokerUuid_.toShortString()},
             log::Arg{"status"sv, Event::toString(Event::Type::SyncBegin)});
+
+        sendEvent(Event::Type::SyncBegin, brokerUuid_.toPart());
 
     } else if (reply == BROKER_SYNC_ELEMN) {
         LOG_DEBUG(log::Arg{"worker"sv, uuid_.toShortString()},
             log::Arg{"snapshot"sv, "recv"sv},
+            log::Arg{"broker", brokerUuid_.toShortString()},
             log::Arg{"status"sv, Event::toString(Event::Type::SyncElement)});
 
         sendEvent(Event::Type::SyncElement, std::move(params));
         sync_->onReply(0, seqn, SyncMachine::ReplyType::Snapshot);
 
     } else if (reply == BROKER_SYNC_COMPL) {
+        if (const auto uuid = Uuid::fromPart(params); uuid != brokerUuid_) {
+            LOG_WARN(log::Arg{"worker"sv, uuid_.toShortString()},
+                log::Arg{"snapshot"sv, "recv"sv},
+                log::Arg{"old", brokerUuid_.toShortString()},
+                log::Arg{"new", uuid.toShortString()},
+                log::Arg{"err"sv, "broker uuid has changed"sv});
+
+            brokerUuid_ = uuid;
+        }
+
         sync_->onReply(0, seqn, SyncMachine::ReplyType::Complete);
 
     } else {

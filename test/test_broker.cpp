@@ -240,7 +240,7 @@ BOOST_DATA_TEST_CASE(testReceiverWorkerSync,
         auto [rep, seq, pay] = zmq::PartMulti::unpack<std::string_view, uint8_t, zmq::Part>(p);
         BOOST_TEST(id == rep);
         BOOST_TEST(nn == seq);
-        BOOST_TEST(pay.empty());
+        BOOST_TEST(TestBroker::bid == Uuid::fromPart(pay));
     };
     const auto testTopic = [](const zmq::Part& p, std::string_view id, uint8_t nn, Topic tt) {
         auto [rep, seq, pay] = zmq::PartMulti::unpack<std::string_view, uint8_t, zmq::Part>(p);

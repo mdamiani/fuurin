@@ -56,8 +56,9 @@ public:
         Offline,         ///< Event for \ref Worker disconnection.
         Online,          ///< Event for \ref Worker connection.
         Delivery,        ///< Event for any \ref Worker::dispatch(Topic::Name, zmq::Part&&).
-        SyncBegin,       ///< Event for start of \ref Worker::sync().
-        SyncElement,     ///< Event for any element of \ref Worker::sync().
+        SyncRequest,     ///< Event for start of \ref Worker::sync().
+        SyncBegin,       ///< Event for reply from broker of \ref Worker::sync().
+        SyncElement,     ///< Event for Worker::sync() reply.
         SyncSuccess,     ///< Event for \ref Worker::sync() success.
         SyncError,       ///< Event for \ref Worker::sync() error.
         SyncDownloadOn,  ///< Event when download of snapshot starts.

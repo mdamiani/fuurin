@@ -231,7 +231,7 @@ void Broker::BrokerSession::replySnapshot(uint32_t rouID, uint8_t seqn, zmq::Par
         const auto& errWouldBlock = ERROR(ZMQSocketSendFailed, "",
             log::Arg{log::ec_t{EAGAIN}});
 
-        if (zsnapshot_->trySend(zmq::PartMulti::pack(BROKER_SYNC_BEGIN, seqn, ""sv)
+        if (zsnapshot_->trySend(zmq::PartMulti::pack(BROKER_SYNC_BEGIN, seqn, uuid_.toPart())
                                     .withRoutingID(rouID)) == -1) {
             throw errWouldBlock;
         }
@@ -244,7 +244,7 @@ void Broker::BrokerSession::replySnapshot(uint32_t rouID, uint8_t seqn, zmq::Par
                 throw errWouldBlock;
             }
         }
-        if (zsnapshot_->trySend(zmq::PartMulti::pack(BROKER_SYNC_COMPL, seqn, ""sv)
+        if (zsnapshot_->trySend(zmq::PartMulti::pack(BROKER_SYNC_COMPL, seqn, uuid_.toPart())
                                     .withRoutingID(rouID)) == -1) {
             throw errWouldBlock;
         }

@@ -190,6 +190,7 @@ protected:
 
         bool isOnline_;   ///< Whether the worker's connection is up.
         bool isSnapshot_; ///< Whether for workers is syncing its snapshot.
+        Uuid brokerUuid_; ///< Broker which last sucessfully synced.
     };
 };
 
