@@ -285,6 +285,35 @@ public:
     /**
      * \brief Extract a multi parts message to a tuple, from an iterable data.
      *
+     * See \ref unpack(const Part&, OutputIt) for description.
+     *
+     * \param[in] pm Part to unpack.
+     * \param[out] visit Visit function for every item.
+     *
+     * \exception ZMQPartAccessFailed The multi part buffer could not be extracted.
+     *
+     * \see pack(InputIt, InputIt)
+     * \see unpack(const Part&, OutputIt)
+     * \see unpack2(const Part&, size_t)
+     * \see unpack1(const Part&, size_t)
+     */
+    template<typename T, typename Visitor>
+    static void unpack(const Part& pm, Visitor visit)
+    {
+        auto [size, count] = unpack2<string_length_t, iterable_length_t>(pm, 0);
+        size_t pos = sizeof(size) + sizeof(count);
+
+        for (iterable_length_t i = 0; i < count; ++i) {
+            auto [item] = unpack1<T>(pm, pos);
+            pos += tsize(item);
+            visit(std::move(item));
+        }
+    }
+
+
+    /**
+     * \brief Extract a multi parts message to a tuple, from an iterable data.
+     *
      * Unpacks data in a \ref Part, which contains a variable number of items,
      * packed with the corresponding iterable version of pack method.
      *
@@ -294,6 +323,7 @@ public:
      * \exception ZMQPartAccessFailed The multi part buffer could not be extracted.
      *
      * \see pack(InputIt, InputIt)
+     * \see unpack(const Part&, Visitor)
      * \see unpack2(const Part&, size_t)
      * \see unpack1(const Part&, size_t)
      */
@@ -301,14 +331,10 @@ public:
     static std::enable_if_t<isIteratorType<OutputIt>::value, void>
     unpack(const Part& pm, OutputIt d_first)
     {
-        auto [size, count] = unpack2<string_length_t, iterable_length_t>(pm, 0);
-        size_t pos = sizeof(size) + sizeof(count);
-
-        for (iterable_length_t i = 0; i < count; ++i, ++d_first) {
-            auto [item] = unpack1<typename isIteratorType<OutputIt>::iterator_type>(pm, pos);
-            pos += tsize(item);
-            *d_first = std::move(item);
-        }
+        using T = typename isIteratorType<OutputIt>::iterator_type;
+        unpack<T>(pm, [&d_first](T&& v) {
+            *d_first++ = v;
+        });
     }
 
 

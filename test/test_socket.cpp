@@ -368,11 +368,17 @@ BOOST_AUTO_TEST_CASE(partMultiPackIter)
     std::list<std::string> dst5;
     PartMulti::unpack(a, std::inserter(dst5, dst5.begin()));
 
+    std::list<std::string> dst6;
+    PartMulti::unpack<std::string>(a, [&dst6](const std::string& s) {
+        dst6.push_back(s);
+    });
+
     BOOST_TEST(src == dst1);
     BOOST_TEST(src == dst2);
     BOOST_TEST(src == dst3);
     BOOST_TEST(src == dst4);
     BOOST_TEST(src == dst5);
+    BOOST_TEST(src == dst6);
 
 
     // This one should stress the pack template type inference,
