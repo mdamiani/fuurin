@@ -512,6 +512,7 @@ private:
         } else {
             assertFalseType<T>();
         }
+        return 0;
     }
 
 
