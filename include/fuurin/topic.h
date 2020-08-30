@@ -36,9 +36,10 @@ public:
     using SeqN = uint64_t;
 
     /**
-     * \brief Payload namae data type.
+     * \brief Payload name data type.
      *
-     * The name has a maximum limit of 16 characters.
+     * The name has a maximum limit of 15 characters.
+     * The internal string is null terminated.
      */
     class Name final
     {
@@ -78,6 +79,10 @@ public:
 
         /**
          * \brief Converts this name to string.
+         *
+         * Internal string is null terminated,
+         * not included in data size, at position
+         * just past the end of the string.
          */
         ///{@
         operator std::string_view() const;
@@ -96,7 +101,7 @@ public:
 
     private:
         size_t sz_;               ///< Actual size of the name.
-        std::array<char, 15> dd_; ///< Backing array of the name.
+        std::array<char, 16> dd_; ///< Backing array of the name.
     };
 
 

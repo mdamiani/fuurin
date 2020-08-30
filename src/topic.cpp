@@ -23,7 +23,7 @@ namespace fuurin {
 Topic::Name::Name()
     : sz_(0)
 {
-    static_assert(std::tuple_size<decltype(dd_)>::value <= ZMQ_GROUP_MAX_LENGTH,
+    static_assert(std::tuple_size<decltype(dd_)>::value <= ZMQ_GROUP_MAX_LENGTH + 1,
         "topic name exceeds ZMQ_GROUP_MAX_LENGTH");
 
     std::memset(dd_.data(), 0, dd_.size());
@@ -32,7 +32,7 @@ Topic::Name::Name()
 
 Topic::Name::Name(std::string_view str)
 {
-    sz_ = std::min(dd_.size(), str.size());
+    sz_ = std::min(capacity(), str.size());
     std::memset(dd_.data(), 0, dd_.size());
     std::copy_n(str.data(), sz_, dd_.data());
 }
@@ -46,7 +46,7 @@ Topic::Name::Name(const std::string& str)
 
 constexpr size_t Topic::Name::capacity() const noexcept
 {
-    return dd_.size();
+    return dd_.size() - 1;
 }
 
 
