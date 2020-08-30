@@ -96,7 +96,7 @@ public:
 
     private:
         size_t sz_;               ///< Actual size of the name.
-        std::array<char, 16> dd_; ///< Backing array of the name.
+        std::array<char, 15> dd_; ///< Backing array of the name.
     };
 
 

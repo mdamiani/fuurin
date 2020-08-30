@@ -11,6 +11,8 @@
 #include "fuurin/topic.h"
 #include "fuurin/zmqpartmulti.h"
 
+#include <zmq.h> // ZMQ_GROUP_MAX_LENGTH
+
 #include <algorithm>
 #include <cstring>
 
@@ -21,6 +23,9 @@ namespace fuurin {
 Topic::Name::Name()
     : sz_(0)
 {
+    static_assert(std::tuple_size<decltype(dd_)>::value <= ZMQ_GROUP_MAX_LENGTH,
+        "topic name exceeds ZMQ_GROUP_MAX_LENGTH");
+
     std::memset(dd_.data(), 0, dd_.size());
 }
 
