@@ -87,6 +87,7 @@ public:
      * \see stop()
      * \see isRunning()
      * \see Session::run()
+     * \see prepareConfiguration()
      */
     std::future<void> start();
 
@@ -129,6 +130,18 @@ protected:
     class Session;
 
     /**
+     * \brief Prepares configuration to send to the asynchronous task upon start.
+     *
+     * This method shall be overridden by subclasses in order to
+     * return a specific configuration data.
+     *
+     * \return An empty \ref Part.
+     *
+     * \see start()
+     */
+    virtual zmq::Part prepareConfiguration() const;
+
+    /**
      * \brief Instantiates a session which runs the asynchronous task.
      *
      * This method shall be overridden by subclasses in order to
@@ -137,9 +150,9 @@ protected:
      * \param[in] onComplete Function to call when session is completed.
      *                       It shall not throw exceptions.
      *
-     * \see Session
      * \return A pointer to a new session.
      *
+     * \see Session
      * \see makeSession()
      */
     virtual std::unique_ptr<Session> createSession(CompletionFunc onComplete) const;

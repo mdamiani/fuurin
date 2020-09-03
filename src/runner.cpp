@@ -80,6 +80,12 @@ bool Runner::isRunning() const noexcept
 }
 
 
+zmq::Part Runner::prepareConfiguration() const
+{
+    return zmq::Part{};
+}
+
+
 std::unique_ptr<Runner::Session> Runner::createSession(CompletionFunc onComplete) const
 {
     return makeSession<Session>(onComplete);
@@ -107,6 +113,8 @@ std::future<void> Runner::start()
         })]() {
             s->run();
         });
+
+    sendOperation(Operation::Type::Start, prepareConfiguration());
 
     commit = true;
     return ret;
@@ -232,12 +240,6 @@ void Runner::Session::run()
     };
 
     auto poll = createPoller();
-
-    // generate a start operation
-    {
-        auto oper = Operation{Operation::Type::Start, Operation::Notification::Success};
-        operationReady(&oper);
-    }
 
     for (;;) {
         for (auto s : poll->wait()) {
