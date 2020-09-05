@@ -276,13 +276,20 @@ zmq::Part Topic::toPart() const
 }
 
 
+std::ostream& operator<<(std::ostream& os, const Topic::Name& n)
+{
+    os << std::string_view(n);
+    return os;
+}
+
+
 std::ostream& operator<<(std::ostream& os, const Topic& t)
 {
     os << "["
        << t.broker() << ", "
        << t.worker() << ", "
        << t.seqNum() << ", "
-       << std::string_view(t.name()) << ", "
+       << t.name() << ", "
        << t.data().size()
        << "]";
 

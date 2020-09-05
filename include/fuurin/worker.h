@@ -12,11 +12,14 @@
 #define FUURIN_WORKER_H
 
 #include "fuurin/runner.h"
+#include "fuurin/workerconfig.h"
 #include "fuurin/event.h"
 #include "fuurin/topic.h"
 #include "fuurin/uuid.h"
 
 #include <memory>
+#include <vector>
+#include <string>
 #include <string_view>
 
 
@@ -48,6 +51,15 @@ public:
     virtual ~Worker() noexcept;
 
     /**
+     * \brief Sets topics to sync with and receive from broker.
+     *
+     * If the list of names is empty, then every topic will be received.
+     *
+     * \param[in] names List of topics names.
+     */
+    void setTopicNames(const std::vector<Topic::Name>& names);
+
+    /**
      * \brief Sends data to the broker.
      *
      * \exception Error The worker task is not running.
@@ -74,6 +86,13 @@ public:
 
 
 protected:
+    /**
+     * \brief Prepares configuration.
+     *
+     * \see Runner::prepareConfiguration()
+     */
+    virtual zmq::Part prepareConfiguration() const override;
+
     /**
      * \return A new worker session.
      * \see Runner::createSession()
@@ -153,6 +172,22 @@ protected:
         void sendSync(uint8_t seqn);
 
         /**
+         * \brief Save the configuration upon start.
+         *
+         * \param[in] part Configuration data.
+         */
+        void saveConfiguration(const zmq::Part& part);
+
+        /**
+         * \brief Checks whether a topic name is part of running configuration.
+         *
+         * \param[in] name Topic's name to check.
+         *
+         * \return \c true in case the passed name is part of running configuration.
+         */
+        bool isTopicInConfig(const Topic::Name& name) const;
+
+        /**
          * \brief Collects a message which was published by a broker.
          *
          * \param[in] payload Message payload.
@@ -188,10 +223,15 @@ protected:
         const std::unique_ptr<ConnMachine> conn_;      ///< Connection state machine.
         const std::unique_ptr<SyncMachine> sync_;      ///< Connection sync machine.
 
-        bool isOnline_;   ///< Whether the worker's connection is up.
-        bool isSnapshot_; ///< Whether for workers is syncing its snapshot.
-        Uuid brokerUuid_; ///< Broker which last sucessfully synced.
+        bool isOnline_;     ///< Whether the worker's connection is up.
+        bool isSnapshot_;   ///< Whether for workers is syncing its snapshot.
+        Uuid brokerUuid_;   ///< Broker which last sucessfully synced.
+        WorkerConfig conf_; ///< Configuration for running the asynchronous task.
     };
+
+
+protected:
+    std::vector<Topic::Name> names_; ///< List of topic names.
 };
 
 } // namespace fuurin

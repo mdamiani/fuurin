@@ -256,7 +256,10 @@ private:
 };
 
 
-///< Streams to printable form a \ref SyncMachine::State value.
+///< Streams to printable form.
+std::ostream& operator<<(std::ostream& os, const Topic::Name& n);
+
+///< Streams to printable form.
 std::ostream& operator<<(std::ostream& os, const Topic& t);
 
 } // namespace fuurin

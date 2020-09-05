@@ -16,9 +16,11 @@
 
 #include "fuurin/broker.h"
 #include "fuurin/worker.h"
+#include "fuurin/workerconfig.h"
 #include "fuurin/zmqpart.h"
 #include "fuurin/zmqpoller.h"
 #include "fuurin/elapser.h"
+#include "fuurin/errors.h"
 
 #include <string_view>
 #include <chrono>
@@ -60,26 +62,21 @@ inline std::ostream& operator<<(std::ostream& os, const std::list<T>& l)
 
 
 Event testWaitForEvent(Worker& w, std::chrono::milliseconds timeout, Event::Notification evRet,
-    Event::Type evType, const zmq::Part& evPay = zmq::Part{})
+    Event::Type evType)
 {
     const auto& ev = w.waitForEvent(timeout);
 
     BOOST_TEST(ev.notification() == evRet);
     BOOST_TEST(ev.type() == evType);
-
-    if (!evPay.empty()) {
-        BOOST_TEST(!ev.payload().empty());
-        BOOST_TEST(ev.payload() == evPay);
-    } else {
-        BOOST_TEST(ev.payload().empty());
-    }
+    BOOST_TEST(ev.payload().empty());
 
     return ev;
 }
 
 
+template<typename T>
 Event testWaitForEvent(Worker& w, std::chrono::milliseconds timeout, Event::Notification evRet,
-    Event::Type evType, const Topic& evT)
+    Event::Type evType, const T& evT)
 {
     const auto& ev = w.waitForEvent(timeout);
 
@@ -87,9 +84,15 @@ Event testWaitForEvent(Worker& w, std::chrono::milliseconds timeout, Event::Noti
     BOOST_TEST(ev.type() == evType);
 
     BOOST_TEST(!ev.payload().empty());
-    BOOST_TEST(Topic::fromPart(ev.payload()) == evT);
+    BOOST_TEST(T::fromPart(ev.payload()) == evT);
 
     return ev;
+}
+
+
+WorkerConfig mkCnf(const std::vector<Topic::Name>& names = {})
+{
+    return WorkerConfig{names};
 }
 
 
@@ -101,7 +104,7 @@ struct WorkerFixture
         , wf(w.start())
         , bf(b.start())
     {
-        testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Started);
+        testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Started, mkCnf());
         testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Online);
     }
 
@@ -151,7 +154,7 @@ BOOST_AUTO_TEST_CASE(testDeliverUuid)
     auto wf = w.start();
     auto bf = b.start();
 
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Started);
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Started, mkCnf());
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Online);
 
     w.dispatch("topic"sv, zmq::Part{"hello"sv});
@@ -166,6 +169,9 @@ BOOST_AUTO_TEST_CASE(testDeliverUuid)
 
     w.stop();
     b.stop();
+
+    bf.get();
+    wf.get();
 }
 
 
@@ -326,7 +332,7 @@ BOOST_AUTO_TEST_CASE(testWaitForStart)
 
     auto wf = w.start();
 
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Started);
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Started, mkCnf());
 
     w.stop();
 
@@ -418,7 +424,7 @@ BOOST_FIXTURE_TEST_CASE(testWaitForEventDiscard, WorkerFixture)
     testWaitForEvent(w, 1500ms, Event::Notification::Discard, Event::Type::Stopped);
 
     // receive new start event
-    testWaitForEvent(w, 1500ms, Event::Notification::Success, Event::Type::Started);
+    testWaitForEvent(w, 1500ms, Event::Notification::Success, Event::Type::Started, mkCnf());
     testWaitForEvent(w, 1500ms, Event::Notification::Success, Event::Type::Online);
 
     // produce a new event
@@ -436,8 +442,8 @@ BOOST_FIXTURE_TEST_CASE(testSyncEmpty, WorkerFixture)
 
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncDownloadOn);
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncRequest);
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncBegin, bid.toPart());
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncSuccess, bid.toPart());
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncBegin, bid);
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncSuccess, bid);
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncDownloadOff);
 }
 
@@ -453,10 +459,10 @@ BOOST_FIXTURE_TEST_CASE(testSyncElement, WorkerFixture)
 
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncDownloadOn);
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncRequest);
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncBegin, bid.toPart());
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncBegin, bid);
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncElement, mkT("t1", "hello1"));
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncElement, mkT("t2", "hello2"));
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncSuccess, bid.toPart());
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncSuccess, bid);
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncDownloadOff);
 }
 
@@ -467,7 +473,7 @@ BOOST_AUTO_TEST_CASE(testSyncError_Halt)
 
     auto wf = w.start();
 
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Started);
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Started, mkCnf());
 
     w.sync();
 
@@ -476,7 +482,7 @@ BOOST_AUTO_TEST_CASE(testSyncError_Halt)
 
     w.stop();
 
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncError, Uuid{}.toPart());
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncError, Uuid{});
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncDownloadOff);
 
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Stopped);
@@ -489,14 +495,14 @@ BOOST_AUTO_TEST_CASE(testSyncError_Timeout)
 
     auto wf = w.start();
 
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Started);
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Started, mkCnf());
 
     w.sync();
 
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncDownloadOn);
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncRequest);
     testWaitForEvent(w, 5s, Event::Notification::Success, Event::Type::SyncRequest);
-    testWaitForEvent(w, 5s, Event::Notification::Success, Event::Type::SyncError, Uuid{}.toPart());
+    testWaitForEvent(w, 5s, Event::Notification::Success, Event::Type::SyncError, Uuid{});
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncDownloadOff);
 
     w.stop();
@@ -514,9 +520,9 @@ BOOST_FIXTURE_TEST_CASE(testSyncTopicRecentSameWorker, WorkerFixture)
 
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncDownloadOn);
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncRequest);
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncBegin, bid.toPart());
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncBegin, bid);
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncElement, mkT("topic", "hello2"));
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncSuccess, bid.toPart());
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncSuccess, bid);
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncDownloadOff);
 }
 
@@ -527,7 +533,7 @@ BOOST_FIXTURE_TEST_CASE(testSyncTopicRecentAnotherWorker, WorkerFixture)
     Worker w2(wid2);
     auto wf2 = w2.start();
 
-    testWaitForEvent(w2, 2s, Event::Notification::Success, Event::Type::Started);
+    testWaitForEvent(w2, 2s, Event::Notification::Success, Event::Type::Started, mkCnf());
     testWaitForEvent(w2, 2s, Event::Notification::Success, Event::Type::Online);
 
     w.dispatch("topic"sv, zmq::Part{"hello1"sv});
@@ -547,15 +553,60 @@ BOOST_FIXTURE_TEST_CASE(testSyncTopicRecentAnotherWorker, WorkerFixture)
 
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncDownloadOn);
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncRequest);
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncBegin, bid.toPart());
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncBegin, bid);
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncElement, t2);
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncSuccess, bid.toPart());
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncSuccess, bid);
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncDownloadOff);
 
     w2.stop();
 
     testWaitForEvent(w2, 2s, Event::Notification::Success, Event::Type::Offline);
     testWaitForEvent(w2, 2s, Event::Notification::Success, Event::Type::Stopped);
+}
+
+
+BOOST_AUTO_TEST_CASE(testTopicSubscriptionInvalid)
+{
+    Worker w(WorkerFixture::wid);
+    w.setTopicNames({"UPDT"sv});
+    auto wf = w.start();
+    BOOST_TEST(w.isRunning());
+    BOOST_REQUIRE_THROW(wf.get(), err::Error);
+    BOOST_TEST(!w.isRunning());
+}
+
+
+BOOST_AUTO_TEST_CASE(testTopicSubscriptionSimple)
+{
+    Broker b(WorkerFixture::bid);
+    Worker w(WorkerFixture::wid);
+
+    w.setTopicNames({"short topic"sv, "very long topic 12345"sv});
+
+    auto bf = b.start();
+    auto wf = w.start();
+
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Started,
+        mkCnf({"short topic"sv, "very long topic"sv}));
+
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Online);
+
+    w.dispatch("short topic"sv, zmq::Part{"hello1"sv});
+    w.dispatch("very long topic"sv, zmq::Part{"hello2"sv});
+    w.dispatch("another topic"sv, zmq::Part{"hello3"sv});
+
+    testWaitForEvent(w, 2s, Event::Notification::Success,
+        Event::Type::Delivery, mkT("short topic", "hello1"));
+    testWaitForEvent(w, 2s, Event::Notification::Success,
+        Event::Type::Delivery, mkT("very long topic", "hello2"));
+
+    testWaitForEvent(w, 3s, Event::Notification::Timeout, Event::Type::Invalid);
+
+    w.stop();
+    b.stop();
+
+    wf.get();
+    bf.get();
 }
 
 

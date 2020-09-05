@@ -166,6 +166,14 @@ void Broker::BrokerSession::collectWorkerMessage(zmq::Part&& payload)
 
         const auto t = Topic::fromPart(payload).withBroker(uuid_);
         storeTopic(t);
+
+        /**
+         * Topic is sent twice, both to the global group
+         * and to the topic name group (topic name is
+         * a null terminated string).
+         */
+        // TODO: Is it possible to avoid sending topic twice?
+        zdispatch_->send(t.toPart().withGroup(std::string_view(t.name()).data()));
         zdispatch_->send(t.toPart().withGroup(BROKER_UPDT));
 
     } else {

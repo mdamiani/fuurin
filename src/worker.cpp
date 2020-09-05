@@ -20,9 +20,10 @@
 #include "types.h"
 #include "log.h"
 
+#include <algorithm>
 #include <utility>
 #include <chrono>
-#include <cstring>
+#include <list>
 #include <type_traits>
 
 
@@ -54,6 +55,12 @@ Worker::Worker(Uuid id)
 
 Worker::~Worker() noexcept
 {
+}
+
+
+void Worker::setTopicNames(const std::vector<Topic::Name>& names)
+{
+    names_ = names;
 }
 
 
@@ -102,6 +109,12 @@ Event Worker::waitForEvent(std::chrono::milliseconds timeout)
         log::Arg{"size"sv, int(ev.payload().size())});
 
     return ev;
+}
+
+
+zmq::Part Worker::prepareConfiguration() const
+{
+    return WorkerConfig{names_}.toPart();
 }
 
 
@@ -228,6 +241,7 @@ void Worker::WorkerSession::operationReady(Operation* oper)
     switch (oper->type()) {
     case Operation::Type::Start:
         LOG_DEBUG(log::Arg{"worker"sv, uuid_.toShortString()}, log::Arg{"started"sv});
+        saveConfiguration(oper->payload());
         sendEvent(Event::Type::Started, std::move(oper->payload()));
         conn_->onStart();
         break;
@@ -309,7 +323,20 @@ void Worker::WorkerSession::connOpen()
     zdelivery_->setEndpoints({"ipc:///tmp/worker_delivery"});
     zdispatch_->setEndpoints({"ipc:///tmp/worker_dispatch"});
 
-    zdelivery_->setGroups({BROKER_HUGZ, BROKER_UPDT});
+    std::list<std::string> groups{BROKER_HUGZ};
+    if (!conf_.topicNames.empty()) {
+        for (const auto& name : conf_.topicNames) {
+            if (std::string_view(name) == BROKER_UPDT) {
+                throw ERROR(Error, "could not set topic name",
+                    log::Arg{"name"sv, std::string_view(BROKER_UPDT)});
+            }
+            groups.push_back(name);
+        }
+    } else {
+        groups.push_back(BROKER_UPDT);
+    }
+
+    zdelivery_->setGroups(groups);
 
     // connect
     zdelivery_->connect();
@@ -350,13 +377,28 @@ void Worker::WorkerSession::sendSync(uint8_t seqn)
 }
 
 
+void Worker::WorkerSession::saveConfiguration(const zmq::Part& part)
+{
+    conf_ = WorkerConfig::fromPart(part);
+}
+
+
+bool Worker::WorkerSession::isTopicInConfig(const Topic::Name& name) const
+{
+    // TODO: do we need to make this check faster?
+    return std::find(conf_.topicNames.begin(), conf_.topicNames.end(), name) != conf_.topicNames.end();
+}
+
+
 void Worker::WorkerSession::collectBrokerMessage(zmq::Part&& payload)
 {
-    if (std::strncmp(payload.group(), BROKER_HUGZ, sizeof(BROKER_HUGZ)) == 0) {
+    const std::string_view group(payload.group());
+
+    if (group == BROKER_HUGZ) {
         // TODO: extract the message
         conn_->onPing();
 
-    } else if (std::strncmp(payload.group(), BROKER_UPDT, sizeof(BROKER_UPDT)) == 0) {
+    } else if (group == BROKER_UPDT || isTopicInConfig(group)) {
         sendEvent(Event::Type::Delivery, std::move(payload));
 
     } else {
