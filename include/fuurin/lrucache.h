@@ -42,7 +42,7 @@ public:
 
 public:
     /**
-     * \brief Initializes a cache with zero capacity.
+     * \brief Initializes a cache with infinite capacity.
      */
     LRUCache()
         : capacity_{0}
@@ -51,7 +51,7 @@ public:
 
 
     /**
-     * \brief Constructor.
+     * \brief Initializes a cache with limited capacity.
      *
      * Creates a cache object with the passed capacity.
      *
@@ -65,6 +65,11 @@ public:
 
     /**
      * \brief Constructor with initializer.
+     *
+     * Sets capacity equal to the provided number of items
+     * and puts them into the cache.
+     *
+     * \param[in] l List of items.
      */
     LRUCache(const std::initializer_list<Item>& l)
         : capacity_{l.size()}
@@ -108,6 +113,16 @@ public:
 
 
     /**
+     * \brief Clears this cache.
+     */
+    void clear()
+    {
+        list_.clear();
+        map_.clear();
+    }
+
+
+    /**
      * \brief Puts or updates an item into the cache.
      *
      * The passed item is set as the most recently used.
@@ -125,16 +140,11 @@ public:
      *
      * \return An iterator to the new inserted item,
      *         that is the last element of the \ref list().
-     *         Otherwise \ref list().end() in case of
-     *         zero capacity.
      */
     typename List::iterator put(const K& k, const V& v)
     {
-        if (capacity_ <= 0)
-            return list_.end();
-
         if (auto it = map_.find(k); it == map_.end()) {
-            if (map_.size() >= capacity_) {
+            if (capacity_ > 0 && map_.size() >= capacity_) {
                 const auto& el = list_.front();
                 map_.erase(el.first);
                 list_.pop_front();

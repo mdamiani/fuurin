@@ -153,8 +153,18 @@ BOOST_AUTO_TEST_CASE(testLRUCache)
     testCache(0, {});
 
 
-    // zero capacity
+    // infinite capacity
     CacheT c2;
-    BOOST_TEST((c2.put("a", 1) == c2.list().end()));
-    testCache(0, {});
+    BOOST_TEST((c2.put("a", 1) != c2.list().end()));
+    BOOST_TEST(c2.find("a") != c.list().end());
+    BOOST_TEST(c2.size() == 1u);
+
+
+    // clear cache
+    CacheT d1{{"a", 1}, {"b", 2}};
+    BOOST_TEST(d1.size() == 2u);
+    BOOST_TEST(!d1.empty());
+    d1.clear();
+    BOOST_TEST(d1.size() == 0u);
+    BOOST_TEST(d1.empty());
 }
