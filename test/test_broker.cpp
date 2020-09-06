@@ -272,7 +272,7 @@ BOOST_DATA_TEST_CASE(testReceiverWorkerSync,
                 testNotif(b.testSocket->sentParts.at(0), BROKER_SYNC_BEGIN, 0);
             if (b.testSocket->sentParts.size() >= 2)
                 testTopic(b.testSocket->sentParts.at(1), BROKER_SYNC_ELEMN, 0,
-                    Topic{}.withData(zmq::Part{"hello"sv}));
+                    Topic{}.withSeqNum(1).withData(zmq::Part{"hello"sv}));
             if (b.testSocket->sentParts.size() >= 3)
                 testNotif(b.testSocket->sentParts.at(2), BROKER_SYNC_COMPL, 0);
         } else {

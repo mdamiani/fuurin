@@ -197,8 +197,8 @@ void Broker::BrokerSession::storeTopic(Topic& t)
     ASSERT(it != storage_.list().end(), "broker storage topic cache is null");
 
     Topic::SeqN seqn{0};
-    if (!it->second.empty())
-        seqn = it->second.list().back().second.seqNum();
+    if (auto el = it->second.find(t.worker()); el != it->second.list().end())
+        seqn = el->second.seqNum();
 
     t.withSeqNum(++seqn);
 

@@ -115,6 +115,9 @@ struct WorkerFixture
 
         testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Offline);
         testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Stopped);
+
+        wf.get();
+        bf.get();
     }
 
     static const Uuid wid;
@@ -537,28 +540,32 @@ BOOST_FIXTURE_TEST_CASE(testSyncTopicRecentAnotherWorker, WorkerFixture)
     testWaitForEvent(w2, 2s, Event::Notification::Success, Event::Type::Online);
 
     w.dispatch("topic"sv, zmq::Part{"hello1"sv});
+    w.dispatch("topic"sv, zmq::Part{"hello1"sv});
 
-    auto t1 = mkT("topic", 0, "hello1");
-    auto t2 = mkT("topic", 0, "hello2").withWorker(wid2);
+    auto t1 = mkT("topic", 2, "hello1");
+    auto t2 = mkT("topic", 1, "hello2").withWorker(wid2);
 
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Delivery, t1.withSeqNum(1));
-    testWaitForEvent(w2, 2s, Event::Notification::Success, Event::Type::Delivery, t1.withSeqNum(1));
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Delivery, Topic{t1}.withSeqNum(1));
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Delivery, t1);
+    testWaitForEvent(w2, 2s, Event::Notification::Success, Event::Type::Delivery, Topic{t1}.withSeqNum(1));
+    testWaitForEvent(w2, 2s, Event::Notification::Success, Event::Type::Delivery, t1);
 
     w2.dispatch("topic"sv, zmq::Part{"hello2"sv});
 
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Delivery, t2.withSeqNum(2));
-    testWaitForEvent(w2, 2s, Event::Notification::Success, Event::Type::Delivery, t2.withSeqNum(2));
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Delivery, t2);
+    testWaitForEvent(w2, 2s, Event::Notification::Success, Event::Type::Delivery, t2);
 
     w.sync();
 
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncDownloadOn);
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncRequest);
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncBegin, bid);
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncElement, t2.withSeqNum(2));
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncElement, t2);
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncSuccess, bid);
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncDownloadOff);
 
     w2.stop();
+    wf2.get();
 
     testWaitForEvent(w2, 2s, Event::Notification::Success, Event::Type::Offline);
     testWaitForEvent(w2, 2s, Event::Notification::Success, Event::Type::Stopped);
