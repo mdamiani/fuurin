@@ -164,7 +164,7 @@ void Broker::BrokerSession::collectWorkerMessage(zmq::Part&& payload)
         LOG_DEBUG(log::Arg{"broker"sv, uuid_.toShortString()}, log::Arg{"dispatch"sv},
             log::Arg{"size"sv, int(paysz)});
 
-        const auto t = Topic::fromPart(payload).withBroker(uuid_);
+        auto t = Topic::fromPart(payload).withBroker(uuid_);
         storeTopic(t);
 
         /**
@@ -185,7 +185,7 @@ void Broker::BrokerSession::collectWorkerMessage(zmq::Part&& payload)
 }
 
 
-void Broker::BrokerSession::storeTopic(const Topic& t)
+void Broker::BrokerSession::storeTopic(Topic& t)
 {
     auto it = storage_.find(t.name());
 
@@ -195,6 +195,12 @@ void Broker::BrokerSession::storeTopic(const Topic& t)
     }
 
     ASSERT(it != storage_.list().end(), "broker storage topic cache is null");
+
+    Topic::SeqN seqn{0};
+    if (!it->second.empty())
+        seqn = it->second.list().back().second.seqNum();
+
+    t.withSeqNum(++seqn);
 
     auto it2 = it->second.put(t.worker(), t);
 

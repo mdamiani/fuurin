@@ -13,6 +13,7 @@
 
 #include "fuurin/runner.h"
 #include "fuurin/workerconfig.h"
+#include "fuurin/lrucache.h"
 #include "fuurin/event.h"
 #include "fuurin/topic.h"
 #include "fuurin/uuid.h"
@@ -179,15 +180,6 @@ protected:
         void saveConfiguration(const zmq::Part& part);
 
         /**
-         * \brief Checks whether a topic name is part of running configuration.
-         *
-         * \param[in] name Topic's name to check.
-         *
-         * \return \c true in case the passed name is part of running configuration.
-         */
-        bool isTopicInConfig(const Topic::Name& name) const;
-
-        /**
          * \brief Collects a message which was published by a broker.
          *
          * \param[in] payload Message payload.
@@ -227,6 +219,8 @@ protected:
         bool isSnapshot_;   ///< Whether for workers is syncing its snapshot.
         Uuid brokerUuid_;   ///< Broker which last sucessfully synced.
         WorkerConfig conf_; ///< Configuration for running the asynchronous task.
+
+        LRUCache<Topic::Name, Topic::SeqN> topicState_; ///< State of worker.
     };
 
 

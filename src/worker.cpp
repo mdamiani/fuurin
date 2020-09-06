@@ -380,13 +380,14 @@ void Worker::WorkerSession::sendSync(uint8_t seqn)
 void Worker::WorkerSession::saveConfiguration(const zmq::Part& part)
 {
     conf_ = WorkerConfig::fromPart(part);
-}
 
-
-bool Worker::WorkerSession::isTopicInConfig(const Topic::Name& name) const
-{
-    // TODO: do we need to make this check faster?
-    return std::find(conf_.topicNames.begin(), conf_.topicNames.end(), name) != conf_.topicNames.end();
+    topicState_.clear();
+    for (const auto& name : conf_.topicNames) {
+        if (topicState_.put(name, 0) == topicState_.list().end()) {
+            throw ERROR(Error, "could not save configuration",
+                log::Arg{"reason"sv, "too many topics"sv});
+        }
+    }
 }
 
 
@@ -398,7 +399,7 @@ void Worker::WorkerSession::collectBrokerMessage(zmq::Part&& payload)
         // TODO: extract the message
         conn_->onPing();
 
-    } else if (group == BROKER_UPDT || isTopicInConfig(group)) {
+    } else if (group == BROKER_UPDT || topicState_.find(group) != topicState_.list().end()) {
         sendEvent(Event::Type::Delivery, std::move(payload));
 
     } else {

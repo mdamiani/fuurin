@@ -112,7 +112,7 @@ protected:
          *
          * \param[in] t Topic to store.
          */
-        void storeTopic(const Topic& t);
+        void storeTopic(Topic& t);
 
         /**
          * \brief Receives a synchronous command requested by a worker.

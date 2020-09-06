@@ -106,7 +106,7 @@ protected:
         }
 
 
-        void storeTopic(const Topic& t)
+        void storeTopic(Topic& t)
         {
             BrokerSession::storeTopic(t);
         }
@@ -171,12 +171,16 @@ BOOST_AUTO_TEST_CASE(testStoreTopic)
     auto st = b.testSession->getStorage();
 
     Topic::Name nm("hello"sv);
-    Topic t{Uuid{}, TestBroker::wid, 0, nm, zmq::Part{"data"sv}};
+    Topic t{Uuid{}, TestBroker::wid, 5, nm, zmq::Part{"data"sv}};
 
     BOOST_TEST(st->empty());
     BOOST_TEST((st->find(nm) == st->list().end()));
 
     b.testSession->storeTopic(t);
+    BOOST_TEST(t.seqNum() == 1u);
+
+    b.testSession->storeTopic(t);
+    BOOST_TEST(t.seqNum() == 2u);
 
     BOOST_TEST(st->size() == 1u);
     BOOST_TEST((st->find(nm) != st->list().end()));

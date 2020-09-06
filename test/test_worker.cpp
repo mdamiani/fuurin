@@ -131,10 +131,10 @@ const Uuid WorkerFixture::wid = Uuid::createNamespaceUuid(Uuid::Ns::Dns, "worker
 const Uuid WorkerFixture::bid = Uuid::createNamespaceUuid(Uuid::Ns::Dns, "broker.net"sv);
 
 
-Topic mkT(const std::string& name, const std::string& pay)
+Topic mkT(const std::string& name, Topic::SeqN seqn, const std::string& pay)
 {
     using f = WorkerFixture;
-    return Topic{f::bid, f::wid, Topic::SeqN{}, name, zmq::Part{pay}};
+    return Topic{f::bid, f::wid, seqn, name, zmq::Part{pay}};
 }
 
 
@@ -160,7 +160,7 @@ BOOST_AUTO_TEST_CASE(testDeliverUuid)
     w.dispatch("topic"sv, zmq::Part{"hello"sv});
 
     auto ev = testWaitForEvent(w, 5s, Event::Notification::Success,
-        Event::Type::Delivery, mkT("topic", "hello"));
+        Event::Type::Delivery, mkT("topic", 1, "hello"));
 
     auto t = Topic::fromPart(ev.payload());
 
@@ -360,7 +360,7 @@ BOOST_FIXTURE_TEST_CASE(testSimpleDispatch, WorkerFixture)
 {
     w.dispatch("topic"sv, zmq::Part{"hello"sv});
 
-    testWaitForEvent(w, 5s, Event::Notification::Success, Event::Type::Delivery, mkT("topic", "hello"));
+    testWaitForEvent(w, 5s, Event::Notification::Success, Event::Type::Delivery, mkT("topic", 1, "hello"));
 }
 
 
@@ -403,7 +403,7 @@ BOOST_FIXTURE_TEST_CASE(testWaitForEventDiscard, WorkerFixture)
 
     // receive just one event
     testWaitForEvent(w, 1500ms, Event::Notification::Success,
-        Event::Type::Delivery, mkT("t1", "hello1"));
+        Event::Type::Delivery, mkT("t1", 1, "hello1"));
 
     // wait for other events to be received
     std::this_thread::sleep_for(1s);
@@ -416,7 +416,7 @@ BOOST_FIXTURE_TEST_CASE(testWaitForEventDiscard, WorkerFixture)
     // discard old events
     for (int i = 0; i < iterations - 1; ++i) {
         testWaitForEvent(w, 1500ms, Event::Notification::Discard,
-            Event::Type::Delivery, mkT("t1", "hello1"));
+            Event::Type::Delivery, mkT("t1", i + 2, "hello1"));
     }
 
     // discard old stop event
@@ -432,7 +432,7 @@ BOOST_FIXTURE_TEST_CASE(testWaitForEventDiscard, WorkerFixture)
 
     // receive new events
     testWaitForEvent(w, 1500ms, Event::Notification::Success,
-        Event::Type::Delivery, mkT("t2", "hello2"));
+        Event::Type::Delivery, mkT("t2", 1, "hello2"));
 }
 
 
@@ -452,16 +452,16 @@ BOOST_FIXTURE_TEST_CASE(testSyncElement, WorkerFixture)
 {
     w.dispatch("t1"sv, zmq::Part{"hello1"sv});
     w.dispatch("t2"sv, zmq::Part{"hello2"sv});
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Delivery, mkT("t1", "hello1"));
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Delivery, mkT("t2", "hello2"));
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Delivery, mkT("t1", 1, "hello1"));
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Delivery, mkT("t2", 1, "hello2"));
 
     w.sync();
 
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncDownloadOn);
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncRequest);
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncBegin, bid);
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncElement, mkT("t1", "hello1"));
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncElement, mkT("t2", "hello2"));
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncElement, mkT("t1", 1, "hello1"));
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncElement, mkT("t2", 1, "hello2"));
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncSuccess, bid);
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncDownloadOff);
 }
@@ -513,15 +513,15 @@ BOOST_FIXTURE_TEST_CASE(testSyncTopicRecentSameWorker, WorkerFixture)
 {
     w.dispatch("topic"sv, zmq::Part{"hello1"sv});
     w.dispatch("topic"sv, zmq::Part{"hello2"sv});
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Delivery, mkT("topic", "hello1"));
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Delivery, mkT("topic", "hello2"));
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Delivery, mkT("topic", 1, "hello1"));
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Delivery, mkT("topic", 2, "hello2"));
 
     w.sync();
 
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncDownloadOn);
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncRequest);
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncBegin, bid);
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncElement, mkT("topic", "hello2"));
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncElement, mkT("topic", 2, "hello2"));
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncSuccess, bid);
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncDownloadOff);
 }
@@ -538,23 +538,23 @@ BOOST_FIXTURE_TEST_CASE(testSyncTopicRecentAnotherWorker, WorkerFixture)
 
     w.dispatch("topic"sv, zmq::Part{"hello1"sv});
 
-    auto t1 = mkT("topic", "hello1");
-    auto t2 = mkT("topic", "hello2").withWorker(wid2);
+    auto t1 = mkT("topic", 0, "hello1");
+    auto t2 = mkT("topic", 0, "hello2").withWorker(wid2);
 
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Delivery, t1);
-    testWaitForEvent(w2, 2s, Event::Notification::Success, Event::Type::Delivery, t1);
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Delivery, t1.withSeqNum(1));
+    testWaitForEvent(w2, 2s, Event::Notification::Success, Event::Type::Delivery, t1.withSeqNum(1));
 
     w2.dispatch("topic"sv, zmq::Part{"hello2"sv});
 
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Delivery, t2);
-    testWaitForEvent(w2, 2s, Event::Notification::Success, Event::Type::Delivery, t2);
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Delivery, t2.withSeqNum(2));
+    testWaitForEvent(w2, 2s, Event::Notification::Success, Event::Type::Delivery, t2.withSeqNum(2));
 
     w.sync();
 
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncDownloadOn);
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncRequest);
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncBegin, bid);
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncElement, t2);
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncElement, t2.withSeqNum(2));
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncSuccess, bid);
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncDownloadOff);
 
@@ -596,9 +596,9 @@ BOOST_AUTO_TEST_CASE(testTopicSubscriptionSimple)
     w.dispatch("another topic"sv, zmq::Part{"hello3"sv});
 
     testWaitForEvent(w, 2s, Event::Notification::Success,
-        Event::Type::Delivery, mkT("short topic", "hello1"));
+        Event::Type::Delivery, mkT("short topic", 1, "hello1"));
     testWaitForEvent(w, 2s, Event::Notification::Success,
-        Event::Type::Delivery, mkT("very long topic", "hello2"));
+        Event::Type::Delivery, mkT("very long topic", 1, "hello2"));
 
     testWaitForEvent(w, 3s, Event::Notification::Timeout, Event::Type::Invalid);
 
