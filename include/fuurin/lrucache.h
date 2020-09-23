@@ -177,9 +177,11 @@ public:
         if (it == map_.end())
             return {};
 
-        const Item ret{*it->second};
+        const auto vit = it->second;
+        const Item ret{*vit};
+
         map_.erase(k);
-        list_.erase(it->second);
+        list_.erase(vit);
 
         return {ret};
     }
