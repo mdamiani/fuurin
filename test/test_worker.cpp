@@ -435,7 +435,7 @@ BOOST_FIXTURE_TEST_CASE(testWaitForEventDiscard, WorkerFixture)
 
     // receive new events
     testWaitForEvent(w, 1500ms, Event::Notification::Success,
-        Event::Type::Delivery, mkT("t2", 1, "hello2"));
+        Event::Type::Delivery, mkT("t2", 4, "hello2"));
 }
 
 
@@ -456,7 +456,7 @@ BOOST_FIXTURE_TEST_CASE(testSyncElement, WorkerFixture)
     w.dispatch("t1"sv, zmq::Part{"hello1"sv});
     w.dispatch("t2"sv, zmq::Part{"hello2"sv});
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Delivery, mkT("t1", 1, "hello1"));
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Delivery, mkT("t2", 1, "hello2"));
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Delivery, mkT("t2", 2, "hello2"));
 
     w.sync();
 
@@ -464,7 +464,7 @@ BOOST_FIXTURE_TEST_CASE(testSyncElement, WorkerFixture)
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncRequest);
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncBegin, bid);
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncElement, mkT("t1", 1, "hello1"));
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncElement, mkT("t2", 1, "hello2"));
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncElement, mkT("t2", 2, "hello2"));
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncSuccess, bid);
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncDownloadOff);
 }
@@ -605,7 +605,7 @@ BOOST_AUTO_TEST_CASE(testTopicSubscriptionSimple)
     testWaitForEvent(w, 2s, Event::Notification::Success,
         Event::Type::Delivery, mkT("short topic", 1, "hello1"));
     testWaitForEvent(w, 2s, Event::Notification::Success,
-        Event::Type::Delivery, mkT("very long topic", 1, "hello2"));
+        Event::Type::Delivery, mkT("very long topic", 2, "hello2"));
 
     testWaitForEvent(w, 3s, Event::Notification::Timeout, Event::Type::Invalid);
 

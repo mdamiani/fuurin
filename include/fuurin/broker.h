@@ -137,7 +137,11 @@ protected:
         const std::unique_ptr<zmq::Socket> zdispatch_; ///< ZMQ socket send data.
         const std::unique_ptr<zmq::Timer> zhugz_;      ///< ZMQ timer to send keepalives.
 
-        LRUCache<Topic::Name, LRUCache<Uuid, Topic>> storage_; ///< Topic storage.
+        /// Alias for worker's uuid type.
+        using WorkerUuid = Uuid;
+
+        LRUCache<Topic::Name, LRUCache<WorkerUuid, Topic>> storTopic_; ///< Topic storage.
+        LRUCache<WorkerUuid, Topic::SeqN> storWorker_;                 ///< Worker storage.
     };
 };
 

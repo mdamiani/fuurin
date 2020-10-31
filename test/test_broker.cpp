@@ -112,9 +112,9 @@ protected:
         }
 
 
-        auto getStorage() -> decltype(storage_)*
+        auto getStorage() -> decltype(storTopic_)*
         {
-            return &storage_;
+            return &storTopic_;
         }
 
 

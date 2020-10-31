@@ -19,8 +19,7 @@
 #include "types.h"
 #include "log.h"
 
-#include <zmq.h>
-
+#include <memory>
 #include <cstring>
 #include <string_view>
 #include <type_traits>
@@ -73,7 +72,8 @@ Broker::BrokerSession::BrokerSession(Uuid id, token_type_t token, CompletionFunc
     , zdelivery_{std::make_unique<zmq::Socket>(zctx.get(), zmq::Socket::DISH)}
     , zdispatch_{std::make_unique<zmq::Socket>(zctx.get(), zmq::Socket::RADIO)}
     , zhugz_{std::make_unique<zmq::Timer>(zctx.get(), "hugz")}
-    , storage_{1024} // TODO: configure capacity.
+    , storTopic_{1024} // TODO: configure capacity.
+    , storWorker_{64}  // TODO: configure capacity.
 {
     zsnapshot_->setEndpoints({"ipc:///tmp/broker_snapshot"});
     zdelivery_->setEndpoints({"ipc:///tmp/worker_dispatch"});
@@ -187,20 +187,22 @@ void Broker::BrokerSession::collectWorkerMessage(zmq::Part&& payload)
 
 void Broker::BrokerSession::storeTopic(Topic& t)
 {
-    auto it = storage_.find(t.name());
+    auto it = storTopic_.find(t.name());
 
-    if (it == storage_.list().end()) {
+    if (it == storTopic_.list().end()) {
         // TODO: configure capacity.
-        it = storage_.put(t.name(), LRUCache<Uuid, Topic>{8});
+        it = storTopic_.put(t.name(), LRUCache<Uuid, Topic>{8});
     }
 
-    ASSERT(it != storage_.list().end(), "broker storage topic cache is null");
+    ASSERT(it != storTopic_.list().end(), "broker storage topic cache is null");
 
     Topic::SeqN seqn{0};
-    if (auto el = it->second.find(t.worker()); el != it->second.list().end())
-        seqn = el->second.seqNum();
+    if (auto el = storWorker_.find(t.worker()); el != storWorker_.list().end())
+        seqn = el->second;
 
-    t.withSeqNum(++seqn);
+    ++seqn;
+    storWorker_.put(t.worker(), seqn);
+    t.withSeqNum(seqn);
 
     auto it2 = it->second.put(t.worker(), t);
 
@@ -239,7 +241,7 @@ void Broker::BrokerSession::replySnapshot(uint32_t rouID, uint8_t seqn, zmq::Par
     static_assert(std::is_same_v<SyncMachine::seqn_t, decltype(seqn)>);
 
     LOG_DEBUG(log::Arg{"broker"sv, uuid_.toShortString()}, log::Arg{"sync"sv, "reply"sv},
-        log::Arg{"elements"sv, int(storage_.size())});
+        log::Arg{"elements"sv, int(storTopic_.size())});
 
     try {
         const auto& errWouldBlock = ERROR(ZMQSocketSendFailed, "",
@@ -249,7 +251,7 @@ void Broker::BrokerSession::replySnapshot(uint32_t rouID, uint8_t seqn, zmq::Par
                                     .withRoutingID(rouID)) == -1) {
             throw errWouldBlock;
         }
-        for (const auto& el : storage_.list()) {
+        for (const auto& el : storTopic_.list()) {
             ASSERT(!el.second.list().empty(), "topic entry has empty cache");
             const auto& t = el.second.list().back().second;
 
