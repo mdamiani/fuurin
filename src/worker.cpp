@@ -47,8 +47,9 @@ namespace fuurin {
  * MAIN TASK
  */
 
-Worker::Worker(Uuid id)
-    : Runner(id)
+Worker::Worker(Uuid id, Topic::SeqN initSequence)
+    : Runner{id}
+    , seqNum_{initSequence}
 {
 }
 

@@ -43,8 +43,11 @@ class Worker : public Runner
 public:
     /**
      * \brief Initializes this worker.
+     *
+     * \param[in] id Identifier.
+     * \param[in] initSequence Initial sequence number.
      */
-    Worker(Uuid id = Uuid::createRandomUuid());
+    Worker(Uuid id = Uuid::createRandomUuid(), Topic::SeqN initSequence = 0);
 
     /**
      * \brief Destroys this worker.
@@ -226,6 +229,7 @@ protected:
 
 protected:
     std::vector<Topic::Name> names_; ///< List of topic names.
+    Topic::SeqN seqNum_;             ///< Worker sequence number.
 };
 
 } // namespace fuurin
