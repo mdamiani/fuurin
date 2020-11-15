@@ -9,6 +9,9 @@
  */
 
 #include "fuurin/operation.h"
+#include "fuurin/zmqpartmulti.h"
+#include "failure.h"
+#include "types.h"
 
 
 using namespace std::literals::string_view_literals;
@@ -17,16 +20,24 @@ using namespace std::literals::string_view_literals;
 namespace fuurin {
 
 Operation::Operation() noexcept
-    : type_(Type::Invalid)
-    , notif_(Notification::Discard)
+    : type_{Type::Invalid}
+    , notif_{Notification::Discard}
+{
+}
+
+
+Operation::Operation(Type type, Notification notif, const zmq::Part& data) noexcept
+    : type_{type}
+    , notif_{notif}
+    , payld_{data}
 {
 }
 
 
 Operation::Operation(Type type, Notification notif, zmq::Part&& data) noexcept
-    : type_(type)
-    , notif_(notif)
-    , payld_(std::move(data))
+    : type_{type}
+    , notif_{notif}
+    , payld_{std::move(data)}
 {
 }
 
@@ -55,6 +66,34 @@ zmq::Part& Operation::payload() noexcept
 const zmq::Part& Operation::payload() const noexcept
 {
     return payld_;
+}
+
+
+Operation& Operation::withType(Type v)
+{
+    type_ = v;
+    return *this;
+}
+
+
+Operation& Operation::withNotification(Notification v)
+{
+    notif_ = v;
+    return *this;
+}
+
+
+Operation& Operation::withPayload(const zmq::Part& v)
+{
+    payld_ = v;
+    return *this;
+}
+
+
+Operation& Operation::withPayload(zmq::Part&& v)
+{
+    payld_ = std::move(v);
+    return *this;
 }
 
 
@@ -97,6 +136,39 @@ std::string_view Operation::toString(Operation::Type v) noexcept
         break;
     }
     return "n/a"sv;
+}
+
+
+Operation Operation::fromPart(const zmq::Part& part)
+{
+    auto [type, notif, payload] = zmq::PartMulti::unpack<type_t, notif_t, zmq::Part>(part);
+
+    ASSERT(type >= toIntegral(Operation::Type::Invalid) &&
+            type < toIntegral(Operation::Type::COUNT),
+        "Operation::fromPart: bad operation type");
+
+    ASSERT(notif >= toIntegral(Operation::Notification::Discard) &&
+            notif < toIntegral(Operation::Notification::COUNT),
+        "Operation::fromPart: bad operation notification");
+
+    return {Operation::Type{type}, Operation::Notification{notif}, std::move(payload)};
+}
+
+
+zmq::Part Operation::toPart() const
+{
+    const type_t type = static_cast<type_t>(type_);
+    const notif_t notif = static_cast<notif_t>(notif_);
+
+    ASSERT(type >= toIntegral(Operation::Type::Invalid) &&
+            type < toIntegral(Operation::Type::COUNT),
+        "Operation::toPart: bad operation type");
+
+    ASSERT(notif >= toIntegral(Operation::Notification::Discard) &&
+            notif < toIntegral(Operation::Notification::COUNT),
+        "Operation::toPart: bad operation notification");
+
+    return zmq::PartMulti::pack(type, notif, payld_);
 }
 
 
