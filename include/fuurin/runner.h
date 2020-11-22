@@ -125,6 +125,26 @@ protected:
     ///< Function type to call when a sessions ends.
     using CompletionFunc = std::function<void()>;
 
+    /**
+     * \brief Sends an operation over a socket.
+     *
+     * \param[in] sock Socket the operation is sent to.
+     * \param[in] token Operation token.
+     * \param[in] oper Type of operation.
+     * \param[in] payload Payload of operation.
+     */
+    static void sendOperation(zmq::Socket* sock, token_type_t token, Operation::Type oper, zmq::Part&& payload) noexcept;
+
+    /**
+     * \brief Receives an operation reply from a socket.
+     *
+     * \param[in] sock Socket the operation is received from.
+     * \param[in] token Expected operation token.
+     *
+     * \return An operation object.
+     */
+    static Operation recvOperation(zmq::Socket* sock, token_type_t token) noexcept;
+
 
 protected:
     class Session;

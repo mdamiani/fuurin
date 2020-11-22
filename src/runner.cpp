@@ -190,13 +190,38 @@ void Runner::sendOperation(Operation::Type oper) noexcept
 
 void Runner::sendOperation(Operation::Type oper, zmq::Part&& payload) noexcept
 {
+    sendOperation(zops_.get(), token_, oper, std::move(payload));
+}
+
+
+void Runner::sendOperation(zmq::Socket* sock, token_type_t token, Operation::Type oper, zmq::Part&& payload) noexcept
+{
     try {
-        zops_->send(zmq::Part{token_},
+        sock->send(zmq::Part{token},
             Operation{oper, Operation::Notification::Success, payload}
                 .toPart());
     } catch (const std::exception& e) {
         LOG_FATAL(log::Arg{"runner"sv}, log::Arg{"operation send threw exception"sv},
             log::Arg{std::string_view(e.what())});
+    }
+}
+
+
+Operation Runner::recvOperation(zmq::Socket* sock, token_type_t token) noexcept
+{
+    try {
+        zmq::Part tok, oper;
+        sock->recv(&tok, &oper);
+        return Operation::fromPart(oper)
+            .withNotification(tok.toUint8() == token
+                    ? Operation::Notification::Success
+                    : Operation::Notification::Discard);
+
+    } catch (const std::exception& e) {
+        LOG_FATAL(log::Arg{"runner"sv}, log::Arg{"operation recv threw exception"sv},
+            log::Arg{std::string_view(e.what())});
+
+        return Operation{};
     }
 }
 
@@ -278,20 +303,7 @@ void Runner::Session::socketReady(zmq::Pollable*)
 
 Operation Runner::Session::recvOperation() noexcept
 {
-    try {
-        zmq::Part tok, oper;
-        zopr_->recv(&tok, &oper);
-        return Operation::fromPart(oper)
-            .withNotification(tok.toUint8() == token_
-                    ? Operation::Notification::Success
-                    : Operation::Notification::Discard);
-
-    } catch (const std::exception& e) {
-        LOG_FATAL(log::Arg{"runner"sv}, log::Arg{"operation recv threw exception"sv},
-            log::Arg{std::string_view(e.what())});
-
-        return Operation{};
-    }
+    return Runner::recvOperation(zopr_.get(), token_);
 }
 
 
