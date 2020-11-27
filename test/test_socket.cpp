@@ -1129,6 +1129,87 @@ BOOST_AUTO_TEST_CASE(socketRadioDish)
 }
 
 
+BOOST_AUTO_TEST_CASE(testHighWaterMarkOption)
+{
+    Context ctx;
+    Socket s1{&ctx, Socket::Type::PUSH};
+    Socket s2{&ctx, Socket::Type::PULL};
+
+    s1.setEndpoints({"inproc://transfer1"});
+    s2.setEndpoints({"inproc://transfer1"});
+
+    const int hwm = 255;
+
+    s1.setHighWaterMark(hwm, hwm);
+    s2.setHighWaterMark(hwm, hwm);
+
+    s1.connect();
+    s2.bind();
+
+    // send until high water mark
+    for (auto v = 0; v <= hwm; ++v) {
+        const int w = s1.trySend(Part{uint8_t(v)});
+        BOOST_REQUIRE(w == 1);
+    }
+
+    // exceeding message
+    bool notSent = false;
+    for (auto v = 0; v <= 10 * hwm; ++v) {
+        const int w = s1.trySend(Part{uint8_t(v)});
+        if (w == -1) {
+            notSent = true;
+            break;
+        }
+    }
+    BOOST_REQUIRE(notSent);
+
+    Poller poll{PollerEvents::Type::Read, 0s, &s2};
+
+    for (auto v = 0; v <= hwm; ++v) {
+        BOOST_REQUIRE(!poll.wait().empty());
+
+        Part r;
+        s2.recv(&r);
+        BOOST_REQUIRE(r.toUint8() == v);
+    }
+}
+
+
+BOOST_AUTO_TEST_CASE(testConflateOption)
+{
+    Context ctx;
+    Socket s1{&ctx, Socket::Type::PUSH};
+    Socket s2{&ctx, Socket::Type::PULL};
+
+    s1.setEndpoints({"inproc://transfer1"});
+    s2.setEndpoints({"inproc://transfer1"});
+
+    s1.setHighWaterMark(1, 1);
+    s2.setHighWaterMark(1, 1);
+
+    s1.setConflate(true);
+    s2.setConflate(true);
+
+    s1.connect();
+    s2.bind();
+
+    for (auto v = 0; v <= 255; ++v) {
+        const int w = s1.trySend(Part{uint8_t(v)});
+        BOOST_REQUIRE(w == 1);
+    }
+
+    Poller poll{PollerEvents::Type::Read, 0s, &s2};
+
+    BOOST_REQUIRE(!poll.wait().empty());
+
+    Part r;
+    s2.recv(&r);
+    BOOST_TEST(r.toUint8() == 255);
+
+    BOOST_REQUIRE(poll.wait().empty());
+}
+
+
 static void BM_TransferSinglePartSmall(benchmark::State& state)
 {
     const auto [ctx, s1, s2] = transferSetup(Socket::Type::PAIR, Socket::Type::PAIR);
