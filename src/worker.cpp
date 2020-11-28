@@ -385,6 +385,10 @@ void Worker::WorkerSession::saveConfiguration(const zmq::Part& part)
     topicState_.clear();
     for (const auto& name : conf_.topicNames) {
         if (topicState_.put(name, 0) == topicState_.list().end()) {
+            // restore state
+            conf_ = WorkerConfig{};
+            topicState_.clear();
+
             throw ERROR(Error, "could not save configuration",
                 log::Arg{"reason"sv, "too many topics"sv});
         }
