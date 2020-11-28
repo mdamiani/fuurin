@@ -185,7 +185,7 @@ protected:
     template<typename S>
     std::unique_ptr<Session> makeSession(CompletionFunc onComplete) const
     {
-        return std::make_unique<S>(uuid_, token_, onComplete, zctx_, zopr_, zevs_);
+        return std::make_unique<S>(uuid_, token_, onComplete, zctx_.get(), zopr_.get(), zevs_.get());
     }
 
     /**
@@ -283,9 +283,7 @@ protected:
          * \param[in] zevent ZMQ socket to send events to main task.
          */
         Session(Uuid id, token_type_t token, CompletionFunc onComplete,
-            const std::unique_ptr<zmq::Context>& zctx,
-            const std::unique_ptr<zmq::Socket>& zoper,
-            const std::unique_ptr<zmq::Socket>& zevent);
+            zmq::Context* zctx, zmq::Socket* zoper, zmq::Socket* zevent);
 
         /**
          * \brief Destructor.
@@ -390,12 +388,12 @@ protected:
 
 
     protected:
-        const Uuid uuid_;                           ///< Identifier.
-        const token_type_t token_;                  ///< Session token.
-        const CompletionFunc docompl_;              ///< Completion action.
-        const std::unique_ptr<zmq::Context>& zctx_; ///< \see Runner::zctx_.
-        const std::unique_ptr<zmq::Socket>& zopr_;  ///< \see Runner::zopr_.
-        const std::unique_ptr<zmq::Socket>& zevs_;  ///< \see Runner::zevs_.
+        const Uuid uuid_;              ///< Identifier.
+        const token_type_t token_;     ///< Session token.
+        const CompletionFunc docompl_; ///< Completion action.
+        zmq::Context* const zctx_;     ///< \see Runner::zctx_.
+        zmq::Socket* const zopr_;      ///< \see Runner::zopr_.
+        zmq::Socket* const zevs_;      ///< \see Runner::zevs_.
     };
 
 

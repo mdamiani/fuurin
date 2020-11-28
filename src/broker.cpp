@@ -64,14 +64,12 @@ std::unique_ptr<Runner::Session> Broker::createSession(CompletionFunc onComplete
  */
 
 Broker::BrokerSession::BrokerSession(Uuid id, token_type_t token, CompletionFunc onComplete,
-    const std::unique_ptr<zmq::Context>& zctx,
-    const std::unique_ptr<zmq::Socket>& zoper,
-    const std::unique_ptr<zmq::Socket>& zevent)
+    zmq::Context* zctx, zmq::Socket* zoper, zmq::Socket* zevent)
     : Session(id, token, onComplete, zctx, zoper, zevent)
-    , zsnapshot_{std::make_unique<zmq::Socket>(zctx.get(), zmq::Socket::SERVER)}
-    , zdelivery_{std::make_unique<zmq::Socket>(zctx.get(), zmq::Socket::DISH)}
-    , zdispatch_{std::make_unique<zmq::Socket>(zctx.get(), zmq::Socket::RADIO)}
-    , zhugz_{std::make_unique<zmq::Timer>(zctx.get(), "hugz")}
+    , zsnapshot_{std::make_unique<zmq::Socket>(zctx, zmq::Socket::SERVER)}
+    , zdelivery_{std::make_unique<zmq::Socket>(zctx, zmq::Socket::DISH)}
+    , zdispatch_{std::make_unique<zmq::Socket>(zctx, zmq::Socket::RADIO)}
+    , zhugz_{std::make_unique<zmq::Timer>(zctx, "hugz")}
     , storTopic_{1024} // TODO: configure capacity.
     , storWorker_{64}  // TODO: configure capacity.
 {
@@ -96,7 +94,7 @@ Broker::BrokerSession::~BrokerSession() noexcept = default;
 std::unique_ptr<zmq::PollerWaiter> Broker::BrokerSession::createPoller()
 {
     return std::unique_ptr<zmq::PollerWaiter>{new zmq::Poller{zmq::PollerEvents::Type::Read,
-        zopr_.get(), zsnapshot_.get(), zdelivery_.get(), zhugz_.get()}};
+        zopr_, zsnapshot_.get(), zdelivery_.get(), zhugz_.get()}};
 }
 
 

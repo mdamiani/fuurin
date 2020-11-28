@@ -231,15 +231,13 @@ Operation Runner::recvOperation(zmq::Socket* sock, token_type_t token) noexcept
  */
 
 Runner::Session::Session(Uuid id, token_type_t token, CompletionFunc onComplete,
-    const std::unique_ptr<zmq::Context>& zctx,
-    const std::unique_ptr<zmq::Socket>& zoper,
-    const std::unique_ptr<zmq::Socket>& zevent)
-    : uuid_(id)
-    , token_(token)
-    , docompl_(onComplete)
-    , zctx_(zctx)
-    , zopr_(zoper)
-    , zevs_(zevent)
+    zmq::Context* zctx, zmq::Socket* zoper, zmq::Socket* zevent)
+    : uuid_{id}
+    , token_{token}
+    , docompl_{onComplete}
+    , zctx_{zctx}
+    , zopr_{zoper}
+    , zevs_{zevent}
 {
 }
 
@@ -264,7 +262,7 @@ void Runner::Session::run()
 
     for (;;) {
         for (auto s : poll->wait()) {
-            if (s != zopr_.get()) {
+            if (s != zopr_) {
                 socketReady(s);
                 continue;
             }
@@ -286,7 +284,7 @@ void Runner::Session::run()
 
 std::unique_ptr<zmq::PollerWaiter> Runner::Session::createPoller()
 {
-    auto poll = new zmq::Poller{zmq::PollerEvents::Type::Read, zopr_.get()};
+    auto poll = new zmq::Poller{zmq::PollerEvents::Type::Read, zopr_};
     return std::unique_ptr<zmq::PollerWaiter>{poll};
 }
 
@@ -303,7 +301,7 @@ void Runner::Session::socketReady(zmq::Pollable*)
 
 Operation Runner::Session::recvOperation() noexcept
 {
-    return Runner::recvOperation(zopr_.get(), token_);
+    return Runner::recvOperation(zopr_, token_);
 }
 
 

@@ -73,9 +73,7 @@ protected:
          * \see Runner::Session::Session(...)
          */
         BrokerSession(Uuid id, token_type_t token, CompletionFunc onComplete,
-            const std::unique_ptr<zmq::Context>& zctx,
-            const std::unique_ptr<zmq::Socket>& zoper,
-            const std::unique_ptr<zmq::Socket>& zevents);
+            zmq::Context* zctx, zmq::Socket* zoper, zmq::Socket* zevents);
 
         /**
          * \brief Destructor.

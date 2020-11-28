@@ -130,15 +130,13 @@ std::unique_ptr<Runner::Session> Worker::createSession(CompletionFunc onComplete
  */
 
 Worker::WorkerSession::WorkerSession(Uuid id, token_type_t token, CompletionFunc onComplete,
-    const std::unique_ptr<zmq::Context>& zctx,
-    const std::unique_ptr<zmq::Socket>& zoper,
-    const std::unique_ptr<zmq::Socket>& zevent)
+    zmq::Context* zctx, zmq::Socket* zoper, zmq::Socket* zevent)
     : Session(id, token, onComplete, zctx, zoper, zevent)
-    , zsnapshot_{std::make_unique<zmq::Socket>(zctx.get(), zmq::Socket::CLIENT)}
-    , zdelivery_{std::make_unique<zmq::Socket>(zctx.get(), zmq::Socket::DISH)}
-    , zdispatch_{std::make_unique<zmq::Socket>(zctx.get(), zmq::Socket::RADIO)}
+    , zsnapshot_{std::make_unique<zmq::Socket>(zctx, zmq::Socket::CLIENT)}
+    , zdelivery_{std::make_unique<zmq::Socket>(zctx, zmq::Socket::DISH)}
+    , zdispatch_{std::make_unique<zmq::Socket>(zctx, zmq::Socket::RADIO)}
     , conn_{
-          std::make_unique<ConnMachine>("worker"sv, id, zctx.get(),
+          std::make_unique<ConnMachine>("worker"sv, id, zctx,
               500ms,  // TODO: make configurable
               3000ms, // TODO: make configurable
 
@@ -160,7 +158,7 @@ Worker::WorkerSession::WorkerSession(Uuid id, token_type_t token, CompletionFunc
               }),
       }
     , sync_{
-          std::make_unique<SyncMachine>("worker"sv, id, zctx.get(),
+          std::make_unique<SyncMachine>("worker"sv, id, zctx,
               0,      // TODO: depends on number of endpoints
               1,      // TODO: make configurable
               3000ms, // TODO: make configurable
@@ -228,7 +226,7 @@ bool Worker::WorkerSession::isOnline() const noexcept
 std::unique_ptr<zmq::PollerWaiter> Worker::WorkerSession::createPoller()
 {
     return std::unique_ptr<zmq::PollerWaiter>{new zmq::PollerAuto{zmq::PollerEvents::Type::Read,
-        zopr_.get(), zsnapshot_.get(), zdelivery_.get(),
+        zopr_, zsnapshot_.get(), zdelivery_.get(),
         conn_->timerRetry(), conn_->timerTimeout(),
         sync_->timerTimeout()}};
 }
