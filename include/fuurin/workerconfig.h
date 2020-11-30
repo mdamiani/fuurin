@@ -32,6 +32,9 @@ struct WorkerConfig
     ///< List of topic names.
     std::vector<Topic::Name> topicNames;
 
+    ///< Initial sequence number.
+    Topic::SeqN seqNum;
+
     /**
      * \brief Comparison operator.
      * \param[in] rhs Another config.

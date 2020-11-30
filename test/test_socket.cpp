@@ -1210,6 +1210,25 @@ BOOST_AUTO_TEST_CASE(testConflateOption)
 }
 
 
+BOOST_AUTO_TEST_CASE(testInprocNoIOThread)
+{
+    Context ctx;
+    Socket s1{&ctx, Socket::Type::PUSH};
+    Socket s2{&ctx, Socket::Type::PULL};
+
+    s1.setEndpoints({"inproc://transfer1"});
+    s2.setEndpoints({"inproc://transfer1"});
+
+    s1.connect();
+    s2.bind();
+
+    Part r;
+    BOOST_REQUIRE(s2.tryRecv(&r) == -1);
+    BOOST_REQUIRE(s1.trySend(Part{uint64_t(1)}) == sizeof(uint64_t));
+    BOOST_REQUIRE(s2.tryRecv(&r) == sizeof(uint64_t));
+}
+
+
 static void BM_TransferSinglePartSmall(benchmark::State& state)
 {
     const auto [ctx, s1, s2] = transferSetup(Socket::Type::PAIR, Socket::Type::PAIR);

@@ -88,6 +88,11 @@ public:
      */
     Event waitForEvent(std::chrono::milliseconds timeout = std::chrono::milliseconds(-1));
 
+    /**
+     * \return The last sequence number used for marking data.
+     */
+    Topic::SeqN seqNumber() const;
+
 
 protected:
     /**
@@ -122,7 +127,8 @@ protected:
          * \see Runner::Session::Session(...)
          */
         WorkerSession(Uuid id, token_type_t token, CompletionFunc onComplete,
-            zmq::Context* zctx, zmq::Socket* zoper, zmq::Socket* zevent);
+            zmq::Context* zctx, zmq::Socket* zoper, zmq::Socket* zevent,
+            zmq::Socket* zseqs);
 
         /**
          * \brief Destructor.
@@ -208,6 +214,11 @@ protected:
          */
         void notifySnapshotDownload(bool isSync);
 
+        /**
+         * \brief Notifies for any change of current sequence number.
+         */
+        void notifySequenceNumber() const;
+
 
     protected:
         const std::unique_ptr<zmq::Socket> zsnapshot_; ///< ZMQ socket to receive snapshots.
@@ -215,19 +226,24 @@ protected:
         const std::unique_ptr<zmq::Socket> zdispatch_; ///< ZMQ socket to send data.
         const std::unique_ptr<ConnMachine> conn_;      ///< Connection state machine.
         const std::unique_ptr<SyncMachine> sync_;      ///< Connection sync machine.
+        zmq::Socket* const zseqs_;                     ///< ZMQ socket to send sequence number.
 
         bool isOnline_;     ///< Whether the worker's connection is up.
         bool isSnapshot_;   ///< Whether for workers is syncing its snapshot.
         Uuid brokerUuid_;   ///< Broker which last sucessfully synced.
         WorkerConfig conf_; ///< Configuration for running the asynchronous task.
 
+        Topic::SeqN seqNum_;                            ///< Sequence number.
         LRUCache<Topic::Name, Topic::SeqN> topicState_; ///< State of worker.
     };
 
 
 protected:
     std::vector<Topic::Name> names_; ///< List of topic names.
-    Topic::SeqN seqNum_;             ///< Worker sequence number.
+    mutable Topic::SeqN seqNum_;     ///< Worker sequence number.
+
+    const std::unique_ptr<zmq::Socket> zseqs_; ///< ZMQ socket to send sequence number.
+    const std::unique_ptr<zmq::Socket> zseqr_; ///< ZMQ socket to receive sequence number.
 };
 
 } // namespace fuurin

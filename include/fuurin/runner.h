@@ -150,6 +150,11 @@ protected:
     class Session;
 
     /**
+     * \return Runner's ZMQ Context.
+     */
+    zmq::Context* zmqCtx() const noexcept;
+
+    /**
      * \brief Prepares configuration to send to the asynchronous task upon start.
      *
      * This method shall be overridden by subclasses in order to
@@ -182,10 +187,11 @@ protected:
      *
      * \see createSession()
      */
-    template<typename S>
-    std::unique_ptr<Session> makeSession(CompletionFunc onComplete) const
+    template<typename S, typename... Args>
+    std::unique_ptr<Session> makeSession(CompletionFunc onComplete, Args&&... args) const
     {
-        return std::make_unique<S>(uuid_, token_, onComplete, zctx_.get(), zopr_.get(), zevs_.get());
+        return std::make_unique<S>(uuid_, token_, onComplete, zctx_.get(), zopr_.get(), zevs_.get(),
+            std::forward<Args>(args)...);
     }
 
     /**

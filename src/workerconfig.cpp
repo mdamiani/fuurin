@@ -20,7 +20,8 @@ namespace fuurin {
 
 bool WorkerConfig::operator==(const WorkerConfig& rhs) const
 {
-    return topicNames == rhs.topicNames;
+    return topicNames == rhs.topicNames &&
+        seqNum == rhs.seqNum;
 }
 
 
@@ -34,9 +35,13 @@ WorkerConfig WorkerConfig::fromPart(const zmq::Part& part)
 {
     WorkerConfig wc;
 
+    const auto [namesPart, seqNum] = zmq::PartMulti::unpack<zmq::Part, Topic::SeqN>(part);
+
     std::vector<std::string_view> names;
-    zmq::PartMulti::unpack(part, std::inserter(names, names.begin()));
+    zmq::PartMulti::unpack(namesPart, std::inserter(names, names.begin()));
+
     wc.topicNames = std::vector<Topic::Name>(names.begin(), names.end());
+    wc.seqNum = seqNum;
 
     return wc;
 }
@@ -45,7 +50,7 @@ WorkerConfig WorkerConfig::fromPart(const zmq::Part& part)
 zmq::Part WorkerConfig::toPart() const
 {
     const std::vector<std::string_view> names{topicNames.begin(), topicNames.end()};
-    return zmq::PartMulti::pack(names.begin(), names.end());
+    return zmq::PartMulti::pack(zmq::PartMulti::pack(names.begin(), names.end()), seqNum);
 }
 
 
@@ -60,6 +65,7 @@ std::ostream& operator<<(std::ostream& os, const WorkerConfig& wc)
         sep = ", ";
     }
     os << "]";
+    os << ", " << wc.seqNum;
     os << "]";
 
     return os;

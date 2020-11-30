@@ -79,6 +79,12 @@ bool Runner::isRunning() const noexcept
 }
 
 
+zmq::Context* Runner::zmqCtx() const noexcept
+{
+    return zctx_.get();
+}
+
+
 zmq::Part Runner::prepareConfiguration() const
 {
     return zmq::Part{};

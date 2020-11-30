@@ -90,9 +90,9 @@ Event testWaitForEvent(Worker& w, std::chrono::milliseconds timeout, Event::Noti
 }
 
 
-WorkerConfig mkCnf(const std::vector<Topic::Name>& names = {})
+WorkerConfig mkCnf(const std::vector<Topic::Name>& names = {}, Topic::SeqN seqn = 0)
 {
-    return WorkerConfig{names};
+    return WorkerConfig{names, seqn};
 }
 
 
@@ -427,7 +427,7 @@ BOOST_FIXTURE_TEST_CASE(testWaitForEventDiscard, WorkerFixture)
     testWaitForEvent(w, 1500ms, Event::Notification::Discard, Event::Type::Stopped);
 
     // receive new start event
-    testWaitForEvent(w, 1500ms, Event::Notification::Success, Event::Type::Started, mkCnf());
+    testWaitForEvent(w, 1500ms, Event::Notification::Success, Event::Type::Started, mkCnf({}, 3));
     testWaitForEvent(w, 1500ms, Event::Notification::Success, Event::Type::Online);
 
     // produce a new event
@@ -614,6 +614,53 @@ BOOST_AUTO_TEST_CASE(testTopicSubscriptionSimple)
 
     wf.get();
     bf.get();
+}
+
+
+BOOST_FIXTURE_TEST_CASE(testSeqnNotify, WorkerFixture)
+{
+    // test initial value
+    BOOST_TEST(w.seqNumber() == 0ull);
+
+    auto t1 = mkT("topic", 0, "hello");
+
+    // test final value
+    w.dispatch("topic"sv, zmq::Part{"hello"sv});
+    w.dispatch("topic"sv, zmq::Part{"hello"sv});
+    w.dispatch("topic"sv, zmq::Part{"hello"sv});
+
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Delivery, Topic{t1}.withSeqNum(1));
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Delivery, Topic{t1}.withSeqNum(2));
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Delivery, Topic{t1}.withSeqNum(3));
+
+    BOOST_TEST(w.seqNumber() == 3ull);
+    BOOST_TEST(w.seqNumber() == 3ull);
+    BOOST_TEST(w.seqNumber() == 3ull);
+
+    w.dispatch("topic"sv, zmq::Part{"hello"sv});
+
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Delivery, Topic{t1}.withSeqNum(4));
+
+    BOOST_TEST(w.seqNumber() == 4ull);
+
+    // stop
+    w.stop();
+    wf.get();
+
+    testWaitForEvent(w, 1500ms, Event::Notification::Success, Event::Type::Offline);
+    testWaitForEvent(w, 1500ms, Event::Notification::Success, Event::Type::Stopped);
+
+    // start again
+    wf = w.start();
+
+    testWaitForEvent(w, 1500ms, Event::Notification::Success, Event::Type::Started, mkCnf({}, 4));
+    testWaitForEvent(w, 1500ms, Event::Notification::Success, Event::Type::Online);
+
+    w.dispatch("topic"sv, zmq::Part{"hello"sv});
+
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Delivery, Topic{t1}.withSeqNum(5));
+
+    BOOST_TEST(w.seqNumber() == 5ull);
 }
 
 

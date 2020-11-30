@@ -50,7 +50,21 @@ namespace fuurin {
 Worker::Worker(Uuid id, Topic::SeqN initSequence)
     : Runner{id}
     , seqNum_{initSequence}
+    , zseqs_(std::make_unique<zmq::Socket>(zmqCtx(), zmq::Socket::PUSH))
+    , zseqr_(std::make_unique<zmq::Socket>(zmqCtx(), zmq::Socket::PULL))
 {
+    // MUST be inproc in order to get instant delivery of messages.
+    zseqs_->setEndpoints({"inproc://worker-seqn"});
+    zseqr_->setEndpoints({"inproc://worker-seqn"});
+
+    zseqs_->setHighWaterMark(1, 1);
+    zseqr_->setHighWaterMark(1, 1);
+
+    zseqs_->setConflate(true);
+    zseqr_->setConflate(true);
+
+    zseqr_->bind();
+    zseqs_->connect();
 }
 
 
@@ -113,15 +127,28 @@ Event Worker::waitForEvent(std::chrono::milliseconds timeout)
 }
 
 
+Topic::SeqN Worker::seqNumber() const
+{
+    // latest message is always available
+    // over the socket, because we are using
+    // inproc transport.
+    zmq::Part r;
+    if (zseqr_->tryRecv(&r) != -1)
+        seqNum_ = r.toUint64();
+
+    return seqNum_;
+}
+
+
 zmq::Part Worker::prepareConfiguration() const
 {
-    return WorkerConfig{names_}.toPart();
+    return WorkerConfig{names_, seqNumber()}.toPart();
 }
 
 
 std::unique_ptr<Runner::Session> Worker::createSession(CompletionFunc onComplete) const
 {
-    return makeSession<WorkerSession>(onComplete);
+    return makeSession<WorkerSession>(onComplete, zseqs_.get());
 }
 
 
@@ -130,7 +157,7 @@ std::unique_ptr<Runner::Session> Worker::createSession(CompletionFunc onComplete
  */
 
 Worker::WorkerSession::WorkerSession(Uuid id, token_type_t token, CompletionFunc onComplete,
-    zmq::Context* zctx, zmq::Socket* zoper, zmq::Socket* zevent)
+    zmq::Context* zctx, zmq::Socket* zoper, zmq::Socket* zevent, zmq::Socket* zseqs)
     : Session(id, token, onComplete, zctx, zoper, zevent)
     , zsnapshot_{std::make_unique<zmq::Socket>(zctx, zmq::Socket::CLIENT)}
     , zdelivery_{std::make_unique<zmq::Socket>(zctx, zmq::Socket::DISH)}
@@ -208,6 +235,7 @@ Worker::WorkerSession::WorkerSession(Uuid id, token_type_t token, CompletionFunc
                   };
               }),
       }
+    , zseqs_{zseqs}
     , isOnline_{false}
     , isSnapshot_{false}
 {
@@ -253,8 +281,14 @@ void Worker::WorkerSession::operationReady(Operation* oper)
         break;
 
     case Operation::Type::Dispatch:
+        // TODO: send seqNum_ to broker
+        ++seqNum_;
+        notifySequenceNumber();
+
+        // FIXME: log::Arg shoud support int64 type, int(seqNum_) is not correct.
         LOG_DEBUG(log::Arg{"worker"sv, uuid_.toShortString()}, log::Arg{"dispatch"sv},
-            log::Arg{"size"sv, int(paysz)});
+            log::Arg{"size"sv, int(paysz)}, log::Arg{"seqn"sv, int(seqNum_)});
+
         zdispatch_->send(oper->payload().withGroup(WORKER_UPDT));
         break;
 
@@ -391,6 +425,8 @@ void Worker::WorkerSession::saveConfiguration(const zmq::Part& part)
                 log::Arg{"reason"sv, "too many topics"sv});
         }
     }
+
+    seqNum_ = conf_.seqNum;
 }
 
 
@@ -403,6 +439,7 @@ void Worker::WorkerSession::collectBrokerMessage(zmq::Part&& payload)
         conn_->onPing();
 
     } else if (group == BROKER_UPDT || topicState_.find(group) != topicState_.list().end()) {
+        // TODO: filter out topics by sequence number.
         sendEvent(Event::Type::Delivery, std::move(payload));
 
     } else {
@@ -416,7 +453,7 @@ void Worker::WorkerSession::collectBrokerMessage(zmq::Part&& payload)
 
 void Worker::WorkerSession::recvBrokerSnapshot(zmq::Part&& payload)
 {
-    auto [reply, seqn, params] = zmq::PartMulti::unpack<std::string_view, SyncMachine::seqn_t, zmq::Part>(payload);
+    auto [reply, syncseq, params] = zmq::PartMulti::unpack<std::string_view, SyncMachine::seqn_t, zmq::Part>(payload);
 
     if (reply == BROKER_SYNC_BEGIN) {
         brokerUuid_ = Uuid::fromPart(params);
@@ -435,7 +472,8 @@ void Worker::WorkerSession::recvBrokerSnapshot(zmq::Part&& payload)
             log::Arg{"status"sv, Event::toString(Event::Type::SyncElement)});
 
         sendEvent(Event::Type::SyncElement, std::move(params));
-        sync_->onReply(0, seqn, SyncMachine::ReplyType::Snapshot);
+        sync_->onReply(0, syncseq, SyncMachine::ReplyType::Snapshot);
+        // TODO: update seqNum_ if greater and notifySequenceNumber();
 
     } else if (reply == BROKER_SYNC_COMPL) {
         if (const auto uuid = Uuid::fromPart(params); uuid != brokerUuid_) {
@@ -448,7 +486,7 @@ void Worker::WorkerSession::recvBrokerSnapshot(zmq::Part&& payload)
             brokerUuid_ = uuid;
         }
 
-        sync_->onReply(0, seqn, SyncMachine::ReplyType::Complete);
+        sync_->onReply(0, syncseq, SyncMachine::ReplyType::Complete);
 
     } else {
         LOG_WARN(log::Arg{"worker"sv, uuid_.toShortString()},
@@ -483,5 +521,19 @@ void Worker::WorkerSession::notifySnapshotDownload(bool isSync)
     isSnapshot_ = isSync;
     sendEvent(isSync ? Event::Type::SyncDownloadOn : Event::Type::SyncDownloadOff, zmq::Part{});
 }
+
+
+void Worker::WorkerSession::notifySequenceNumber() const
+{
+    try {
+        if (zseqs_->trySend(zmq::Part{seqNum_}) == -1)
+            throw ERROR(ZMQSocketSendFailed, "socket send would block");
+
+    } catch (const std::exception& e) {
+        LOG_FATAL(log::Arg{"runner"sv}, log::Arg{"could not notify sequence number"sv},
+            log::Arg{std::string_view(e.what())});
+    }
+}
+
 
 } // namespace fuurin
