@@ -37,6 +37,7 @@ class SyncMachine;
  * \brief Worker is the client interface to implement a service.
  *
  * This class is not thread-safe.
+ * This class does not throw exceptions by itself.
  */
 class Worker : public Runner
 {
@@ -65,8 +66,6 @@ public:
 
     /**
      * \brief Sends data to the broker.
-     *
-     * \exception Error The worker task is not running.
      *
      * \see isRunning()
      */

@@ -93,10 +93,8 @@ void Worker::dispatch(Topic::Name name, Topic::Data& data)
 
 void Worker::dispatch(Topic::Name name, Topic::Data&& data)
 {
-    if (!isRunning()) {
-        throw ERROR(Error, "could not dispatch data",
-            log::Arg{"reason"sv, "worker is not running"sv});
-    }
+    if (!isRunning())
+        return;
 
     sendOperation(Operation::Type::Dispatch,
         Topic{Uuid{}, uuid(), Topic::SeqN{}, name, data}.toPart());
@@ -105,10 +103,8 @@ void Worker::dispatch(Topic::Name name, Topic::Data&& data)
 
 void Worker::sync()
 {
-    if (!isRunning()) {
-        throw ERROR(Error, "could not sync",
-            log::Arg{"reason"sv, "worker is not running"sv});
-    }
+    if (!isRunning())
+        return;
 
     sendOperation(Operation::Type::Sync);
 }
