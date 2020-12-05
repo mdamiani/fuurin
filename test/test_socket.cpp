@@ -740,6 +740,34 @@ BOOST_AUTO_TEST_CASE(tryTransferMultiPart, *utf::timeout(2))
 }
 
 
+BOOST_AUTO_TEST_CASE(hasMoreParts, *utf::timeout(2))
+{
+    Context ctx;
+    Socket s1{&ctx, Socket::Type::PUSH};
+    Socket s2{&ctx, Socket::Type::PULL};
+
+    s1.setEndpoints({"inproc://transfer"});
+    s2.setEndpoints({"inproc://transfer"});
+
+    s1.connect();
+    s2.bind();
+
+    int n = s1.send(Part{uint8_t(1)}, Part{uint16_t(2)});
+    BOOST_REQUIRE(n == 3);
+
+    Part r;
+    n = s2.tryRecv(&r);
+    BOOST_REQUIRE(n == 1);
+    BOOST_REQUIRE(r.toUint8() == 1u);
+    BOOST_REQUIRE(r.hasMore());
+
+    n = s2.tryRecv(&r);
+    BOOST_REQUIRE(n == 2);
+    BOOST_REQUIRE(r.toUint16() == 2u);
+    BOOST_REQUIRE(!r.hasMore());
+}
+
+
 void testWaitForEvents(Socket* socket, PollerEvents::Type type, std::chrono::milliseconds timeout, bool expected)
 {
     Poller poll{type, timeout, socket};
