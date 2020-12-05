@@ -443,11 +443,8 @@ private:
      * \return The tuple with the object of the requested type,
      *      extracted from the internal buffer.
      *
-     * \exception ZMQPartAccessFailed The the integral type,
-     *      or the size of the string type, exceeds the length of the internal buffer,
-     *      from the specified starting position.
-     *
      * \see unpack2
+     * \see psize(const Part&, size_t)
      */
     template<typename T>
     static std::tuple<std::remove_cv_t<std::remove_reference_t<T>>>
@@ -455,12 +452,51 @@ private:
     {
         using TT = std::remove_cv_t<std::remove_reference_t<T>>;
         const char* const buf = &pm.data()[pos];
+        const auto len = psize<T>(pm, pos);
+
+        if constexpr (isIntegralType<T>()) {
+            return {Part::memcpyWithEndian<TT>(buf)};
+
+        } else if constexpr (isStringType<T>()) {
+            return {TT{buf + sizeof(string_length_t), len - sizeof(string_length_t)}};
+
+        } else if constexpr (isCharArrayType<T>()) {
+            TT arr;
+            std::copy_n(buf, len, arr.begin());
+            return {std::move(arr)};
+
+        } else {
+            assertFalseType<T>();
+        }
+    }
+
+
+    /**
+     * \brief Calculates the size of any supported packed type.
+     *
+     * The size of any integral type is calculated with \c sizeof.
+     * Instead the size of a string argument is its \c size() itself,
+     * plus 4 bytes.
+     *
+     * \param[in] pm Part which contains the packed type.
+     * \param[in] pos Offset of the packed type in part.
+     *
+     * \return Total size in bytes of the packed type.
+     *
+     * \exception ZMQPartAccessFailed The integral type,
+     *      or the size of the string type, exceeds the length of the internal buffer,
+     *      from the specified starting position.
+     */
+    template<typename T>
+    static size_t psize(const Part& pm, size_t pos)
+    {
+        const char* const buf = &pm.data()[pos];
 
         if constexpr (isIntegralType<T>()) {
             if (accessOutOfBoundary(pm, pos, sizeof(T)))
                 throwAccessError("could not extract integral type");
 
-            return {Part::memcpyWithEndian<TT>(buf)};
+            return sizeof(T);
 
         } else if constexpr (isStringType<T>()) {
             if (accessOutOfBoundary(pm, pos, sizeof(string_length_t)))
@@ -472,7 +508,7 @@ private:
             if (accessOutOfBoundary(pm, pos, len))
                 throwAccessError("could not extract contents of string type");
 
-            return {TT{buf + sizeof(string_length_t), len}};
+            return sizeof(string_length_t) + len;
 
         } else if constexpr (isCharArrayType<T>()) {
             const size_t len = std::tuple_size<T>::value;
@@ -480,25 +516,26 @@ private:
             if (accessOutOfBoundary(pm, pos, len))
                 throwAccessError("could not extract contents of array type");
 
-            TT arr;
-            std::copy_n(buf, len, arr.begin());
-
-            return {std::move(arr)};
+            return len;
 
         } else {
             assertFalseType<T>();
         }
+
+        return 0;
     }
 
 
     /**
-     * \brief Calculates the size of any supported type.
+     * \brief Calculates the size of any supported type to pack.
      *
      * The size of any integral type is calculated with \c sizeof.
      * Instead the size of a string argument is its \c size() itself,
      * plus 4 bytes.
      *
      * \param[in] s Argument to query for size.
+     *
+     * \return Total size in bytes of the type to pack.
      */
     template<typename T>
     static size_t tsize(T&& s)
