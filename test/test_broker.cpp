@@ -106,15 +106,20 @@ protected:
         }
 
 
-        void storeTopic(Topic& t)
+        bool storeTopic(Topic& t)
         {
-            BrokerSession::storeTopic(t);
+            return BrokerSession::storeTopic(t);
         }
 
 
-        auto getStorage() -> decltype(storTopic_)*
+        auto getStorageTopic() -> decltype(storTopic_)*
         {
             return &storTopic_;
+        }
+
+        auto getStorageWorker() -> decltype(storWorker_)*
+        {
+            return &storWorker_;
         }
 
 
@@ -164,30 +169,106 @@ BOOST_AUTO_TEST_CASE(testUuid)
 }
 
 
-BOOST_AUTO_TEST_CASE(testStoreTopic)
+static void testStorage(decltype(TestBroker{}.testSession->getStorageTopic()) st,
+    Topic::Name nm, Uuid wid, const Topic& t)
+{
+    BOOST_TEST((st->find(nm) != st->list().end()));
+    BOOST_TEST((st->find(nm)->first == nm));
+    BOOST_TEST((st->find(nm)->second.find(wid) != st->find(nm)->second.list().end()));
+    BOOST_TEST((st->find(nm)->second.find(wid)->first == wid));
+    BOOST_TEST((st->find(nm)->second.find(wid)->second == t));
+}
+
+
+static void testStorage(decltype(TestBroker{}.testSession->getStorageWorker()) st,
+    Uuid wid, Topic::SeqN val)
+{
+    BOOST_TEST((st->find(wid) != st->list().end()));
+    BOOST_TEST((st->find(wid)->first == wid));
+    BOOST_TEST((st->find(wid)->second == val));
+}
+
+
+BOOST_AUTO_TEST_CASE(testStoreTopicSingle)
 {
     TestBroker b;
     auto bf = b.start();
-    auto st = b.testSession->getStorage();
+    auto bts = b.testSession;
+    auto stt = b.testSession->getStorageTopic();
+    auto stw = b.testSession->getStorageWorker();
 
     Topic::Name nm("hello"sv);
     Topic t{Uuid{}, TestBroker::wid, 5, nm, zmq::Part{"data"sv}};
 
-    BOOST_TEST(st->empty());
-    BOOST_TEST((st->find(nm) == st->list().end()));
+    BOOST_TEST(stt->empty());
+    BOOST_TEST((stt->find(nm) == stt->list().end()));
+    BOOST_TEST((stw->find(TestBroker::wid) == stw->list().end()));
 
-    b.testSession->storeTopic(t);
-    BOOST_TEST(t.seqNum() == 1u);
+    // store a topic.
+    BOOST_TEST(bts->storeTopic(t));
+    BOOST_TEST(t.seqNum() == 5u);
 
-    b.testSession->storeTopic(t);
-    BOOST_TEST(t.seqNum() == 2u);
+    // store a new topic
+    BOOST_TEST(bts->storeTopic(t.withSeqNum(6u)));
+    BOOST_TEST(t.seqNum() == 6u);
 
-    BOOST_TEST(st->size() == 1u);
-    BOOST_TEST((st->find(nm) != st->list().end()));
-    BOOST_TEST((st->find(nm)->first == nm));
-    BOOST_TEST((st->find(nm)->second.find(TestBroker::wid) != st->find(nm)->second.list().end()));
-    BOOST_TEST((st->find(nm)->second.find(TestBroker::wid)->first == TestBroker::wid));
-    BOOST_TEST((st->find(nm)->second.find(TestBroker::wid)->second == t));
+    // discard topic
+    BOOST_TEST(!bts->storeTopic(Topic{t}.withSeqNum(0u)));
+    BOOST_TEST(!bts->storeTopic(Topic{t}.withSeqNum(6u)));
+
+    // test storage
+    BOOST_TEST(stt->size() == 1u);
+    BOOST_TEST(stw->size() == 1u);
+
+    testStorage(stt, nm, TestBroker::wid, t);
+    testStorage(stw, TestBroker::wid, t.seqNum());
+}
+
+
+BOOST_AUTO_TEST_CASE(testStoreTopicMultiple)
+{
+    TestBroker b;
+    auto bf = b.start();
+    auto bts = b.testSession;
+    auto stt = b.testSession->getStorageTopic();
+    auto stw = b.testSession->getStorageWorker();
+    const Uuid wid1 = Uuid::createNamespaceUuid(Uuid::Ns::Dns, "worker1.net"sv);
+    const Uuid wid2 = Uuid::createNamespaceUuid(Uuid::Ns::Dns, "worker2.net"sv);
+
+    Topic::Name nm1("hello1"sv);
+    Topic::Name nm2("hello2"sv);
+    Topic t1{Uuid{}, wid1, 5, nm1, zmq::Part{"data"sv}};
+    Topic t2{Uuid{}, wid2, 7, nm2, zmq::Part{"data"sv}};
+
+    // store topics
+    BOOST_TEST(bts->storeTopic(t1));
+    BOOST_TEST(bts->storeTopic(t2));
+    BOOST_TEST(t1.seqNum() == 5u);
+    BOOST_TEST(t2.seqNum() == 7u);
+
+    BOOST_TEST(stt->size() == 2u);
+    BOOST_TEST(stw->size() == 2u);
+
+    testStorage(stt, nm1, wid1, t1);
+    testStorage(stt, nm2, wid2, t2);
+
+    testStorage(stw, wid1, t1.seqNum());
+    testStorage(stw, wid2, t2.seqNum());
+
+    // update topics
+    BOOST_TEST(bts->storeTopic(t1.withSeqNum(9)));
+    BOOST_TEST(bts->storeTopic(t2.withSeqNum(11)));
+    BOOST_TEST(t1.seqNum() == 9u);
+    BOOST_TEST(t2.seqNum() == 11u);
+
+    BOOST_TEST(stt->size() == 2u);
+    BOOST_TEST(stw->size() == 2u);
+
+    testStorage(stt, nm1, wid1, t1);
+    testStorage(stt, nm2, wid2, t2);
+
+    testStorage(stw, wid1, t1.seqNum());
+    testStorage(stw, wid2, t2.seqNum());
 }
 
 
@@ -255,34 +336,37 @@ BOOST_DATA_TEST_CASE(testReceiverWorkerSync,
 
     TestBroker b;
     auto bf = b.start();
+    auto bts = b.testSession;
+    auto bsk = b.testSocket;
+    auto bpp = &bsk->sentParts;
 
-    b.testSession->storeTopic(Topic{}.withData(zmq::Part{"hello"sv}));
-    b.testSocket->errAfter = errAfter;
+    Topic t = Topic{}.withSeqNum(1).withData(zmq::Part{"hello"sv});
+    bts->storeTopic(t);
+    bsk->errAfter = errAfter;
     if (!errWouldBlock) {
-        b.testSocket->errHostUnreach = errHostUnreach;
-        b.testSocket->errOtherCode = !errHostUnreach;
+        bsk->errHostUnreach = errHostUnreach;
+        bsk->errOtherCode = !errHostUnreach;
     }
 
     if (wantError.empty()) {
-        b.testSession->testReceiveWorkerCommand(zmq::Part{payload});
+        bts->testReceiveWorkerCommand(zmq::Part{payload});
 
         if (wantSize > 0) {
-            BOOST_TEST(int(b.testSocket->sentParts.size()) == wantSize);
-            if (b.testSocket->sentParts.size() >= 1)
-                testNotif(b.testSocket->sentParts.at(0), BROKER_SYNC_BEGIN, 0);
-            if (b.testSocket->sentParts.size() >= 2)
-                testTopic(b.testSocket->sentParts.at(1), BROKER_SYNC_ELEMN, 0,
-                    Topic{}.withSeqNum(1).withData(zmq::Part{"hello"sv}));
-            if (b.testSocket->sentParts.size() >= 3)
-                testNotif(b.testSocket->sentParts.at(2), BROKER_SYNC_COMPL, 0);
+            BOOST_TEST(int(bpp->size()) == wantSize);
+            if (bpp->size() >= 1)
+                testNotif(bpp->at(0), BROKER_SYNC_BEGIN, 0);
+            if (bpp->size() >= 2)
+                testTopic(bpp->at(1), BROKER_SYNC_ELEMN, 0, t);
+            if (bpp->size() >= 3)
+                testNotif(bpp->at(2), BROKER_SYNC_COMPL, 0);
         } else {
-            BOOST_TEST(int(b.testSocket->sentParts.empty()));
+            BOOST_TEST(int(bpp->empty()));
         }
     } else {
         if (wantError == "ZMQPartAccessFailed"sv) {
-            BOOST_REQUIRE_THROW(b.testSession->testReceiveWorkerCommand(zmq::Part{payload}), err::ZMQPartAccessFailed);
+            BOOST_REQUIRE_THROW(bts->testReceiveWorkerCommand(zmq::Part{payload}), err::ZMQPartAccessFailed);
         } else if (wantError == "ZMQSocketSendFailed"sv) {
-            BOOST_REQUIRE_THROW(b.testSession->testReceiveWorkerCommand(zmq::Part{payload}), err::ZMQSocketSendFailed);
+            BOOST_REQUIRE_THROW(bts->testReceiveWorkerCommand(zmq::Part{payload}), err::ZMQSocketSendFailed);
         } else {
             BOOST_FAIL("unexpected error type");
         }

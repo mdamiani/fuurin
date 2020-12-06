@@ -108,9 +108,15 @@ protected:
         /**
          * \brief Stores a topic into local storage.
          *
+         * This functions checks the topic's sequence number and
+         * it discards it if it's lower than the last sequence number,
+         * for any source worker.
+         *
          * \param[in] t Topic to store.
+         *
+         * \return \c false in case topic is discarded, i.e. not stored.
          */
-        void storeTopic(Topic& t);
+        bool storeTopic(const Topic& t);
 
         /**
          * \brief Receives a synchronous command requested by a worker.

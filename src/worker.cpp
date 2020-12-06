@@ -277,7 +277,6 @@ void Worker::WorkerSession::operationReady(Operation* oper)
         break;
 
     case Operation::Type::Dispatch:
-        // TODO: send seqNum_ to broker
         ++seqNum_;
         notifySequenceNumber();
 
@@ -285,7 +284,9 @@ void Worker::WorkerSession::operationReady(Operation* oper)
         LOG_DEBUG(log::Arg{"worker"sv, uuid_.toShortString()}, log::Arg{"dispatch"sv},
             log::Arg{"size"sv, int(paysz)}, log::Arg{"seqn"sv, int(seqNum_)});
 
-        zdispatch_->send(oper->payload().withGroup(WORKER_UPDT));
+        zdispatch_->send(std::move(
+            Topic::withSeqNum(oper->payload(), seqNum_)
+                .withGroup(WORKER_UPDT)));
         break;
 
     case Operation::Type::Sync:

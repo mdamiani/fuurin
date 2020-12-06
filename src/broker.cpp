@@ -162,8 +162,9 @@ void Broker::BrokerSession::collectWorkerMessage(zmq::Part&& payload)
         LOG_DEBUG(log::Arg{"broker"sv, uuid_.toShortString()}, log::Arg{"dispatch"sv},
             log::Arg{"size"sv, int(paysz)});
 
-        auto t = Topic::fromPart(payload).withBroker(uuid_);
-        storeTopic(t);
+        const auto t = Topic::fromPart(payload).withBroker(uuid_);
+        if (!storeTopic(t))
+            return;
 
         /**
          * Topic is sent twice, both to the global group
@@ -183,28 +184,32 @@ void Broker::BrokerSession::collectWorkerMessage(zmq::Part&& payload)
 }
 
 
-void Broker::BrokerSession::storeTopic(Topic& t)
+bool Broker::BrokerSession::storeTopic(const Topic& t)
 {
     auto it = storTopic_.find(t.name());
 
     if (it == storTopic_.list().end()) {
         // TODO: configure capacity.
-        it = storTopic_.put(t.name(), LRUCache<Uuid, Topic>{8});
+        it = storTopic_.put(t.name(), LRUCache<WorkerUuid, Topic>{8});
     }
 
     ASSERT(it != storTopic_.list().end(), "broker storage topic cache is null");
 
-    Topic::SeqN seqn{0};
+    Topic::SeqN lastSeqNum{0};
     if (auto el = storWorker_.find(t.worker()); el != storWorker_.list().end())
-        seqn = el->second;
+        lastSeqNum = el->second;
 
-    ++seqn;
-    storWorker_.put(t.worker(), seqn);
-    t.withSeqNum(seqn);
+    // filter out old topics.
+    if (t.seqNum() <= lastSeqNum)
+        return false;
+
+    storWorker_.put(t.worker(), t.seqNum());
 
     auto it2 = it->second.put(t.worker(), t);
 
     ASSERT(it2 != it->second.list().end(), "broker storage uuid cache is null");
+
+    return true;
 }
 
 
