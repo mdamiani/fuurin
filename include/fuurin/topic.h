@@ -246,6 +246,18 @@ public:
      */
     zmq::Part toPart() const;
 
+    /**
+     * \brief Patches a Topic packed data with a different sequence number.
+     *
+     * \param[in] part Topic packed data.
+     * \param[in] val New sequence number.
+     *
+     * \return The modified part.
+     *
+     * \exception ZMQPartAccessFailed Failed to access the field that represents the sequence number.
+     */
+    static zmq::Part& withSeqNum(zmq::Part& part, Topic::SeqN val);
+
 
 private:
     Uuid broker_; ///< Broker uuid.

@@ -188,6 +188,36 @@ BOOST_AUTO_TEST_CASE(testTopicPart)
 }
 
 
+BOOST_AUTO_TEST_CASE(testTopicPatchSeqNum)
+{
+    using f = WorkerFixture;
+    const Topic::Name name{"topic/test"sv};
+    const Topic::Data data{"topic/data"sv};
+    const Topic t1{f::bid, f::wid, 256, name, data};
+    zmq::Part p1 = t1.toPart();
+
+    const Topic t2{Topic::fromPart(p1)};
+    BOOST_TEST(t2.broker() == f::bid);
+    BOOST_TEST(t2.worker() == f::wid);
+    BOOST_TEST(t2.seqNum() == 256llu);
+    BOOST_TEST(t2.name() == name);
+    BOOST_TEST(t2.data() == data);
+
+    Topic::withSeqNum(p1, 9223372036854775808ull);
+
+    const Topic t3{Topic::fromPart(p1)};
+
+    BOOST_TEST(t2.broker() == f::bid);
+    BOOST_TEST(t2.worker() == f::wid);
+    BOOST_TEST(t3.seqNum() == 9223372036854775808ull);
+    BOOST_TEST(t2.name() == name);
+    BOOST_TEST(t2.data() == data);
+
+    zmq::Part p4{uint16_t(0)};
+    BOOST_REQUIRE_THROW(Topic::withSeqNum(p4, 1), err::ZMQPartAccessFailed);
+}
+
+
 namespace fuurin {
 class TestRunner : public zmq::PollerWaiter, public Elapser
 {

@@ -9,12 +9,17 @@
  */
 
 #include "fuurin/topic.h"
+#include "fuurin/errors.h"
 #include "fuurin/zmqpartmulti.h"
 
 #include <zmq.h> // ZMQ_GROUP_MAX_LENGTH
 
+#include <string_view>
 #include <algorithm>
 #include <cstring>
+
+
+using namespace std::literals::string_view_literals;
 
 
 namespace fuurin {
@@ -263,8 +268,8 @@ bool Topic::operator!=(const Topic& rhs) const
 
 Topic Topic::fromPart(const zmq::Part& part)
 {
-    auto [brok, work, seqn, name, data] = zmq::PartMulti::unpack<Uuid::Bytes, Uuid::Bytes,
-        Topic::SeqN, std::string_view, zmq::Part>(part);
+    auto [seqn, brok, work, name, data] = zmq::PartMulti::unpack<Topic::SeqN,
+        Uuid::Bytes, Uuid::Bytes, std::string_view, zmq::Part>(part);
 
     return Topic{Uuid::fromBytes(brok), Uuid::fromBytes(work),
         std::move(seqn), std::move(name), std::move(data)};
@@ -273,7 +278,21 @@ Topic Topic::fromPart(const zmq::Part& part)
 
 zmq::Part Topic::toPart() const
 {
-    return zmq::PartMulti::pack(broker_.bytes(), worker_.bytes(), seqn_, std::string_view(name_), data_);
+    return zmq::PartMulti::pack(seqn_, broker_.bytes(), worker_.bytes(), std::string_view(name_), data_);
+}
+
+
+zmq::Part& Topic::withSeqNum(zmq::Part& part, Topic::SeqN val)
+{
+    const zmq::Part buf{val};
+
+    if (part.size() < buf.size()) {
+        throw ERROR(ZMQPartAccessFailed, "could not access topic multi part seqn field",
+            log::Arg{std::string_view("reason"), "out of bound access"sv});
+    }
+
+    std::copy_n(buf.data(), buf.size(), part.data());
+    return part;
 }
 
 
