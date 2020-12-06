@@ -266,7 +266,8 @@ Topic Topic::fromPart(const zmq::Part& part)
     auto [brok, work, seqn, name, data] = zmq::PartMulti::unpack<Uuid::Bytes, Uuid::Bytes,
         Topic::SeqN, std::string_view, zmq::Part>(part);
 
-    return Topic{Uuid::fromBytes(brok), Uuid::fromBytes(work), seqn, name, data};
+    return Topic{Uuid::fromBytes(brok), Uuid::fromBytes(work),
+        std::move(seqn), std::move(name), std::move(data)};
 }
 
 
