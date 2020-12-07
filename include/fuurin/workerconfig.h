@@ -35,6 +35,9 @@ struct WorkerConfig
     ///< Initial sequence number.
     Topic::SeqN seqNum;
 
+    ///< Worker Uuid.
+    Uuid uuid;
+
     /**
      * \brief Comparison operator.
      * \param[in] rhs Another config.

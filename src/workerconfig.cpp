@@ -21,7 +21,8 @@ namespace fuurin {
 bool WorkerConfig::operator==(const WorkerConfig& rhs) const
 {
     return topicNames == rhs.topicNames &&
-        seqNum == rhs.seqNum;
+        seqNum == rhs.seqNum &&
+        uuid == rhs.uuid;
 }
 
 
@@ -35,13 +36,14 @@ WorkerConfig WorkerConfig::fromPart(const zmq::Part& part)
 {
     WorkerConfig wc;
 
-    const auto [namesPart, seqNum] = zmq::PartMulti::unpack<zmq::Part, Topic::SeqN>(part);
+    const auto [uuid, seqNum, namesPart] = zmq::PartMulti::unpack<Uuid::Bytes, Topic::SeqN, zmq::Part>(part);
 
     std::vector<std::string_view> names;
     zmq::PartMulti::unpack(namesPart, std::inserter(names, names.begin()));
 
     wc.topicNames = std::vector<Topic::Name>(names.begin(), names.end());
     wc.seqNum = seqNum;
+    wc.uuid = Uuid::fromBytes(uuid);
 
     return wc;
 }
@@ -50,13 +52,14 @@ WorkerConfig WorkerConfig::fromPart(const zmq::Part& part)
 zmq::Part WorkerConfig::toPart() const
 {
     const std::vector<std::string_view> names{topicNames.begin(), topicNames.end()};
-    return zmq::PartMulti::pack(zmq::PartMulti::pack(names.begin(), names.end()), seqNum);
+    return zmq::PartMulti::pack(uuid.bytes(), seqNum, zmq::PartMulti::pack(names.begin(), names.end()));
 }
 
 
 std::ostream& operator<<(std::ostream& os, const WorkerConfig& wc)
 {
     os << "[";
+    os << wc.uuid << ", ";
     os << "[";
     const char* sep = "";
     for (const auto& el : wc.topicNames) {

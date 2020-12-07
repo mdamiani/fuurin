@@ -138,7 +138,7 @@ Topic::SeqN Worker::seqNumber() const
 
 zmq::Part Worker::prepareConfiguration() const
 {
-    return WorkerConfig{names_, seqNumber()}.toPart();
+    return WorkerConfig{names_, seqNumber(), uuid()}.toPart();
 }
 
 

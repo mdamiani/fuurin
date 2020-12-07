@@ -90,12 +90,6 @@ Event testWaitForEvent(Worker& w, std::chrono::milliseconds timeout, Event::Noti
 }
 
 
-WorkerConfig mkCnf(const std::vector<Topic::Name>& names = {}, Topic::SeqN seqn = 0)
-{
-    return WorkerConfig{names, seqn};
-}
-
-
 struct WorkerFixture
 {
     WorkerFixture()
@@ -104,7 +98,7 @@ struct WorkerFixture
         , wf(w.start())
         , bf(b.start())
     {
-        testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Started, mkCnf());
+        testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Started, WorkerConfig{{}, 0, wid});
         testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Online);
     }
 
@@ -134,6 +128,13 @@ const Uuid WorkerFixture::wid = Uuid::createNamespaceUuid(Uuid::Ns::Dns, "worker
 const Uuid WorkerFixture::bid = Uuid::createNamespaceUuid(Uuid::Ns::Dns, "broker.net"sv);
 
 
+WorkerConfig mkCnf(Uuid uuid = WorkerFixture::wid, Topic::SeqN seqn = 0,
+    const std::vector<Topic::Name>& names = {})
+{
+    return WorkerConfig{names, seqn, uuid};
+}
+
+
 Topic mkT(const std::string& name, Topic::SeqN seqn, const std::string& pay)
 {
     using f = WorkerFixture;
@@ -157,7 +158,7 @@ BOOST_AUTO_TEST_CASE(testDeliverUuid)
     auto wf = w.start();
     auto bf = b.start();
 
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Started, mkCnf());
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Started, mkCnf(w.uuid()));
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Online);
 
     w.dispatch("topic"sv, zmq::Part{"hello"sv});
@@ -365,7 +366,7 @@ BOOST_AUTO_TEST_CASE(testWaitForStart)
 
     auto wf = w.start();
 
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Started, mkCnf());
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Started, mkCnf(w.uuid()));
 
     w.stop();
 
@@ -457,7 +458,7 @@ BOOST_FIXTURE_TEST_CASE(testWaitForEventDiscard, WorkerFixture)
     testWaitForEvent(w, 1500ms, Event::Notification::Discard, Event::Type::Stopped);
 
     // receive new start event
-    testWaitForEvent(w, 1500ms, Event::Notification::Success, Event::Type::Started, mkCnf({}, 3));
+    testWaitForEvent(w, 1500ms, Event::Notification::Success, Event::Type::Started, mkCnf(w.uuid(), 3, {}));
     testWaitForEvent(w, 1500ms, Event::Notification::Success, Event::Type::Online);
 
     // produce a new event
@@ -506,7 +507,7 @@ BOOST_AUTO_TEST_CASE(testSyncError_Halt)
 
     auto wf = w.start();
 
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Started, mkCnf());
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Started, mkCnf(w.uuid()));
 
     w.sync();
 
@@ -528,7 +529,7 @@ BOOST_AUTO_TEST_CASE(testSyncError_Timeout)
 
     auto wf = w.start();
 
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Started, mkCnf());
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Started, mkCnf(w.uuid()));
 
     w.sync();
 
@@ -566,7 +567,7 @@ BOOST_FIXTURE_TEST_CASE(testSyncTopicRecentAnotherWorker, WorkerFixture)
     Worker w2(wid2);
     auto wf2 = w2.start();
 
-    testWaitForEvent(w2, 2s, Event::Notification::Success, Event::Type::Started, mkCnf());
+    testWaitForEvent(w2, 2s, Event::Notification::Success, Event::Type::Started, mkCnf(w2.uuid()));
     testWaitForEvent(w2, 2s, Event::Notification::Success, Event::Type::Online);
 
     w.dispatch("topic"sv, zmq::Part{"hello1"sv});
@@ -624,7 +625,7 @@ BOOST_AUTO_TEST_CASE(testTopicSubscriptionSimple)
     auto wf = w.start();
 
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Started,
-        mkCnf({"short topic"sv, "very long topic"sv}));
+        mkCnf(w.uuid(), 0, {"short topic"sv, "very long topic"sv}));
 
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Online);
 
@@ -683,7 +684,7 @@ BOOST_FIXTURE_TEST_CASE(testSeqnNotify, WorkerFixture)
     // start again
     wf = w.start();
 
-    testWaitForEvent(w, 1500ms, Event::Notification::Success, Event::Type::Started, mkCnf({}, 4));
+    testWaitForEvent(w, 1500ms, Event::Notification::Success, Event::Type::Started, mkCnf(w.uuid(), 4, {}));
     testWaitForEvent(w, 1500ms, Event::Notification::Success, Event::Type::Online);
 
     w.dispatch("topic"sv, zmq::Part{"hello"sv});
