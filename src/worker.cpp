@@ -411,12 +411,12 @@ void Worker::WorkerSession::saveConfiguration(const zmq::Part& part)
 {
     conf_ = WorkerConfig::fromPart(part);
 
-    topicState_.clear();
+    subscrTopic_.clear();
     for (const auto& name : conf_.topicNames) {
-        if (topicState_.put(name, 0) == topicState_.list().end()) {
+        if (subscrTopic_.put(name, 0) == subscrTopic_.list().end()) {
             // restore state
             conf_ = WorkerConfig{};
-            topicState_.clear();
+            subscrTopic_.clear();
 
             throw ERROR(Error, "could not save configuration",
                 log::Arg{"reason"sv, "too many topics"sv});
@@ -435,7 +435,7 @@ void Worker::WorkerSession::collectBrokerMessage(zmq::Part&& payload)
         // TODO: extract the message
         conn_->onPing();
 
-    } else if (group == BROKER_UPDT || topicState_.find(group) != topicState_.list().end()) {
+    } else if (group == BROKER_UPDT || subscrTopic_.find(group) != subscrTopic_.list().end()) {
         // TODO: filter out topics by sequence number.
         sendEvent(Event::Type::Delivery, std::move(payload));
 

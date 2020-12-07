@@ -232,8 +232,11 @@ protected:
         Uuid brokerUuid_;   ///< Broker which last sucessfully synced.
         WorkerConfig conf_; ///< Configuration for running the asynchronous task.
 
-        Topic::SeqN seqNum_;                            ///< Sequence number.
-        LRUCache<Topic::Name, Topic::SeqN> topicState_; ///< State of worker.
+        /// Alias for worker's uuid type.
+        using WorkerUuid = Uuid;
+
+        Topic::SeqN seqNum_;                      ///< Sequence number.
+        LRUCache<Topic::Name, bool> subscrTopic_; ///< Subscribed topics.
     };
 
 
