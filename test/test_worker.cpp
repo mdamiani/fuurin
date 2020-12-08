@@ -98,7 +98,7 @@ struct WorkerFixture
         , wf(w.start())
         , bf(b.start())
     {
-        testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Started, WorkerConfig{{}, 0, wid});
+        testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Started, WorkerConfig{wid, 0, {}});
         testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Online);
     }
 
@@ -131,7 +131,7 @@ const Uuid WorkerFixture::bid = Uuid::createNamespaceUuid(Uuid::Ns::Dns, "broker
 WorkerConfig mkCnf(Uuid uuid = WorkerFixture::wid, Topic::SeqN seqn = 0,
     const std::vector<Topic::Name>& names = {})
 {
-    return WorkerConfig{names, seqn, uuid};
+    return WorkerConfig{uuid, seqn, names};
 }
 
 

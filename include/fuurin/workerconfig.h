@@ -29,14 +29,14 @@ class Part;
  */
 struct WorkerConfig
 {
-    ///< List of topic names.
-    std::vector<Topic::Name> topicNames;
+    ///< Worker Uuid.
+    Uuid uuid;
 
     ///< Initial sequence number.
     Topic::SeqN seqNum;
 
-    ///< Worker Uuid.
-    Uuid uuid;
+    ///< List of topic names.
+    std::vector<Topic::Name> topicNames;
 
     /**
      * \brief Comparison operator.
