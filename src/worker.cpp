@@ -138,7 +138,15 @@ Topic::SeqN Worker::seqNumber() const
 
 zmq::Part Worker::prepareConfiguration() const
 {
-    return WorkerConfig{uuid(), seqNumber(), names_}.toPart();
+    return WorkerConfig{
+        uuid(),
+        seqNumber(),
+        names_,
+        {"ipc:///tmp/worker_delivery"},
+        {"ipc:///tmp/worker_dispatch"},
+        {"ipc:///tmp/broker_snapshot"},
+    }
+        .toPart();
 }
 
 
@@ -350,8 +358,8 @@ void Worker::WorkerSession::connClose()
 void Worker::WorkerSession::connOpen()
 {
     // configure
-    zdelivery_->setEndpoints({"ipc:///tmp/worker_delivery"});
-    zdispatch_->setEndpoints({"ipc:///tmp/worker_dispatch"});
+    zdelivery_->setEndpoints({conf_.endpDelivery.begin(), conf_.endpDelivery.end()});
+    zdispatch_->setEndpoints({conf_.endpDispatch.begin(), conf_.endpDispatch.end()});
 
     std::list<std::string> groups{BROKER_HUGZ};
     if (!conf_.topicNames.empty()) {
@@ -382,7 +390,7 @@ void Worker::WorkerSession::snapClose()
 
 void Worker::WorkerSession::snapOpen()
 {
-    zsnapshot_->setEndpoints({"ipc:///tmp/broker_snapshot"});
+    zsnapshot_->setEndpoints({conf_.endpSnapshot.begin(), conf_.endpSnapshot.end()});
     zsnapshot_->connect();
 }
 

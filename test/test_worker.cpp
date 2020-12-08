@@ -90,6 +90,16 @@ Event testWaitForEvent(Worker& w, std::chrono::milliseconds timeout, Event::Noti
 }
 
 
+WorkerConfig mkCnf(Uuid uuid = Uuid{}, Topic::SeqN seqn = 0,
+    const std::vector<Topic::Name>& names = {},
+    const std::vector<std::string>& endp1 = {"ipc:///tmp/worker_delivery"},
+    const std::vector<std::string>& endp2 = {"ipc:///tmp/worker_dispatch"},
+    const std::vector<std::string>& endp3 = {"ipc:///tmp/broker_snapshot"})
+{
+    return WorkerConfig{uuid, seqn, names, endp1, endp2, endp3};
+}
+
+
 struct WorkerFixture
 {
     WorkerFixture()
@@ -98,7 +108,7 @@ struct WorkerFixture
         , wf(w.start())
         , bf(b.start())
     {
-        testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Started, WorkerConfig{wid, 0, {}});
+        testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Started, mkCnf(wid));
         testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Online);
     }
 
@@ -126,13 +136,6 @@ struct WorkerFixture
 
 const Uuid WorkerFixture::wid = Uuid::createNamespaceUuid(Uuid::Ns::Dns, "worker.net"sv);
 const Uuid WorkerFixture::bid = Uuid::createNamespaceUuid(Uuid::Ns::Dns, "broker.net"sv);
-
-
-WorkerConfig mkCnf(Uuid uuid = WorkerFixture::wid, Topic::SeqN seqn = 0,
-    const std::vector<Topic::Name>& names = {})
-{
-    return WorkerConfig{uuid, seqn, names};
-}
 
 
 Topic mkT(const std::string& name, Topic::SeqN seqn, const std::string& pay)

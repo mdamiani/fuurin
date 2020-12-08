@@ -38,6 +38,13 @@ struct WorkerConfig
     ///< List of topic names.
     std::vector<Topic::Name> topicNames;
 
+    ///< List of endpoints.
+    ///{@
+    std::vector<std::string> endpDelivery;
+    std::vector<std::string> endpDispatch;
+    std::vector<std::string> endpSnapshot;
+    ///@}
+
     /**
      * \brief Comparison operator.
      * \param[in] rhs Another config.
