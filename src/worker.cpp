@@ -436,8 +436,8 @@ void Worker::WorkerSession::collectBrokerMessage(zmq::Part&& payload)
         conn_->onPing();
 
     } else if (group == BROKER_UPDT || subscrTopic_.find(group) != subscrTopic_.list().end()) {
-        // TODO: filter out topics by sequence number.
-        sendEvent(Event::Type::Delivery, std::move(payload));
+        if (acceptTopic(payload))
+            sendEvent(Event::Type::Delivery, std::move(payload));
 
     } else {
         LOG_WARN(log::Arg{"worker"sv, uuid_.toShortString()},
@@ -468,9 +468,9 @@ void Worker::WorkerSession::recvBrokerSnapshot(zmq::Part&& payload)
             log::Arg{"broker", brokerUuid_.toShortString()},
             log::Arg{"status"sv, Event::toString(Event::Type::SyncElement)});
 
+        acceptTopic(params);
         sendEvent(Event::Type::SyncElement, std::move(params));
         sync_->onReply(0, syncseq, SyncMachine::ReplyType::Snapshot);
-        // TODO: update seqNum_ if greater and notifySequenceNumber();
 
     } else if (reply == BROKER_SYNC_COMPL) {
         if (const auto uuid = Uuid::fromPart(params); uuid != brokerUuid_) {
@@ -491,6 +491,40 @@ void Worker::WorkerSession::recvBrokerSnapshot(zmq::Part&& payload)
             log::Arg{"reply"sv, reply},
             log::Arg{"unknown reply"sv});
     }
+}
+
+
+bool Worker::WorkerSession::acceptTopic(const zmq::Part& part)
+{
+    // TODO: seq num and uuid might be extracted from params without constructing a full Topic.
+    const auto t = Topic::fromPart(part);
+
+    if (!acceptTopic(t.worker(), t.seqNum()))
+        return false;
+
+    if (t.worker() != conf_.uuid || t.seqNum() <= seqNum_)
+        return true;
+
+    seqNum_ = t.seqNum();
+    notifySequenceNumber();
+
+    return true;
+}
+
+
+bool Worker::WorkerSession::acceptTopic(const Uuid& worker, Topic::SeqN value)
+{
+    Topic::SeqN last{0};
+
+    if (const auto it = workerSeqNum_.find(worker); it != workerSeqNum_.list().end())
+        last = it->second;
+
+    if (value <= last)
+        return false;
+
+    workerSeqNum_.put(worker, value);
+
+    return true;
 }
 
 

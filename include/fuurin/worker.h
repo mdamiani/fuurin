@@ -200,6 +200,35 @@ protected:
         void recvBrokerSnapshot(zmq::Part&& payload);
 
         /**
+         * \brief Accepts a topic, for the specified worker.
+         *
+         * If topic was accepted and its uuid corresponds to
+         * this session's uuid, then current sequence number is
+         * updated.
+         *
+         * \param[in] part Packed topic.
+         *
+         * \return Whether topic was accepted or not.
+         *
+         * \see acceptTopic(const Uuid&, Topic::SeqN)
+         * \see notifySequenceNumber()
+         */
+        bool acceptTopic(const zmq::Part& part);
+
+        /**
+         * \brief Accepts a topic, for the specified worker.
+         *
+         * Topic is accepted only if its sequence number is
+         * greater than the last value.
+         *
+         * \param[in] worker Worker uuid.
+         * \param[in] value Sequence number.
+         *
+         * \return Whether topic was accepted or not.
+         */
+        bool acceptTopic(const Uuid& worker, Topic::SeqN value);
+
+        /**
          * \brief Notifies for any change of connection state.
          *
          * \param[in] isUp Whether the connection is up or down.
@@ -235,8 +264,9 @@ protected:
         /// Alias for worker's uuid type.
         using WorkerUuid = Uuid;
 
-        Topic::SeqN seqNum_;                      ///< Sequence number.
-        LRUCache<Topic::Name, bool> subscrTopic_; ///< Subscribed topics.
+        Topic::SeqN seqNum_;                             ///< Sequence number.
+        LRUCache<Topic::Name, bool> subscrTopic_;        ///< Subscribed topics.
+        LRUCache<WorkerUuid, Topic::SeqN> workerSeqNum_; ///< Sequence numbers.
     };
 
 
