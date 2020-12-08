@@ -23,6 +23,7 @@
 #include <cstring>
 #include <string_view>
 #include <type_traits>
+#include <string>
 
 
 #define BROKER_HUGZ "HUGZ"
@@ -53,6 +54,18 @@ Broker::~Broker() noexcept
 }
 
 
+zmq::Part Broker::prepareConfiguration() const
+{
+    return BrokerConfig{
+        uuid(),
+        endpointDelivery(),
+        endpointDispatch(),
+        endpointSnapshot(),
+    }
+        .toPart();
+}
+
+
 std::unique_ptr<Runner::Session> Broker::createSession(CompletionFunc onComplete) const
 {
     return makeSession<BrokerSession>(onComplete);
@@ -73,16 +86,6 @@ Broker::BrokerSession::BrokerSession(Uuid id, token_type_t token, CompletionFunc
     , storTopic_{1024} // TODO: configure capacity.
     , storWorker_{64}  // TODO: configure capacity.
 {
-    zsnapshot_->setEndpoints({"ipc:///tmp/broker_snapshot"});
-    zdelivery_->setEndpoints({"ipc:///tmp/worker_dispatch"});
-    zdispatch_->setEndpoints({"ipc:///tmp/worker_delivery"});
-
-    zdelivery_->setGroups({WORKER_HUGZ, WORKER_UPDT});
-
-    zsnapshot_->bind();
-    zdelivery_->bind();
-    zdispatch_->bind();
-
     zhugz_->setInterval(1s);
     zhugz_->setSingleShot(false);
 }
@@ -93,8 +96,36 @@ Broker::BrokerSession::~BrokerSession() noexcept = default;
 
 std::unique_ptr<zmq::PollerWaiter> Broker::BrokerSession::createPoller()
 {
-    return std::unique_ptr<zmq::PollerWaiter>{new zmq::Poller{zmq::PollerEvents::Type::Read,
+    return std::unique_ptr<zmq::PollerWaiter>{new zmq::PollerAuto{zmq::PollerEvents::Type::Read,
         zopr_, zsnapshot_.get(), zdelivery_.get(), zhugz_.get()}};
+}
+
+
+void Broker::BrokerSession::saveConfiguration(const zmq::Part& part)
+{
+    conf_ = BrokerConfig::fromPart(part);
+}
+
+
+void Broker::BrokerSession::openSockets()
+{
+    zdelivery_->setEndpoints({conf_.endpDispatch.begin(), conf_.endpDispatch.end()});
+    zdispatch_->setEndpoints({conf_.endpDelivery.begin(), conf_.endpDelivery.end()});
+    zsnapshot_->setEndpoints({conf_.endpSnapshot.begin(), conf_.endpSnapshot.end()});
+
+    zdelivery_->setGroups({WORKER_HUGZ, WORKER_UPDT});
+
+    zdelivery_->bind();
+    zdispatch_->bind();
+    zsnapshot_->bind();
+}
+
+
+void Broker::BrokerSession::closeSockets()
+{
+    zdelivery_->close();
+    zdispatch_->close();
+    zsnapshot_->close();
 }
 
 
@@ -103,10 +134,13 @@ void Broker::BrokerSession::operationReady(Operation* oper)
     switch (oper->type()) {
     case Operation::Type::Start:
         LOG_DEBUG(log::Arg{"broker"sv, uuid_.toShortString()}, log::Arg{"started"sv});
+        saveConfiguration(oper->payload());
+        openSockets();
         break;
 
     case Operation::Type::Stop:
         LOG_DEBUG(log::Arg{"broker"sv, uuid_.toShortString()}, log::Arg{"stopped"sv});
+        closeSockets();
         break;
 
     default:

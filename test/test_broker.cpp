@@ -144,7 +144,7 @@ public:
     void setupSession(TestBrokerSession* s)
     {
         testSession = s;
-        testSocket = new TestSocket(nullptr, zmq::Socket::Type{});
+        testSocket = new TestSocket(zmqCtx(), zmq::Socket::Type{});
         testSession->setSnapshotSocket(testSocket);
     }
 
@@ -222,6 +222,8 @@ BOOST_AUTO_TEST_CASE(testStoreTopicSingle)
 
     testStorage(stt, nm, TestBroker::wid, t);
     testStorage(stw, TestBroker::wid, t.seqNum());
+
+    b.stop();
 }
 
 
@@ -269,6 +271,8 @@ BOOST_AUTO_TEST_CASE(testStoreTopicMultiple)
 
     testStorage(stw, wid1, t1.seqNum());
     testStorage(stw, wid2, t2.seqNum());
+
+    b.stop();
 }
 
 

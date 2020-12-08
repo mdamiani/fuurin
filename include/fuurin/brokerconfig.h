@@ -8,11 +8,10 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-#ifndef FUURIN_WORKERCONFIG_H
-#define FUURIN_WORKERCONFIG_H
+#ifndef FUURIN_BROKERCONFIG_H
+#define FUURIN_BROKERCONFIG_H
 
 #include "fuurin/uuid.h"
-#include "fuurin/topic.h"
 
 #include <vector>
 #include <string>
@@ -26,18 +25,12 @@ class Part;
 
 
 /**
- * \brief Worker run configuration to be used upon \ref Worker::start().
+ * \brief Broker run configuration to be used upon \ref Broker::start().
  */
-struct WorkerConfig
+struct BrokerConfig
 {
     ///< Worker Uuid.
     Uuid uuid;
-
-    ///< Initial sequence number.
-    Topic::SeqN seqNum;
-
-    ///< List of topic names.
-    std::vector<Topic::Name> topicNames;
 
     ///< List of endpoints.
     ///{@
@@ -51,8 +44,8 @@ struct WorkerConfig
      * \param[in] rhs Another config.
      */
     ///{@
-    bool operator==(const WorkerConfig& rhs) const;
-    bool operator!=(const WorkerConfig& rhs) const;
+    bool operator==(const BrokerConfig& rhs) const;
+    bool operator!=(const BrokerConfig& rhs) const;
     ///@}
 
     /**
@@ -64,7 +57,7 @@ struct WorkerConfig
      *
      * \see zmq::PartMulti::unpack(const Part&)
      */
-    static WorkerConfig fromPart(const zmq::Part& part);
+    static BrokerConfig fromPart(const zmq::Part& part);
 
     /**
      * \brief Converts this configuration to a \ref zmq::PartMulti packed \ref zmq::Part.
@@ -78,8 +71,8 @@ struct WorkerConfig
 
 
 ///< Streams to printable form.
-std::ostream& operator<<(std::ostream& os, const WorkerConfig& wc);
+std::ostream& operator<<(std::ostream& os, const BrokerConfig& cc);
 
 } // namespace fuurin
 
-#endif // FUURIN_WORKERCONFIG_H
+#endif // FUURIN_BROKERCONFIG_H
