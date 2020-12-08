@@ -41,6 +41,9 @@ Runner::Runner(Uuid id)
     , zevr_(std::make_unique<zmq::Socket>(zctx_.get(), zmq::Socket::DISH))
     , running_(false)
     , token_(0)
+    , endpDelivery_{{"ipc:///tmp/worker_delivery"}}
+    , endpDispatch_{{"ipc:///tmp/worker_dispatch"}}
+    , endpSnapshot_{{"ipc:///tmp/broker_snapshot"}}
 {
     zops_->setEndpoints({"inproc://runner-loop"});
     zopr_->setEndpoints({"inproc://runner-loop"});
@@ -70,6 +73,34 @@ Runner::~Runner() noexcept
 Uuid Runner::uuid() const
 {
     return uuid_;
+}
+
+
+void Runner::setEndpoints(const std::vector<std::string>& delivery,
+    const std::vector<std::string>& dispatch,
+    const std::vector<std::string>& snapshot)
+{
+    endpDelivery_ = delivery;
+    endpDispatch_ = dispatch;
+    endpSnapshot_ = snapshot;
+}
+
+
+std::vector<std::string> Runner::endpointDelivery() const
+{
+    return endpDelivery_;
+}
+
+
+std::vector<std::string> Runner::endpointDispatch() const
+{
+    return endpDispatch_;
+}
+
+
+std::vector<std::string> Runner::endpointSnapshot() const
+{
+    return endpSnapshot_;
 }
 
 

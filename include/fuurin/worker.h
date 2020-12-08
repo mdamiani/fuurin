@@ -20,8 +20,6 @@
 
 #include <memory>
 #include <vector>
-#include <string>
-#include <string_view>
 
 
 namespace fuurin {
@@ -271,11 +269,12 @@ protected:
 
 
 protected:
-    std::vector<Topic::Name> names_; ///< List of topic names.
-    mutable Topic::SeqN seqNum_;     ///< Worker sequence number.
-
     const std::unique_ptr<zmq::Socket> zseqs_; ///< ZMQ socket to send sequence number.
     const std::unique_ptr<zmq::Socket> zseqr_; ///< ZMQ socket to receive sequence number.
+
+    mutable Topic::SeqN seqNum_; ///< Worker sequence number.
+
+    std::vector<Topic::Name> subscrNames_; ///< List of topic names.
 };
 
 } // namespace fuurin

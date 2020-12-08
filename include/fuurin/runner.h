@@ -20,6 +20,8 @@
 #include <atomic>
 #include <chrono>
 #include <functional>
+#include <string>
+#include <vector>
 
 
 namespace fuurin {
@@ -75,6 +77,34 @@ public:
      * \return Return the instance identifier.
      */
     Uuid uuid() const;
+
+    /**
+     * \brief Sets endpoints to connect to broker.
+     *
+     * If endpoints were not set, then IPC protocol will be used as default.
+     *
+     * \param[in] delivery List endpoints, default is {"ipc:///tmp/worker_delivery"}.
+     * \param[in] dispatch List endpoints, default is {"ipc:///tmp/worker_dispatch"}.
+     * \param[in] snapshot List endpoints, default is {"ipc:///tmp/broker_snapshot"}.
+     *
+     * \see endpointDelivery()
+     * \see endpointDispatch()
+     * \see endpointSnapshot()
+     */
+    void setEndpoints(const std::vector<std::string>& delivery,
+        const std::vector<std::string>& dispatch,
+        const std::vector<std::string>& snapshot);
+
+    /**
+     * \return Current endpoints.
+     *
+     * \see setEndpoints(std::vector<std::string>, std::vector<std::string>, std::vector<std::string>)
+     */
+    ///{@
+    std::vector<std::string> endpointDelivery() const;
+    std::vector<std::string> endpointDispatch() const;
+    std::vector<std::string> endpointSnapshot() const;
+    ///@}
 
     /**
      * \brief Starts the background thread of the main task.
@@ -410,8 +440,13 @@ private:
     const std::unique_ptr<zmq::Socket> zopr_;  ///< Inter-thread receiving socket.
     const std::unique_ptr<zmq::Socket> zevs_;  ///< Inter-thread events notifications.
     const std::unique_ptr<zmq::Socket> zevr_;  ///< Inter-thread events reception.
-    std::atomic<bool> running_;                ///< Whether the task is running.
-    std::atomic<token_type_t> token_;          ///< Current execution token for the task.
+
+    std::atomic<bool> running_;       ///< Whether the task is running.
+    std::atomic<token_type_t> token_; ///< Current execution token for the task.
+
+    std::vector<std::string> endpDelivery_; ///< List of endpoints.
+    std::vector<std::string> endpDispatch_; ///< List of endpoints.
+    std::vector<std::string> endpSnapshot_; ///< List of endpoints.
 };
 
 } // namespace fuurin

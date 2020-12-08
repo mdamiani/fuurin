@@ -25,6 +25,7 @@
 #include <chrono>
 #include <list>
 #include <type_traits>
+#include <string_view>
 
 
 #define BROKER_HUGZ "HUGZ"
@@ -49,9 +50,9 @@ namespace fuurin {
 
 Worker::Worker(Uuid id, Topic::SeqN initSequence)
     : Runner{id}
-    , seqNum_{initSequence}
     , zseqs_(std::make_unique<zmq::Socket>(zmqCtx(), zmq::Socket::PUSH))
     , zseqr_(std::make_unique<zmq::Socket>(zmqCtx(), zmq::Socket::PULL))
+    , seqNum_{initSequence}
 {
     // MUST be inproc in order to get instant delivery of messages.
     zseqs_->setEndpoints({"inproc://worker-seqn"});
@@ -75,7 +76,7 @@ Worker::~Worker() noexcept
 
 void Worker::setTopicNames(const std::vector<Topic::Name>& names)
 {
-    names_ = names;
+    subscrNames_ = names;
 }
 
 
@@ -141,10 +142,10 @@ zmq::Part Worker::prepareConfiguration() const
     return WorkerConfig{
         uuid(),
         seqNumber(),
-        names_,
-        {"ipc:///tmp/worker_delivery"},
-        {"ipc:///tmp/worker_dispatch"},
-        {"ipc:///tmp/broker_snapshot"},
+        subscrNames_,
+        endpointDelivery(),
+        endpointDispatch(),
+        endpointSnapshot(),
     }
         .toPart();
 }
