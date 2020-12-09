@@ -455,6 +455,7 @@ private:
         const auto len = psize<T>(pm, pos);
 
         if constexpr (isIntegralType<T>()) {
+            (void)(len); // fix unused variable compiler warning
             return {Part::memcpyWithEndian<TT>(buf)};
 
         } else if constexpr (isStringType<T>()) {
