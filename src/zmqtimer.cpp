@@ -66,9 +66,10 @@ public:
         };
 
         if (ec) {
-            if (ec != boost::asio::error::operation_aborted)
+            if (ec != boost::asio::error::operation_aborted) {
                 LOG_DEBUG(log::Arg{"fuurin::Timer"sv, "timer fired error"sv},
                     log::Arg{"reason"sv, ec.message()});
+            }
             return;
         }
 
