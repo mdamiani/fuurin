@@ -746,6 +746,67 @@ BOOST_AUTO_TEST_CASE(testSeqnMaxDelivery)
 }
 
 
+BOOST_AUTO_TEST_CASE(testBrokerDiscardDelivery)
+{
+    // setup two identical workers
+    Broker b(Uuid::createRandomUuid());
+    Worker w1(Uuid::createRandomUuid());
+    Worker w2(w1.uuid());
+
+    const auto t1 = Topic{b.uuid(), w1.uuid(), 0, "topic"sv, zmq::Part{"hello"sv}};
+    const auto t2 = Topic{b.uuid(), w2.uuid(), 0, "topic"sv, zmq::Part{"hello"sv}};
+
+    auto waitForStart = [](Worker& w) {
+        testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Started,
+            mkCnf(w.uuid(), 0, {}));
+        testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Online);
+    };
+
+    auto waitForStop = [](Worker& w) {
+        testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Offline);
+        testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Stopped);
+    };
+
+    auto waitForTopic = [t1](Worker& w, Topic t, int seqn) {
+        testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Delivery,
+            t.withSeqNum(seqn));
+    };
+
+    auto bf = b.start();
+    auto wf1 = w1.start();
+
+    waitForStart(w1);
+
+    // primary worker increments sequence number.
+    for (auto i = 1; i <= 3; ++i) {
+        w1.dispatch(t1.name(), t1.data());
+        waitForTopic(w1, t1, i);
+    }
+
+    // clone will dispatch topics, broker shall discard them.
+    auto wf2 = w2.start();
+
+    waitForStart(w2);
+
+    for (auto i = 1; i <= 2; ++i)
+        w2.dispatch(t2.name(), t2.data());
+
+    testWaitForEvent(w1, 2s, Event::Notification::Timeout, Event::Type::Invalid);
+    testWaitForEvent(w2, 2s, Event::Notification::Timeout, Event::Type::Invalid);
+
+    b.stop();
+    w1.stop();
+    w2.stop();
+
+    waitForStop(w1);
+    waitForStop(w2);
+
+    // primary worker keeps previous sequence number.
+    BOOST_TEST(w1.seqNumber() == 3u);
+    BOOST_TEST(w2.seqNumber() == 2u);
+}
+
+
 static void BM_workerStart(benchmark::State& state)
 {
     for (auto _ : state) {
