@@ -698,6 +698,54 @@ BOOST_FIXTURE_TEST_CASE(testSeqnNotify, WorkerFixture)
 }
 
 
+BOOST_AUTO_TEST_CASE(testSeqnMaxDelivery)
+{
+    // setup two identical workers
+    Broker b(Uuid::createRandomUuid());
+    Worker w1(Uuid::createRandomUuid());
+    Worker w2(w1.uuid());
+    Worker w3(Uuid::createRandomUuid());
+
+    auto bf = b.start();
+    auto wf1 = w1.start();
+    auto wf2 = w2.start();
+    auto wf3 = w3.start();
+
+    for (auto w : {&w1, &w2, &w3}) {
+        testWaitForEvent(*w, 2s, Event::Notification::Success, Event::Type::Started,
+            mkCnf(w->uuid(), 0, {}));
+        testWaitForEvent(*w, 2s, Event::Notification::Success, Event::Type::Online);
+    }
+
+    const auto t1 = Topic{b.uuid(), w1.uuid(), 0, "topic"sv, zmq::Part{"hello"sv}};
+
+    // primary worker increments sequence number.
+    for (auto i = 1; i <= 3; ++i) {
+        w1.dispatch(t1.name(), t1.data());
+
+        for (auto w : {&w1, &w2, &w3}) {
+            testWaitForEvent(*w, 2s, Event::Notification::Success, Event::Type::Delivery,
+                Topic{t1}.withSeqNum(i));
+        }
+    }
+
+    b.stop();
+    w1.stop();
+    w2.stop();
+    w3.stop();
+
+    for (auto w : {&w1, &w2, &w3}) {
+        testWaitForEvent(*w, 2s, Event::Notification::Success, Event::Type::Offline);
+        testWaitForEvent(*w, 2s, Event::Notification::Success, Event::Type::Stopped);
+    }
+
+    // clone worker keeps the maximum delivered sequence number.
+    BOOST_TEST(w1.seqNumber() == 3u);
+    BOOST_TEST(w2.seqNumber() == 3u);
+    BOOST_TEST(w3.seqNumber() == 0u);
+}
+
+
 static void BM_workerStart(benchmark::State& state)
 {
     for (auto _ : state) {
