@@ -698,6 +698,28 @@ BOOST_FIXTURE_TEST_CASE(testSeqnNotify, WorkerFixture)
 }
 
 
+static void waitForStart(Worker& w)
+{
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Started,
+        mkCnf(w.uuid(), 0, {}));
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Online);
+}
+
+
+static void waitForStop(Worker& w)
+{
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Offline);
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Stopped);
+}
+
+
+static void waitForTopic(Worker& w, Topic t, int seqn)
+{
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Delivery,
+        t.withSeqNum(seqn));
+}
+
+
 BOOST_AUTO_TEST_CASE(testSeqnMaxDelivery)
 {
     // setup two identical workers
@@ -711,11 +733,8 @@ BOOST_AUTO_TEST_CASE(testSeqnMaxDelivery)
     auto wf2 = w2.start();
     auto wf3 = w3.start();
 
-    for (auto w : {&w1, &w2, &w3}) {
-        testWaitForEvent(*w, 2s, Event::Notification::Success, Event::Type::Started,
-            mkCnf(w->uuid(), 0, {}));
-        testWaitForEvent(*w, 2s, Event::Notification::Success, Event::Type::Online);
-    }
+    for (auto w : {&w1, &w2, &w3})
+        waitForStart(*w);
 
     const auto t1 = Topic{b.uuid(), w1.uuid(), 0, "topic"sv, zmq::Part{"hello"sv}};
 
@@ -723,10 +742,8 @@ BOOST_AUTO_TEST_CASE(testSeqnMaxDelivery)
     for (auto i = 1; i <= 3; ++i) {
         w1.dispatch(t1.name(), t1.data());
 
-        for (auto w : {&w1, &w2, &w3}) {
-            testWaitForEvent(*w, 2s, Event::Notification::Success, Event::Type::Delivery,
-                Topic{t1}.withSeqNum(i));
-        }
+        for (auto w : {&w1, &w2, &w3})
+            waitForTopic(*w, t1, i);
     }
 
     b.stop();
@@ -734,10 +751,8 @@ BOOST_AUTO_TEST_CASE(testSeqnMaxDelivery)
     w2.stop();
     w3.stop();
 
-    for (auto w : {&w1, &w2, &w3}) {
-        testWaitForEvent(*w, 2s, Event::Notification::Success, Event::Type::Offline);
-        testWaitForEvent(*w, 2s, Event::Notification::Success, Event::Type::Stopped);
-    }
+    for (auto w : {&w1, &w2, &w3})
+        waitForStop(*w);
 
     // clone worker keeps the maximum delivered sequence number.
     BOOST_TEST(w1.seqNumber() == 3u);
@@ -755,22 +770,6 @@ BOOST_AUTO_TEST_CASE(testBrokerDiscardDelivery)
 
     const auto t1 = Topic{b.uuid(), w1.uuid(), 0, "topic"sv, zmq::Part{"hello"sv}};
     const auto t2 = Topic{b.uuid(), w2.uuid(), 0, "topic"sv, zmq::Part{"hello"sv}};
-
-    auto waitForStart = [](Worker& w) {
-        testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Started,
-            mkCnf(w.uuid(), 0, {}));
-        testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Online);
-    };
-
-    auto waitForStop = [](Worker& w) {
-        testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Offline);
-        testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Stopped);
-    };
-
-    auto waitForTopic = [t1](Worker& w, Topic t, int seqn) {
-        testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Delivery,
-            t.withSeqNum(seqn));
-    };
 
     auto bf = b.start();
     auto wf1 = w1.start();
@@ -804,6 +803,66 @@ BOOST_AUTO_TEST_CASE(testBrokerDiscardDelivery)
     // primary worker keeps previous sequence number.
     BOOST_TEST(w1.seqNumber() == 3u);
     BOOST_TEST(w2.seqNumber() == 2u);
+}
+
+
+BOOST_AUTO_TEST_CASE(testWorkerDiscardDelivery)
+{
+    // setup two identical workers
+    Broker b(Uuid::createRandomUuid());
+    Worker w1(Uuid::createRandomUuid());
+    Worker w2(w1.uuid());
+
+    const auto t1 = Topic{b.uuid(), w1.uuid(), 0, "topic"sv, zmq::Part{"hello"sv}};
+    const auto t2 = Topic{b.uuid(), w2.uuid(), 0, "topic"sv, zmq::Part{"hello"sv}};
+
+    auto bf = b.start();
+    auto wf1 = w1.start();
+
+    waitForStart(w1);
+
+    // primary worker increments sequence number.
+    for (auto i = 1; i <= 3; ++i) {
+        w1.dispatch(t1.name(), t1.data());
+        waitForTopic(w1, t1, i);
+    }
+
+    // clone will dispatch topics, worker shall discard them, restart broker.
+    b.stop();
+    bf.get();
+    bf = b.start();
+    auto wf2 = w2.start();
+
+    waitForStart(w2);
+
+    for (auto i = 1; i <= 2; ++i) {
+        w2.dispatch(t2.name(), t2.data());
+        waitForTopic(w2, t2, i);
+    }
+
+    testWaitForEvent(w1, 2s, Event::Notification::Timeout, Event::Type::Invalid);
+
+    // primary worker keeps previous sequence number.
+    BOOST_TEST(w1.seqNumber() == 3u);
+    BOOST_TEST(w2.seqNumber() == 2u);
+
+    // primary gets new updates.
+    for (auto i = 3; i <= 4; ++i) {
+        w2.dispatch(t2.name(), t2.data());
+        waitForTopic(w2, t2, i);
+    }
+
+    waitForTopic(w1, t2, 4);
+
+    b.stop();
+    w1.stop();
+    w2.stop();
+
+    waitForStop(w1);
+    waitForStop(w2);
+
+    BOOST_TEST(w1.seqNumber() == 4u);
+    BOOST_TEST(w2.seqNumber() == 4u);
 }
 
 
