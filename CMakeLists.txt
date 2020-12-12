@@ -63,9 +63,13 @@ set(LIB_SOURCES
     src/runner.cpp
     src/broker.cpp
     src/worker.cpp
+    src/workerconfig.cpp
+    src/brokerconfig.cpp
     src/connmachine.cpp
     src/syncmachine.cpp
     src/stopwatch.cpp
+    src/topic.cpp
+    src/uuid.cpp
 )
 
 set(LIB_PUBLIC_HEADERS
@@ -86,6 +90,11 @@ set(LIB_PUBLIC_HEADERS
     include/fuurin/runner.h
     include/fuurin/broker.h
     include/fuurin/worker.h
+    include/fuurin/workerconfig.h
+    include/fuurin/brokerconfig.h
+    include/fuurin/topic.h
+    include/fuurin/uuid.h
+    include/fuurin/lrucache.h
 )
 
 set(LIB_DEPS

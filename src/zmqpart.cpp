@@ -305,6 +305,12 @@ bool Part::empty() const noexcept
 }
 
 
+bool Part::hasMore() const
+{
+    return zmq_msg_more(const_cast<zmq_msg_t*>(&msg_));
+}
+
+
 Part& Part::withRoutingID(uint32_t id)
 {
     setRoutingID(id);

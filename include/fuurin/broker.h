@@ -12,10 +12,13 @@
 #define FUURIN_BROKER_H
 
 #include "fuurin/runner.h"
+#include "fuurin/brokerconfig.h"
+#include "fuurin/topic.h"
+#include "fuurin/uuid.h"
+#include "fuurin/lrucache.h"
 
 #include <memory>
 #include <list>
-#include <string>
 
 
 namespace fuurin {
@@ -36,7 +39,7 @@ public:
     /**
      * \brief Initializes this broker.
      */
-    Broker();
+    Broker(Uuid id = Uuid::createRandomUuid());
 
     /**
      * \brief Destroys this broker.
@@ -45,6 +48,13 @@ public:
 
 
 protected:
+    /**
+     * \brief Prepares configuration.
+     *
+     * \see Runner::prepareConfiguration()
+     */
+    virtual zmq::Part prepareConfiguration() const override;
+
     /**
      * \return A new broker session.
      * \see Runner::createSession()
@@ -69,10 +79,8 @@ protected:
          *
          * \see Runner::Session::Session(...)
          */
-        BrokerSession(token_type_t token, CompletionFunc onComplete,
-            const std::unique_ptr<zmq::Context>& zctx,
-            const std::unique_ptr<zmq::Socket>& zoper,
-            const std::unique_ptr<zmq::Socket>& zevents);
+        BrokerSession(Uuid id, token_type_t token, CompletionFunc onComplete,
+            zmq::Context* zctx, zmq::Socket* zoper, zmq::Socket* zevents);
 
         /**
          * \brief Destructor.
@@ -93,6 +101,27 @@ protected:
 
     protected:
         /**
+         * \brief Save the configuration upon start.
+         *
+         * \param[in] part Configuration data.
+         */
+        void saveConfiguration(const zmq::Part& part);
+
+        /**
+         * \brief Binds sockets.
+         *
+         * Endpoints are contained in broker's \ref conf_.
+         *
+         * \see saveConfiguration(zmq::Part).
+         */
+        void openSockets();
+
+        /**
+         * \brief Close sockets.
+         */
+        void closeSockets();
+
+        /**
          * \brief Sends a keepalive.
          */
         void sendHugz();
@@ -103,6 +132,19 @@ protected:
          * \param[in] payload Message payload.
          */
         void collectWorkerMessage(zmq::Part&& payload);
+
+        /**
+         * \brief Stores a topic into local storage.
+         *
+         * This functions checks the topic's sequence number and
+         * it discards it if it's lower than the last sequence number,
+         * for any source worker.
+         *
+         * \param[in] t Topic to store.
+         *
+         * \return \c false in case topic is discarded, i.e. not stored.
+         */
+        bool storeTopic(const Topic& t);
 
         /**
          * \brief Receives a synchronous command requested by a worker.
@@ -127,8 +169,13 @@ protected:
         const std::unique_ptr<zmq::Socket> zdispatch_; ///< ZMQ socket send data.
         const std::unique_ptr<zmq::Timer> zhugz_;      ///< ZMQ timer to send keepalives.
 
-        // TODO: temporary structure, replace with a proper one.
-        std::list<std::string> storage_; ///< Data storage.
+        BrokerConfig conf_; ///< Session configuration.
+
+        /// Alias for worker's uuid type.
+        using WorkerUuid = Uuid;
+
+        LRUCache<Topic::Name, LRUCache<WorkerUuid, Topic>> storTopic_; ///< Topic storage.
+        LRUCache<WorkerUuid, Topic::SeqN> storWorker_;                 ///< Worker storage.
     };
 };
 

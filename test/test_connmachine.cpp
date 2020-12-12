@@ -72,9 +72,10 @@ auto setupConn()
         int pongCnt = 0;
         std::vector<ConnMachine::State> stateCurr;
 
+        const Uuid id = Uuid::createNamespaceUuid(Uuid::Ns::Dns, "conn.fsm"sv);
         zmq::Context ctx;
         ConnMachine conn = ConnMachine{
-            "conn"sv, &ctx, 500ms, 2s,
+            "conn"sv, id, &ctx, 500ms, 2s,
             [this]() { ++closeCnt; },
             [this]() { ++openCnt; },
             [this]() { ++pongCnt; },
@@ -92,6 +93,7 @@ auto setupConn()
                               bool isTimeoutActive) //
     {
         BOOST_TEST(t->conn.name() == "conn"sv);
+        BOOST_TEST(t->conn.uuid() == t->id);
         BOOST_TEST(t->conn.timerRetry() != nullptr);
         BOOST_TEST(t->conn.timerTimeout() != nullptr);
         BOOST_TEST(t->conn.timerRetry()->isSingleShot() == false);
@@ -320,7 +322,7 @@ BOOST_AUTO_TEST_CASE(testOnTimerTimeoutInStable)
 BOOST_AUTO_TEST_CASE(testConsumeTimerTrying)
 {
     zmq::Context ctx;
-    ConnMachine conn{"conn"sv, &ctx, 10s, 10s, []() {}, []() {}, []() {}, [](ConnMachine::State) {}};
+    ConnMachine conn{"conn"sv, Uuid{}, &ctx, 10s, 10s, []() {}, []() {}, []() {}, [](ConnMachine::State) {}};
     BOOST_TEST(!conn.timerRetry()->isExpired());
 
     conn.onTimerRetryFired();
@@ -342,7 +344,7 @@ BOOST_AUTO_TEST_CASE(testConsumeTimerTrying)
 BOOST_AUTO_TEST_CASE(testConsumeTimerTimeout)
 {
     zmq::Context ctx;
-    ConnMachine conn{"conn"sv, &ctx, 10s, 10s, []() {}, []() {}, []() {}, [](ConnMachine::State) {}};
+    ConnMachine conn{"conn"sv, Uuid{}, &ctx, 10s, 10s, []() {}, []() {}, []() {}, [](ConnMachine::State) {}};
     BOOST_TEST(!conn.timerTimeout()->isExpired());
 
     conn.onTimerTimeoutFired();

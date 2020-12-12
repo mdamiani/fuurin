@@ -33,18 +33,19 @@ namespace fuurin {
 class Operation
 {
 public:
+    using type_t = uint8_t;  ///< Underlying type of the event \ref Type.
+    using notif_t = uint8_t; ///< Underlying type of the event \ref Notification.
+
     /**
      * \brief Type of operation read.
      */
-    enum struct Notification
+    enum struct Notification : notif_t
     {
         Discard, ///< The read of operation returned an old event.
         Success, ///< The read of operation successfully returned an event.
 
         COUNT, ///< Number of items.
     };
-
-    using type_t = uint8_t; ///< Underlying type of the event \ref Type.
 
     /**
      * \brief Type of operation.
@@ -88,7 +89,10 @@ public:
      * \param[in] notif Event notification type.
      * \param[in] data Operation payload.
      */
+    ///{@
+    Operation(Type type, Notification notif, const zmq::Part& data) noexcept;
     Operation(Type type, Notification notif, zmq::Part&& data = zmq::Part{}) noexcept;
+    ///@}
 
     /**
      * \brief Destructor.
@@ -114,6 +118,28 @@ public:
     ///@}
 
     /**
+     * \brief Modifies passed value.
+     * \param[in] v Operation type.
+     */
+    Operation& withType(Type v);
+
+    /**
+     * \brief Modifies passed value.
+     * \param[in] v Operation notification.
+     */
+    Operation& withNotification(Notification v);
+
+    /**
+     * \brief Modifies passed value.
+     * \param[in] v Operation payload.
+     */
+    ///{@
+    Operation& withPayload(const zmq::Part& v);
+    Operation& withPayload(zmq::Part&& v);
+    ///@}
+
+
+    /**
      * \brief Converts this operation to log arguments.
      *
      * \return An array with <\ref type(), \ref notification(), bytes of \ref payload()>.
@@ -121,10 +147,32 @@ public:
     std::array<log::Arg, 3> toArgs() const;
 
 
+public:
+    /**
+     * \brief Creates new operation from a \ref zmq::PartMulti packed \ref zmq::Part.
+     *
+     * \param[in] part Packed operation.
+     *
+     * \return A new instance of operation.
+     *
+     * \see zmq::PartMulti::unpack(const Part&)
+     */
+    static Operation fromPart(const zmq::Part& part);
+
+    /**
+     * \brief Converts this operation to a \ref zmq::PartMulti packed \ref zmq::Part.
+     *
+     * \return A packed \ref zmq::Part representing this operation.
+     *
+     * \see zmq::PartMulti::pack(Args&&...)
+     */
+    zmq::Part toPart() const;
+
+
 protected:
-    const Type type_;          ///< Operation type.
-    const Notification notif_; ///< Event notification.
-    zmq::Part payld_;          ///< Operation payload.
+    Type type_;          ///< Operation type.
+    Notification notif_; ///< Event notification.
+    zmq::Part payld_;    ///< Operation payload.
 };
 
 

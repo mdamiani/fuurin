@@ -221,6 +221,11 @@ public:
     bool empty() const noexcept;
 
     /**
+     * \return Whether this is a part of a multi-part message and there are more parts to receive.
+     */
+    bool hasMore() const;
+
+    /**
      * \brief Sets the routing ID property to this part.
      *
      * \param[in] id The routing ID value.

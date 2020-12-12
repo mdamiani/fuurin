@@ -12,10 +12,14 @@
 #define FUURIN_WORKER_H
 
 #include "fuurin/runner.h"
+#include "fuurin/workerconfig.h"
+#include "fuurin/lrucache.h"
 #include "fuurin/event.h"
+#include "fuurin/topic.h"
+#include "fuurin/uuid.h"
 
 #include <memory>
-#include <string_view>
+#include <vector>
 
 
 namespace fuurin {
@@ -31,14 +35,18 @@ class SyncMachine;
  * \brief Worker is the client interface to implement a service.
  *
  * This class is not thread-safe.
+ * This class does not throw exceptions by itself.
  */
 class Worker : public Runner
 {
 public:
     /**
      * \brief Initializes this worker.
+     *
+     * \param[in] id Identifier.
+     * \param[in] initSequence Initial sequence number.
      */
-    Worker();
+    Worker(Uuid id = Uuid::createRandomUuid(), Topic::SeqN initSequence = 0);
 
     /**
      * \brief Destroys this worker.
@@ -46,13 +54,24 @@ public:
     virtual ~Worker() noexcept;
 
     /**
-     * \brief Sends data to the broker.
+     * \brief Sets topics to sync with and receive from broker.
      *
-     * \exception Error The worker task is not running.
+     * If the list of names is empty, then every topic will be received.
+     *
+     * \param[in] names List of topics names.
+     */
+    void setTopicNames(const std::vector<Topic::Name>& names);
+
+    /**
+     * \brief Sends data to the broker.
      *
      * \see isRunning()
      */
-    void dispatch(zmq::Part&& data);
+    ///{@
+    void dispatch(Topic::Name name, const Topic::Data& data);
+    void dispatch(Topic::Name name, Topic::Data& data);
+    void dispatch(Topic::Name name, Topic::Data&& data);
+    ///@}
 
     /**
      * \brief Sends a synchronization request to the broker.
@@ -66,8 +85,20 @@ public:
      */
     Event waitForEvent(std::chrono::milliseconds timeout = std::chrono::milliseconds(-1));
 
+    /**
+     * \return The last sequence number used for marking data.
+     */
+    Topic::SeqN seqNumber() const;
+
 
 protected:
+    /**
+     * \brief Prepares configuration.
+     *
+     * \see Runner::prepareConfiguration()
+     */
+    virtual zmq::Part prepareConfiguration() const override;
+
     /**
      * \return A new worker session.
      * \see Runner::createSession()
@@ -92,10 +123,9 @@ protected:
          *
          * \see Runner::Session::Session(...)
          */
-        WorkerSession(token_type_t token, CompletionFunc onComplete,
-            const std::unique_ptr<zmq::Context>& zctx,
-            const std::unique_ptr<zmq::Socket>& zoper,
-            const std::unique_ptr<zmq::Socket>& zevent);
+        WorkerSession(Uuid id, token_type_t token, CompletionFunc onComplete,
+            zmq::Context* zctx, zmq::Socket* zoper, zmq::Socket* zevent,
+            zmq::Socket* zseqs);
 
         /**
          * \brief Destructor.
@@ -147,6 +177,13 @@ protected:
         void sendSync(uint8_t seqn);
 
         /**
+         * \brief Save the configuration upon start.
+         *
+         * \param[in] part Configuration data.
+         */
+        void saveConfiguration(const zmq::Part& part);
+
+        /**
          * \brief Collects a message which was published by a broker.
          *
          * \param[in] payload Message payload.
@@ -159,6 +196,35 @@ protected:
          * \param[in] payload Payload received from broker.
          */
         void recvBrokerSnapshot(zmq::Part&& payload);
+
+        /**
+         * \brief Accepts a topic, for the specified worker.
+         *
+         * If topic was accepted and its uuid corresponds to
+         * this session's uuid, then current sequence number is
+         * updated.
+         *
+         * \param[in] part Packed topic.
+         *
+         * \return Whether topic was accepted or not.
+         *
+         * \see acceptTopic(const Uuid&, Topic::SeqN)
+         * \see notifySequenceNumber()
+         */
+        bool acceptTopic(const zmq::Part& part);
+
+        /**
+         * \brief Accepts a topic, for the specified worker.
+         *
+         * Topic is accepted only if its sequence number is
+         * greater than the last value.
+         *
+         * \param[in] worker Worker uuid.
+         * \param[in] value Sequence number.
+         *
+         * \return Whether topic was accepted or not.
+         */
+        bool acceptTopic(const Uuid& worker, Topic::SeqN value);
 
         /**
          * \brief Notifies for any change of connection state.
@@ -174,6 +240,11 @@ protected:
          */
         void notifySnapshotDownload(bool isSync);
 
+        /**
+         * \brief Notifies for any change of current sequence number.
+         */
+        void notifySequenceNumber() const;
+
 
     protected:
         const std::unique_ptr<zmq::Socket> zsnapshot_; ///< ZMQ socket to receive snapshots.
@@ -181,10 +252,29 @@ protected:
         const std::unique_ptr<zmq::Socket> zdispatch_; ///< ZMQ socket to send data.
         const std::unique_ptr<ConnMachine> conn_;      ///< Connection state machine.
         const std::unique_ptr<SyncMachine> sync_;      ///< Connection sync machine.
+        zmq::Socket* const zseqs_;                     ///< ZMQ socket to send sequence number.
 
-        bool isOnline_;   ///< Whether the worker's connection is up.
-        bool isSnapshot_; ///< Whether for workers is syncing its snapshot.
+        bool isOnline_;     ///< Whether the worker's connection is up.
+        bool isSnapshot_;   ///< Whether for workers is syncing its snapshot.
+        Uuid brokerUuid_;   ///< Broker which last sucessfully synced.
+        WorkerConfig conf_; ///< Configuration for running the asynchronous task.
+
+        /// Alias for worker's uuid type.
+        using WorkerUuid = Uuid;
+
+        Topic::SeqN seqNum_;                             ///< Sequence number.
+        LRUCache<Topic::Name, bool> subscrTopic_;        ///< Subscribed topics.
+        LRUCache<WorkerUuid, Topic::SeqN> workerSeqNum_; ///< Sequence numbers.
     };
+
+
+protected:
+    const std::unique_ptr<zmq::Socket> zseqs_; ///< ZMQ socket to send sequence number.
+    const std::unique_ptr<zmq::Socket> zseqr_; ///< ZMQ socket to receive sequence number.
+
+    mutable Topic::SeqN seqNum_; ///< Worker sequence number.
+
+    std::vector<Topic::Name> subscrNames_; ///< List of topic names.
 };
 
 } // namespace fuurin

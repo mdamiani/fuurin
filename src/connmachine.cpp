@@ -17,10 +17,11 @@
 
 namespace fuurin {
 
-ConnMachine::ConnMachine(std::string_view name, zmq::Context* zctx,
+ConnMachine::ConnMachine(std::string_view name, Uuid uuid, zmq::Context* zctx,
     std::chrono::milliseconds retry, std::chrono::milliseconds timeout,
     CloseFunc doClose, OpenFunc doOpen, PongFunc doPong, ChangeFunc onChange)
     : name_{name}
+    , uuid_{uuid}
     , doClose_{doClose}
     , doOpen_{doOpen}
     , doPong_{doPong}
@@ -47,6 +48,12 @@ std::string_view ConnMachine::name() const noexcept
 }
 
 
+Uuid ConnMachine::uuid() const noexcept
+{
+    return uuid_;
+}
+
+
 ConnMachine::State ConnMachine::state() const noexcept
 {
     return state_;
@@ -70,7 +77,7 @@ void ConnMachine::onStart()
     if (state_ != State::Halted)
         return;
 
-    LOG_DEBUG(log::Arg{name_}, log::Arg{"event"sv, "start"sv});
+    LOG_DEBUG(log::Arg{name_, uuid_.toShortString()}, log::Arg{"event"sv, "start"sv});
 
     trigger();
 }
@@ -81,7 +88,7 @@ void ConnMachine::onStop()
     if (state_ == State::Halted)
         return;
 
-    LOG_DEBUG(log::Arg{name_}, log::Arg{"event"sv, "stop"sv});
+    LOG_DEBUG(log::Arg{name_, uuid_.toShortString()}, log::Arg{"event"sv, "stop"sv});
 
     halt();
 }
@@ -92,14 +99,14 @@ void ConnMachine::onPing()
     if (state_ == State::Halted)
         return;
 
-    LOG_DEBUG(log::Arg{name_}, log::Arg{"event"sv, "ping"sv});
+    LOG_DEBUG(log::Arg{name_, uuid_.toShortString()}, log::Arg{"event"sv, "ping"sv});
 
     timerTry_->stop();
     timerTmo_->start();
 
     change(State::Stable);
 
-    LOG_DEBUG(log::Arg{name_}, log::Arg{"action"sv, "pong"sv});
+    LOG_DEBUG(log::Arg{name_, uuid_.toShortString()}, log::Arg{"action"sv, "pong"sv});
 
     doPong_();
 }
@@ -116,7 +123,7 @@ void ConnMachine::onTimerRetryFired()
     if (state_ == State::Stable)
         return;
 
-    LOG_DEBUG(log::Arg{name_}, log::Arg{"event"sv, "announce"sv});
+    LOG_DEBUG(log::Arg{name_, uuid_.toShortString()}, log::Arg{"event"sv, "announce"sv});
 
     doPong_();
 }
@@ -130,7 +137,7 @@ void ConnMachine::onTimerTimeoutFired()
     if (state_ == State::Halted)
         return;
 
-    LOG_DEBUG(log::Arg{name_}, log::Arg{"event"sv, "timeout"sv});
+    LOG_DEBUG(log::Arg{name_, uuid_.toShortString()}, log::Arg{"event"sv, "timeout"sv});
 
     trigger();
 }
@@ -165,15 +172,15 @@ void ConnMachine::change(State state)
 
     switch (state) {
     case State::Halted:
-        LOG_DEBUG(log::Arg{name_}, log::Arg{"trans"sv, "halted"sv});
+        LOG_DEBUG(log::Arg{name_, uuid_.toShortString()}, log::Arg{"trans"sv, "halted"sv});
         break;
 
     case State::Trying:
-        LOG_DEBUG(log::Arg{name_}, log::Arg{"trans"sv, "trying"sv});
+        LOG_DEBUG(log::Arg{name_, uuid_.toShortString()}, log::Arg{"trans"sv, "trying"sv});
         break;
 
     case State::Stable:
-        LOG_DEBUG(log::Arg{name_}, log::Arg{"trans"sv, "stable"sv});
+        LOG_DEBUG(log::Arg{name_, uuid_.toShortString()}, log::Arg{"trans"sv, "stable"sv});
         break;
     }
 

@@ -31,10 +31,13 @@ namespace fuurin {
 class Event
 {
 public:
+    using type_t = uint8_t;  ///< Underlying type of the event \ref Type.
+    using notif_t = uint8_t; ///< Underlying type of the event \ref Notification.
+
     /**
      * \brief Type of event read.
      */
-    enum struct Notification
+    enum struct Notification : notif_t
     {
         Discard, ///< The read of event returned an old event.
         Timeout, ///< The read of event timed out.
@@ -43,21 +46,20 @@ public:
         COUNT, ///< Number of items.
     };
 
-    using type_t = uint8_t; ///< Underlying type of the event \ref Type.
-
     /**
      * \brief Type of event payload.
      */
     enum struct Type : type_t
     {
         Invalid,         ///< Event is invalid.
-        Started,         ///< Event delivered when \ref Runner::start() was acknowledged.
+        Started,         ///< Event delivered when \ref Runner::start() was acknowledged, with payload \ref WorkerConfig
         Stopped,         ///< Event delivered when \ref Runner::stop() was acknowledged.
         Offline,         ///< Event for \ref Worker disconnection.
         Online,          ///< Event for \ref Worker connection.
-        Delivery,        ///< Event for any \ref Worker::dispatch(zmq::Part&&).
-        SyncBegin,       ///< Event for start of \ref Worker::sync().
-        SyncElement,     ///< Event for any element of \ref Worker::sync().
+        Delivery,        ///< Event for any \ref Worker::dispatch(Topic::Name, zmq::Part&&), with payload \ref Topic.
+        SyncRequest,     ///< Event for start of \ref Worker::sync().
+        SyncBegin,       ///< Event for reply from broker of \ref Worker::sync().
+        SyncElement,     ///< Event for Worker::sync() reply.
         SyncSuccess,     ///< Event for \ref Worker::sync() success.
         SyncError,       ///< Event for \ref Worker::sync() error.
         SyncDownloadOn,  ///< Event when download of snapshot starts.
@@ -65,6 +67,28 @@ public:
 
         COUNT, ///< Number of items.
     };
+
+
+public:
+    /**
+     * \brief Creates new event from a \ref zmq::PartMulti packed \ref zmq::Part.
+     *
+     * \param[in] part Packed event.
+     *
+     * \return A new instance of event.
+     *
+     * \see zmq::PartMulti::unpack(const Part&)
+     */
+    static Event fromPart(const zmq::Part& part);
+
+    /**
+     * \brief Converts this event to a \ref zmq::PartMulti packed \ref zmq::Part.
+     *
+     * \return A packed \ref zmq::Part representing this event.
+     *
+     * \see zmq::PartMulti::pack(Args&&...)
+     */
+    zmq::Part toPart() const;
 
 
 public:
@@ -94,7 +118,10 @@ public:
      * \param[in] notif Event notification type.
      * \param[in] data Event payload.
      */
+    ///{@
+    Event(Type type, Notification notif, const zmq::Part& data) noexcept;
     Event(Type type, Notification notif, zmq::Part&& data = zmq::Part{}) noexcept;
+    ///@}
 
     /**
      * \brief Destructor.
@@ -120,6 +147,27 @@ public:
     ///@}
 
     /**
+     * \brief Modifies passed value.
+     * \param[in] v Event type.
+     */
+    Event& withType(Type v);
+
+    /**
+     * \brief Modifies passed value.
+     * \param[in] v Event notification.
+     */
+    Event& withNotification(Notification v);
+
+    /**
+     * \brief Modifies passed value.
+     * \param[in] v Event payload.
+     */
+    ///{@
+    Event& withPayload(const zmq::Part& v);
+    Event& withPayload(zmq::Part&& v);
+    ///@}
+
+    /**
      * \brief Converts this event to log arguments.
      *
      * \return An array with <\ref type(), \ref notification(), bytes of \ref payload()>
@@ -128,9 +176,9 @@ public:
 
 
 protected:
-    const Type type_;          ///< Eventy type.
-    const Notification notif_; ///< Event notification.
-    zmq::Part payld_;          ///< Event payload.
+    Type type_;          ///< Eventy type.
+    Notification notif_; ///< Event notification.
+    zmq::Part payld_;    ///< Event payload.
 };
 
 

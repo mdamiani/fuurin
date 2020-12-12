@@ -13,12 +13,15 @@
 
 #include "fuurin/event.h"
 #include "fuurin/operation.h"
+#include "fuurin/uuid.h"
 
 #include <memory>
 #include <future>
 #include <atomic>
 #include <chrono>
 #include <functional>
+#include <string>
+#include <vector>
 
 
 namespace fuurin {
@@ -50,8 +53,10 @@ public:
      * The core sockets for the inter-thread communication is setup,
      * using a runner specific endpoint. Both the sending and receiving
      * ends are created and connected/bound.
+     *
+     * \param[in] id Instance identifier.
      */
-    Runner();
+    Runner(Uuid id = Uuid::createRandomUuid());
 
     /**
      * \brief Stops this runner.
@@ -69,6 +74,39 @@ public:
     ///@}
 
     /**
+     * \return Return the instance identifier.
+     */
+    Uuid uuid() const;
+
+    /**
+     * \brief Sets endpoints to connect to broker.
+     *
+     * If endpoints were not set, then IPC protocol will be used as default.
+     *
+     * \param[in] delivery List endpoints, default is {"ipc:///tmp/worker_delivery"}.
+     * \param[in] dispatch List endpoints, default is {"ipc:///tmp/worker_dispatch"}.
+     * \param[in] snapshot List endpoints, default is {"ipc:///tmp/broker_snapshot"}.
+     *
+     * \see endpointDelivery()
+     * \see endpointDispatch()
+     * \see endpointSnapshot()
+     */
+    void setEndpoints(const std::vector<std::string>& delivery,
+        const std::vector<std::string>& dispatch,
+        const std::vector<std::string>& snapshot);
+
+    /**
+     * \return Current endpoints.
+     *
+     * \see setEndpoints(std::vector<std::string>, std::vector<std::string>, std::vector<std::string>)
+     */
+    ///{@
+    std::vector<std::string> endpointDelivery() const;
+    std::vector<std::string> endpointDispatch() const;
+    std::vector<std::string> endpointSnapshot() const;
+    ///@}
+
+    /**
      * \brief Starts the background thread of the main task.
      *
      * \return A future to hold the result (or an exception) of the computation,
@@ -79,6 +117,7 @@ public:
      * \see stop()
      * \see isRunning()
      * \see Session::run()
+     * \see prepareConfiguration()
      */
     std::future<void> start();
 
@@ -116,9 +155,46 @@ protected:
     ///< Function type to call when a sessions ends.
     using CompletionFunc = std::function<void()>;
 
+    /**
+     * \brief Sends an operation over a socket.
+     *
+     * \param[in] sock Socket the operation is sent to.
+     * \param[in] token Operation token.
+     * \param[in] oper Type of operation.
+     * \param[in] payload Payload of operation.
+     */
+    static void sendOperation(zmq::Socket* sock, token_type_t token, Operation::Type oper, zmq::Part&& payload) noexcept;
+
+    /**
+     * \brief Receives an operation reply from a socket.
+     *
+     * \param[in] sock Socket the operation is received from.
+     * \param[in] token Expected operation token.
+     *
+     * \return An operation object.
+     */
+    static Operation recvOperation(zmq::Socket* sock, token_type_t token) noexcept;
+
 
 protected:
     class Session;
+
+    /**
+     * \return Runner's ZMQ Context.
+     */
+    zmq::Context* zmqCtx() const noexcept;
+
+    /**
+     * \brief Prepares configuration to send to the asynchronous task upon start.
+     *
+     * This method shall be overridden by subclasses in order to
+     * return a specific configuration data.
+     *
+     * \return An empty \ref Part.
+     *
+     * \see start()
+     */
+    virtual zmq::Part prepareConfiguration() const;
 
     /**
      * \brief Instantiates a session which runs the asynchronous task.
@@ -129,9 +205,9 @@ protected:
      * \param[in] onComplete Function to call when session is completed.
      *                       It shall not throw exceptions.
      *
-     * \see Session
      * \return A pointer to a new session.
      *
+     * \see Session
      * \see makeSession()
      */
     virtual std::unique_ptr<Session> createSession(CompletionFunc onComplete) const;
@@ -141,10 +217,11 @@ protected:
      *
      * \see createSession()
      */
-    template<typename S>
-    std::unique_ptr<Session> makeSession(CompletionFunc onComplete) const
+    template<typename S, typename... Args>
+    std::unique_ptr<Session> makeSession(CompletionFunc onComplete, Args&&... args) const
     {
-        return std::make_unique<S>(token_, onComplete, zctx_, zopr_, zevs_);
+        return std::make_unique<S>(uuid_, token_, onComplete, zctx_.get(), zopr_.get(), zevs_.get(),
+            std::forward<Args>(args)...);
     }
 
     /**
@@ -241,10 +318,8 @@ protected:
          * \param[in] zoper ZMQ socket to receive operation commands from main task.
          * \param[in] zevent ZMQ socket to send events to main task.
          */
-        Session(token_type_t token, CompletionFunc onComplete,
-            const std::unique_ptr<zmq::Context>& zctx,
-            const std::unique_ptr<zmq::Socket>& zoper,
-            const std::unique_ptr<zmq::Socket>& zevent);
+        Session(Uuid id, token_type_t token, CompletionFunc onComplete,
+            zmq::Context* zctx, zmq::Socket* zoper, zmq::Socket* zevent);
 
         /**
          * \brief Destructor.
@@ -349,23 +424,30 @@ protected:
 
 
     protected:
-        const token_type_t token_;                  ///< Session token.
-        const CompletionFunc docompl_;              ///< Completion action.
-        const std::unique_ptr<zmq::Context>& zctx_; ///< \see Runner::zctx_.
-        const std::unique_ptr<zmq::Socket>& zopr_;  ///< \see Runner::zopr_.
-        const std::unique_ptr<zmq::Socket>& zevs_;  ///< \see Runner::zevs_.
+        const Uuid uuid_;              ///< Identifier.
+        const token_type_t token_;     ///< Session token.
+        const CompletionFunc docompl_; ///< Completion action.
+        zmq::Context* const zctx_;     ///< \see Runner::zctx_.
+        zmq::Socket* const zopr_;      ///< \see Runner::zopr_.
+        zmq::Socket* const zevs_;      ///< \see Runner::zevs_.
     };
 
 
 private:
+    const Uuid uuid_;                          ///< Identifier.
     const std::unique_ptr<zmq::Context> zctx_; ///< ZMQ context.
     const std::unique_ptr<zmq::Socket> zops_;  ///< Inter-thread sending socket.
     const std::unique_ptr<zmq::Socket> zopr_;  ///< Inter-thread receiving socket.
     const std::unique_ptr<zmq::Socket> zevs_;  ///< Inter-thread events notifications.
     const std::unique_ptr<zmq::Socket> zevr_;  ///< Inter-thread events reception.
-    std::atomic<bool> running_;                ///< Whether the task is running.
-    std::atomic<token_type_t> token_;          ///< Current execution token for the task.
-};                                             // namespace fuurin
+
+    std::atomic<bool> running_;       ///< Whether the task is running.
+    std::atomic<token_type_t> token_; ///< Current execution token for the task.
+
+    std::vector<std::string> endpDelivery_; ///< List of endpoints.
+    std::vector<std::string> endpDispatch_; ///< List of endpoints.
+    std::vector<std::string> endpSnapshot_; ///< List of endpoints.
+};
 
 } // namespace fuurin
 

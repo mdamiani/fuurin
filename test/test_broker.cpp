@@ -20,6 +20,7 @@
 #include "fuurin/zmqpart.h"
 #include "fuurin/zmqpartmulti.h"
 #include "fuurin/errors.h"
+#include "fuurin/uuid.h"
 
 #include <string_view>
 #include <chrono>
@@ -77,10 +78,17 @@ protected:
 
 class TestBroker : public Broker
 {
+public:
+    TestBroker()
+        : Broker{bid}
+    {}
+
 protected:
     class TestBrokerSession;
 
 public:
+    static const Uuid wid;
+    static const Uuid bid;
     TestSocket* testSocket = nullptr;
     TestBrokerSession* testSession;
 
@@ -98,9 +106,20 @@ protected:
         }
 
 
-        void setSnapshot(std::string data)
+        bool storeTopic(Topic& t)
         {
-            storage_.push_back(data);
+            return BrokerSession::storeTopic(t);
+        }
+
+
+        auto getStorageTopic() -> decltype(storTopic_)*
+        {
+            return &storTopic_;
+        }
+
+        auto getStorageWorker() -> decltype(storWorker_)*
+        {
+            return &storWorker_;
         }
 
 
@@ -125,7 +144,7 @@ public:
     void setupSession(TestBrokerSession* s)
     {
         testSession = s;
-        testSocket = new TestSocket(nullptr, zmq::Socket::Type{});
+        testSocket = new TestSocket(zmqCtx(), zmq::Socket::Type{});
         testSession->setSnapshotSocket(testSocket);
     }
 
@@ -135,8 +154,129 @@ public:
         return testSession;
     }
 };
+
+const Uuid TestBroker::wid = Uuid::createNamespaceUuid(Uuid::Ns::Dns, "worker.net"sv);
+const Uuid TestBroker::bid = Uuid::createNamespaceUuid(Uuid::Ns::Dns, "broker.net"sv);
+
 } // namespace fuurin
 
+
+BOOST_AUTO_TEST_CASE(testUuid)
+{
+    auto id = TestBroker::bid;
+    Broker b{id};
+    BOOST_TEST(b.uuid() == id);
+}
+
+
+static void testStorage(decltype(TestBroker{}.testSession->getStorageTopic()) st,
+    Topic::Name nm, Uuid wid, const Topic& t)
+{
+    BOOST_TEST((st->find(nm) != st->list().end()));
+    BOOST_TEST((st->find(nm)->first == nm));
+    BOOST_TEST((st->find(nm)->second.find(wid) != st->find(nm)->second.list().end()));
+    BOOST_TEST((st->find(nm)->second.find(wid)->first == wid));
+    BOOST_TEST((st->find(nm)->second.find(wid)->second == t));
+}
+
+
+static void testStorage(decltype(TestBroker{}.testSession->getStorageWorker()) st,
+    Uuid wid, Topic::SeqN val)
+{
+    BOOST_TEST((st->find(wid) != st->list().end()));
+    BOOST_TEST((st->find(wid)->first == wid));
+    BOOST_TEST((st->find(wid)->second == val));
+}
+
+
+BOOST_AUTO_TEST_CASE(testStoreTopicSingle)
+{
+    TestBroker b;
+    auto bf = b.start();
+    auto bts = b.testSession;
+    auto stt = b.testSession->getStorageTopic();
+    auto stw = b.testSession->getStorageWorker();
+
+    Topic::Name nm("hello"sv);
+    Topic t{Uuid{}, TestBroker::wid, 5, nm, zmq::Part{"data"sv}};
+
+    BOOST_TEST(stt->empty());
+    BOOST_TEST((stt->find(nm) == stt->list().end()));
+    BOOST_TEST((stw->find(TestBroker::wid) == stw->list().end()));
+
+    // store a topic.
+    BOOST_TEST(bts->storeTopic(t));
+    BOOST_TEST(t.seqNum() == 5u);
+
+    // store a new topic
+    BOOST_TEST(bts->storeTopic(t.withSeqNum(6u)));
+    BOOST_TEST(t.seqNum() == 6u);
+
+    // discard topic
+    BOOST_TEST(!bts->storeTopic(Topic{t}.withSeqNum(0u)));
+    BOOST_TEST(!bts->storeTopic(Topic{t}.withSeqNum(6u)));
+
+    // test storage
+    BOOST_TEST(stt->size() == 1u);
+    BOOST_TEST(stw->size() == 1u);
+
+    testStorage(stt, nm, TestBroker::wid, t);
+    testStorage(stw, TestBroker::wid, t.seqNum());
+
+    b.stop();
+}
+
+
+BOOST_AUTO_TEST_CASE(testStoreTopicMultiple)
+{
+    TestBroker b;
+    auto bf = b.start();
+    auto bts = b.testSession;
+    auto stt = b.testSession->getStorageTopic();
+    auto stw = b.testSession->getStorageWorker();
+    const Uuid wid1 = Uuid::createNamespaceUuid(Uuid::Ns::Dns, "worker1.net"sv);
+    const Uuid wid2 = Uuid::createNamespaceUuid(Uuid::Ns::Dns, "worker2.net"sv);
+
+    Topic::Name nm1("hello1"sv);
+    Topic::Name nm2("hello2"sv);
+    Topic t1{Uuid{}, wid1, 5, nm1, zmq::Part{"data"sv}};
+    Topic t2{Uuid{}, wid2, 7, nm2, zmq::Part{"data"sv}};
+
+    // store topics
+    BOOST_TEST(bts->storeTopic(t1));
+    BOOST_TEST(bts->storeTopic(t2));
+    BOOST_TEST(t1.seqNum() == 5u);
+    BOOST_TEST(t2.seqNum() == 7u);
+
+    BOOST_TEST(stt->size() == 2u);
+    BOOST_TEST(stw->size() == 2u);
+
+    testStorage(stt, nm1, wid1, t1);
+    testStorage(stt, nm2, wid2, t2);
+
+    testStorage(stw, wid1, t1.seqNum());
+    testStorage(stw, wid2, t2.seqNum());
+
+    // update topics
+    BOOST_TEST(bts->storeTopic(t1.withSeqNum(9)));
+    BOOST_TEST(bts->storeTopic(t2.withSeqNum(11)));
+    BOOST_TEST(t1.seqNum() == 9u);
+    BOOST_TEST(t2.seqNum() == 11u);
+
+    BOOST_TEST(stt->size() == 2u);
+    BOOST_TEST(stw->size() == 2u);
+
+    testStorage(stt, nm1, wid1, t1);
+    testStorage(stt, nm2, wid2, t2);
+
+    testStorage(stw, wid1, t1.seqNum());
+    testStorage(stw, wid2, t2.seqNum());
+
+    b.stop();
+}
+
+
+const zmq::Part SREQ = zmq::PartMulti::pack(BROKER_SYNC_REQST, uint8_t(0), zmq::Part{}).withRoutingID(1);
 
 BOOST_DATA_TEST_CASE(testReceiverWorkerSync,
     bdata::make({
@@ -149,35 +289,35 @@ BOOST_DATA_TEST_CASE(testReceiverWorkerSync,
             -1, false, false,
             0, ""sv),
         std::make_tuple("payload ok",
-            zmq::PartMulti::pack(BROKER_SYNC_REQST, uint8_t(0), zmq::Part{}).withRoutingID(1),
+            SREQ,
             -1, false, false,
             3, ""sv),
         std::make_tuple("begin would block",
-            zmq::PartMulti::pack(BROKER_SYNC_REQST, uint8_t(0), zmq::Part{}).withRoutingID(1),
+            SREQ,
             1, true, false,
             0, ""sv),
         std::make_tuple("elemn would block",
-            zmq::PartMulti::pack(BROKER_SYNC_REQST, uint8_t(0), zmq::Part{}).withRoutingID(1),
+            SREQ,
             2, true, false,
             1, ""sv),
         std::make_tuple("compl would block",
-            zmq::PartMulti::pack(BROKER_SYNC_REQST, uint8_t(0), zmq::Part{}).withRoutingID(1),
+            SREQ,
             3, true, false,
             2, ""sv),
         std::make_tuple("begin host unreach",
-            zmq::PartMulti::pack(BROKER_SYNC_REQST, uint8_t(0), zmq::Part{}).withRoutingID(1),
+            SREQ,
             1, false, true,
             0, ""sv),
         std::make_tuple("elemn host unreach",
-            zmq::PartMulti::pack(BROKER_SYNC_REQST, uint8_t(0), zmq::Part{}).withRoutingID(1),
+            SREQ,
             2, false, true,
             1, ""sv),
         std::make_tuple("compl host unreach",
-            zmq::PartMulti::pack(BROKER_SYNC_REQST, uint8_t(0), zmq::Part{}).withRoutingID(1),
+            SREQ,
             3, false, true,
             2, ""sv),
         std::make_tuple("other exception",
-            zmq::PartMulti::pack(BROKER_SYNC_REQST, uint8_t(0), zmq::Part{}).withRoutingID(1),
+            SREQ,
             1, false, false,
             0, "ZMQSocketSendFailed"sv),
     }),
@@ -185,42 +325,52 @@ BOOST_DATA_TEST_CASE(testReceiverWorkerSync,
 {
     BOOST_TEST_MESSAGE(name);
 
-    const auto testPart = [](const zmq::Part& p, std::string_view id, uint8_t nn, std::string_view vv) {
+    const auto testNotif = [](const zmq::Part& p, std::string_view id, uint8_t nn) {
         auto [rep, seq, pay] = zmq::PartMulti::unpack<std::string_view, uint8_t, zmq::Part>(p);
         BOOST_TEST(id == rep);
         BOOST_TEST(nn == seq);
-        BOOST_TEST(vv == pay.toString());
+        BOOST_TEST(TestBroker::bid == Uuid::fromPart(pay));
+    };
+    const auto testTopic = [](const zmq::Part& p, std::string_view id, uint8_t nn, Topic tt) {
+        auto [rep, seq, pay] = zmq::PartMulti::unpack<std::string_view, uint8_t, zmq::Part>(p);
+        BOOST_TEST(id == rep);
+        BOOST_TEST(nn == seq);
+        BOOST_TEST(tt == Topic::fromPart(pay));
     };
 
     TestBroker b;
     auto bf = b.start();
+    auto bts = b.testSession;
+    auto bsk = b.testSocket;
+    auto bpp = &bsk->sentParts;
 
-    b.testSession->setSnapshot("hello");
-    b.testSocket->errAfter = errAfter;
+    Topic t = Topic{}.withSeqNum(1).withData(zmq::Part{"hello"sv});
+    bts->storeTopic(t);
+    bsk->errAfter = errAfter;
     if (!errWouldBlock) {
-        b.testSocket->errHostUnreach = errHostUnreach;
-        b.testSocket->errOtherCode = !errHostUnreach;
+        bsk->errHostUnreach = errHostUnreach;
+        bsk->errOtherCode = !errHostUnreach;
     }
 
     if (wantError.empty()) {
-        b.testSession->testReceiveWorkerCommand(zmq::Part{payload});
+        bts->testReceiveWorkerCommand(zmq::Part{payload});
 
         if (wantSize > 0) {
-            BOOST_TEST(int(b.testSocket->sentParts.size()) == wantSize);
-            if (b.testSocket->sentParts.size() >= 1)
-                testPart(b.testSocket->sentParts.at(0), BROKER_SYNC_BEGIN, 0, ""sv);
-            if (b.testSocket->sentParts.size() >= 2)
-                testPart(b.testSocket->sentParts.at(1), BROKER_SYNC_ELEMN, 0, "hello"sv);
-            if (b.testSocket->sentParts.size() >= 3)
-                testPart(b.testSocket->sentParts.at(2), BROKER_SYNC_COMPL, 0, ""sv);
+            BOOST_TEST(int(bpp->size()) == wantSize);
+            if (bpp->size() >= 1)
+                testNotif(bpp->at(0), BROKER_SYNC_BEGIN, 0);
+            if (bpp->size() >= 2)
+                testTopic(bpp->at(1), BROKER_SYNC_ELEMN, 0, t);
+            if (bpp->size() >= 3)
+                testNotif(bpp->at(2), BROKER_SYNC_COMPL, 0);
         } else {
-            BOOST_TEST(int(b.testSocket->sentParts.empty()));
+            BOOST_TEST(int(bpp->empty()));
         }
     } else {
         if (wantError == "ZMQPartAccessFailed"sv) {
-            BOOST_REQUIRE_THROW(b.testSession->testReceiveWorkerCommand(zmq::Part{payload}), err::ZMQPartAccessFailed);
+            BOOST_REQUIRE_THROW(bts->testReceiveWorkerCommand(zmq::Part{payload}), err::ZMQPartAccessFailed);
         } else if (wantError == "ZMQSocketSendFailed"sv) {
-            BOOST_REQUIRE_THROW(b.testSession->testReceiveWorkerCommand(zmq::Part{payload}), err::ZMQSocketSendFailed);
+            BOOST_REQUIRE_THROW(bts->testReceiveWorkerCommand(zmq::Part{payload}), err::ZMQSocketSendFailed);
         } else {
             BOOST_FAIL("unexpected error type");
         }

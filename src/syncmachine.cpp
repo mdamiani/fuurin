@@ -22,10 +22,11 @@ using namespace std::literals::string_view_literals;
 
 namespace fuurin {
 
-SyncMachine::SyncMachine(std::string_view name, zmq::Context* zctx,
+SyncMachine::SyncMachine(std::string_view name, Uuid uuid, zmq::Context* zctx,
     int maxIndex, int maxRetry, std::chrono::milliseconds timeout,
     CloseFunc close, OpenFunc open, SyncFunc sync, ChangeFunc change)
     : name_{name}
+    , uuid_{uuid}
     , indexMax_{maxIndex}
     , retryMax_{maxRetry}
     , doClose_{close}
@@ -60,6 +61,12 @@ SyncMachine::~SyncMachine() noexcept = default;
 std::string_view SyncMachine::name() const noexcept
 {
     return name_;
+}
+
+
+Uuid SyncMachine::uuid() const noexcept
+{
+    return uuid_;
 }
 
 
@@ -125,7 +132,7 @@ void SyncMachine::onHalt()
     if (state_ == State::Halted)
         return;
 
-    LOG_DEBUG(log::Arg{name_}, log::Arg{"event"sv, "halt"sv});
+    LOG_DEBUG(log::Arg{name_, uuid_.toShortString()}, log::Arg{"event"sv, "halt"sv});
 
     switch (state_) {
     case State::Failed:
@@ -148,7 +155,7 @@ void SyncMachine::onSync()
     if (state_ == State::Download)
         return;
 
-    LOG_DEBUG(log::Arg{name_}, log::Arg{"event"sv, "sync"sv});
+    LOG_DEBUG(log::Arg{name_, uuid_.toShortString()}, log::Arg{"event"sv, "sync"sv});
 
     retryCurr_ = 0;
 
@@ -182,7 +189,7 @@ SyncMachine::ReplyResult SyncMachine::onReply(int index, seqn_t seqn, ReplyType 
 
     switch (reply) {
     case ReplyType::Snapshot:
-        LOG_DEBUG(log::Arg{name_}, log::Arg{"event"sv, "reply"sv},
+        LOG_DEBUG(log::Arg{name_, uuid_.toShortString()}, log::Arg{"event"sv, "reply"sv},
             log::Arg{"index"sv, index}, log::Arg{"seqn"sv, seqn},
             log::Arg{"type"sv, "snapshot"sv});
 
@@ -190,7 +197,7 @@ SyncMachine::ReplyResult SyncMachine::onReply(int index, seqn_t seqn, ReplyType 
         break;
 
     case ReplyType::Complete:
-        LOG_DEBUG(log::Arg{name_}, log::Arg{"event"sv, "reply"sv},
+        LOG_DEBUG(log::Arg{name_, uuid_.toShortString()}, log::Arg{"event"sv, "reply"sv},
             log::Arg{"index"sv, index}, log::Arg{"seqn"sv, seqn},
             log::Arg{"type"sv, "complete"sv});
 
@@ -211,7 +218,7 @@ void SyncMachine::onTimerTimeoutFired()
     if (state_ != State::Download)
         return;
 
-    LOG_DEBUG(log::Arg{name_}, log::Arg{"event"sv, "timeout"sv});
+    LOG_DEBUG(log::Arg{name_, uuid_.toShortString()}, log::Arg{"event"sv, "timeout"sv});
 
     if (retryCurr_ + 1 > retryMax_) {
         fail(indexCurr_);
@@ -260,7 +267,7 @@ void SyncMachine::sync(int indexClose, int indexOpen)
     close(indexClose);
     open(indexOpen);
 
-    LOG_DEBUG(log::Arg{name_}, log::Arg{"action"sv, "sync"sv},
+    LOG_DEBUG(log::Arg{name_, uuid_.toShortString()}, log::Arg{"action"sv, "sync"sv},
         log::Arg{"index"sv, indexCurr_}, log::Arg{"seqn"sv, seqNum_});
 
     doSync_(indexCurr_, seqNum_);
@@ -272,7 +279,7 @@ void SyncMachine::close(int index)
     if (index < 0)
         return;
 
-    LOG_DEBUG(log::Arg{name_}, log::Arg{"action"sv, "close"sv},
+    LOG_DEBUG(log::Arg{name_, uuid_.toShortString()}, log::Arg{"action"sv, "close"sv},
         log::Arg{"index"sv, index});
 
     doClose_(index);
@@ -284,7 +291,7 @@ void SyncMachine::open(int index)
     if (index < 0)
         return;
 
-    LOG_DEBUG(log::Arg{name_}, log::Arg{"action"sv, "open"sv},
+    LOG_DEBUG(log::Arg{name_, uuid_.toShortString()}, log::Arg{"action"sv, "open"sv},
         log::Arg{"index"sv, index});
 
     doOpen_(index);
@@ -298,19 +305,19 @@ void SyncMachine::change(State state)
 
     switch (state) {
     case State::Halted:
-        LOG_DEBUG(log::Arg{name_}, log::Arg{"trans"sv, "halted"sv});
+        LOG_DEBUG(log::Arg{name_, uuid_.toShortString()}, log::Arg{"trans"sv, "halted"sv});
         break;
 
     case State::Download:
-        LOG_DEBUG(log::Arg{name_}, log::Arg{"trans"sv, "download"sv});
+        LOG_DEBUG(log::Arg{name_, uuid_.toShortString()}, log::Arg{"trans"sv, "download"sv});
         break;
 
     case State::Failed:
-        LOG_DEBUG(log::Arg{name_}, log::Arg{"trans"sv, "failed"sv});
+        LOG_DEBUG(log::Arg{name_, uuid_.toShortString()}, log::Arg{"trans"sv, "failed"sv});
         break;
 
     case State::Synced:
-        LOG_DEBUG(log::Arg{name_}, log::Arg{"trans"sv, "synced"sv});
+        LOG_DEBUG(log::Arg{name_, uuid_.toShortString()}, log::Arg{"trans"sv, "synced"sv});
         break;
     }
 

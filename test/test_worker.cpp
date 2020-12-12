@@ -16,9 +16,11 @@
 
 #include "fuurin/broker.h"
 #include "fuurin/worker.h"
+#include "fuurin/workerconfig.h"
 #include "fuurin/zmqpart.h"
 #include "fuurin/zmqpoller.h"
 #include "fuurin/elapser.h"
+#include "fuurin/errors.h"
 
 #include <string_view>
 #include <chrono>
@@ -57,6 +59,203 @@ inline std::ostream& operator<<(std::ostream& os, const std::list<T>& l)
     return os;
 }
 } // namespace std
+
+
+Event testWaitForEvent(Worker& w, std::chrono::milliseconds timeout, Event::Notification evRet,
+    Event::Type evType)
+{
+    const auto& ev = w.waitForEvent(timeout);
+
+    BOOST_TEST(ev.notification() == evRet);
+    BOOST_TEST(ev.type() == evType);
+    BOOST_TEST(ev.payload().empty());
+
+    return ev;
+}
+
+
+template<typename T>
+Event testWaitForEvent(Worker& w, std::chrono::milliseconds timeout, Event::Notification evRet,
+    Event::Type evType, const T& evT)
+{
+    const auto& ev = w.waitForEvent(timeout);
+
+    BOOST_TEST(ev.notification() == evRet);
+    BOOST_TEST(ev.type() == evType);
+
+    BOOST_TEST(!ev.payload().empty());
+    BOOST_TEST(T::fromPart(ev.payload()) == evT);
+
+    return ev;
+}
+
+
+WorkerConfig mkCnf(Uuid uuid = Uuid{}, Topic::SeqN seqn = 0,
+    const std::vector<Topic::Name>& names = {},
+    const std::vector<std::string>& endp1 = {"ipc:///tmp/worker_delivery"},
+    const std::vector<std::string>& endp2 = {"ipc:///tmp/worker_dispatch"},
+    const std::vector<std::string>& endp3 = {"ipc:///tmp/broker_snapshot"})
+{
+    return WorkerConfig{uuid, seqn, names, endp1, endp2, endp3};
+}
+
+
+static void testWaitForStart(Worker& w)
+{
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Started, mkCnf(w.uuid()));
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Online);
+}
+
+
+static void testWaitForStop(Worker& w)
+{
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Offline);
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Stopped);
+}
+
+
+static Event testWaitForTopic(Worker& w, Topic t, int seqn)
+{
+    return testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Delivery, t.withSeqNum(seqn));
+}
+
+
+static void testWaitForSyncStart(Worker& w, Broker& b)
+{
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncDownloadOn);
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncRequest);
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncBegin, b.uuid());
+}
+
+
+static void testWaitForSyncStop(Worker& w, Broker& b)
+{
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncSuccess, b.uuid());
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncDownloadOff);
+}
+
+
+static Event testWaitForSyncTopic(Worker& w, Topic t, int seqn)
+{
+    return testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncElement, t.withSeqNum(seqn));
+}
+
+
+struct WorkerFixture
+{
+    WorkerFixture()
+        : w(wid)
+        , b(bid)
+        , wf(w.start())
+        , bf(b.start())
+    {
+        testWaitForStart(w);
+    }
+
+    ~WorkerFixture()
+    {
+        w.stop();
+        b.stop();
+
+        testWaitForStop(w);
+
+        wf.get();
+        bf.get();
+    }
+
+    static const Uuid wid;
+    static const Uuid bid;
+
+    Worker w;
+    Broker b;
+
+    std::future<void> wf;
+    std::future<void> bf;
+};
+
+const Uuid WorkerFixture::wid = Uuid::createNamespaceUuid(Uuid::Ns::Dns, "worker.net"sv);
+const Uuid WorkerFixture::bid = Uuid::createNamespaceUuid(Uuid::Ns::Dns, "broker.net"sv);
+
+
+Topic mkT(const std::string& name, Topic::SeqN seqn, const std::string& pay)
+{
+    using f = WorkerFixture;
+    return Topic{f::bid, f::wid, seqn, name, zmq::Part{pay}};
+}
+
+
+BOOST_AUTO_TEST_CASE(testUuid)
+{
+    auto id = WorkerFixture::wid;
+    Worker w(id);
+    BOOST_TEST(w.uuid() == id);
+}
+
+
+BOOST_AUTO_TEST_CASE(testDeliverUuid)
+{
+    Worker w(WorkerFixture::wid);
+    Broker b(WorkerFixture::bid);
+
+    auto wf = w.start();
+    auto bf = b.start();
+
+    testWaitForStart(w);
+
+    w.dispatch("topic"sv, zmq::Part{"hello"sv});
+
+    auto ev = testWaitForTopic(w, mkT("topic", 0, "hello"), 1);
+    auto t = Topic::fromPart(ev.payload());
+
+    BOOST_TEST(t.worker() == WorkerFixture::wid);
+    BOOST_TEST(t.broker() == WorkerFixture::bid);
+
+    w.stop();
+    b.stop();
+
+    bf.get();
+    wf.get();
+}
+
+
+BOOST_AUTO_TEST_CASE(testTopicPart)
+{
+    using f = WorkerFixture;
+    const Topic t1{f::bid, f::wid, 256, "topic/test"sv, zmq::Part{"topic/data"sv}};
+    const Topic t2{Topic::fromPart(t1.toPart())};
+
+    BOOST_TEST(t1 == t2);
+}
+
+
+BOOST_AUTO_TEST_CASE(testTopicPatchSeqNum)
+{
+    using f = WorkerFixture;
+    const Topic::Name name{"topic/test"sv};
+    const Topic::Data data{"topic/data"sv};
+    const Topic t1{f::bid, f::wid, 256, name, data};
+    zmq::Part p1 = t1.toPart();
+
+    const Topic t2{Topic::fromPart(p1)};
+    BOOST_TEST(t2.broker() == f::bid);
+    BOOST_TEST(t2.worker() == f::wid);
+    BOOST_TEST(t2.seqNum() == 256llu);
+    BOOST_TEST(t2.name() == name);
+    BOOST_TEST(t2.data() == data);
+
+    Topic::withSeqNum(p1, 9223372036854775808ull);
+
+    const Topic t3{Topic::fromPart(p1)};
+
+    BOOST_TEST(t2.broker() == f::bid);
+    BOOST_TEST(t2.worker() == f::wid);
+    BOOST_TEST(t3.seqNum() == 9223372036854775808ull);
+    BOOST_TEST(t2.name() == name);
+    BOOST_TEST(t2.data() == data);
+
+    zmq::Part p4{uint16_t(0)};
+    BOOST_REQUIRE_THROW(Topic::withSeqNum(p4, 1), err::ZMQPartAccessFailed);
+}
 
 
 namespace fuurin {
@@ -179,51 +378,6 @@ BOOST_DATA_TEST_CASE(testWaitForEventTimeout,
 }
 
 
-void testWaitForEvent(Worker& w, std::chrono::milliseconds timeout, Event::Notification evRet,
-    Event::Type evType, const std::string& evPay = std::string())
-{
-    const auto& ev = w.waitForEvent(timeout);
-
-    BOOST_TEST(ev.notification() == evRet);
-    BOOST_TEST(ev.type() == evType);
-
-    if (!evPay.empty()) {
-        BOOST_TEST(!ev.payload().empty());
-        BOOST_TEST(ev.payload().toString() == std::string_view(evPay));
-    } else {
-        BOOST_TEST(ev.payload().empty());
-    }
-}
-
-
-struct WorkerFixture
-{
-    WorkerFixture()
-    {
-        wf = w.start();
-        bf = b.start();
-
-        testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Started);
-        testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Online);
-    }
-
-    ~WorkerFixture()
-    {
-        w.stop();
-        b.stop();
-
-        testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Offline);
-        testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Stopped);
-    }
-
-    Worker w;
-    Broker b;
-
-    std::future<void> wf;
-    std::future<void> bf;
-};
-
-
 typedef boost::mpl::list<Broker, Worker> runnerTypes;
 BOOST_AUTO_TEST_CASE_TEMPLATE(workerStart, T, runnerTypes)
 {
@@ -245,13 +399,13 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(workerStart, T, runnerTypes)
 }
 
 
-BOOST_AUTO_TEST_CASE(testWaitForStart)
+BOOST_AUTO_TEST_CASE(testWaitForStarted)
 {
     Worker w;
 
     auto wf = w.start();
 
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Started);
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Started, mkCnf(w.uuid()));
 
     w.stop();
 
@@ -277,9 +431,9 @@ BOOST_FIXTURE_TEST_CASE(testWaitForOffline, WorkerFixture)
 
 BOOST_FIXTURE_TEST_CASE(testSimpleDispatch, WorkerFixture)
 {
-    w.dispatch(zmq::Part{"hello"sv});
+    w.dispatch("topic"sv, zmq::Part{"hello"sv});
 
-    testWaitForEvent(w, 5s, Event::Notification::Success, Event::Type::Delivery, "hello");
+    testWaitForTopic(w, mkT("topic", 0, "hello"), 1);
 }
 
 
@@ -299,7 +453,7 @@ BOOST_FIXTURE_TEST_CASE(testWaitForEventThreadSafe, WorkerFixture)
     const int iterations = 100;
 
     for (int i = 0; i < iterations; ++i)
-        w.dispatch(zmq::Part{"hello"sv});
+        w.dispatch("topic"sv, zmq::Part{"hello"sv});
 
     auto f1 = std::async(std::launch::async, recvEvent);
     auto f2 = std::async(std::launch::async, recvEvent);
@@ -318,11 +472,10 @@ BOOST_FIXTURE_TEST_CASE(testWaitForEventDiscard, WorkerFixture)
     // produce some events
     const int iterations = 3;
     for (int i = 0; i < iterations; ++i)
-        w.dispatch(zmq::Part{"hello1"sv});
+        w.dispatch("t1"sv, zmq::Part{"hello1"sv});
 
     // receive just one event
-    testWaitForEvent(w, 1500ms, Event::Notification::Success,
-        Event::Type::Delivery, "hello1");
+    testWaitForTopic(w, mkT("t1", 0, "hello1"), 1);
 
     // wait for other events to be received
     std::this_thread::sleep_for(1s);
@@ -335,7 +488,7 @@ BOOST_FIXTURE_TEST_CASE(testWaitForEventDiscard, WorkerFixture)
     // discard old events
     for (int i = 0; i < iterations - 1; ++i) {
         testWaitForEvent(w, 1500ms, Event::Notification::Discard,
-            Event::Type::Delivery, "hello1");
+            Event::Type::Delivery, mkT("t1", i + 2, "hello1"));
     }
 
     // discard old stop event
@@ -343,15 +496,14 @@ BOOST_FIXTURE_TEST_CASE(testWaitForEventDiscard, WorkerFixture)
     testWaitForEvent(w, 1500ms, Event::Notification::Discard, Event::Type::Stopped);
 
     // receive new start event
-    testWaitForEvent(w, 1500ms, Event::Notification::Success, Event::Type::Started);
+    testWaitForEvent(w, 1500ms, Event::Notification::Success, Event::Type::Started, mkCnf(w.uuid(), 3, {}));
     testWaitForEvent(w, 1500ms, Event::Notification::Success, Event::Type::Online);
 
     // produce a new event
-    w.dispatch(zmq::Part{"hello2"sv});
+    w.dispatch("t2"sv, zmq::Part{"hello2"sv});
 
     // receive new events
-    testWaitForEvent(w, 1500ms, Event::Notification::Success,
-        Event::Type::Delivery, "hello2");
+    testWaitForTopic(w, mkT("t2", 0, "hello2"), 4);
 }
 
 
@@ -359,28 +511,24 @@ BOOST_FIXTURE_TEST_CASE(testSyncEmpty, WorkerFixture)
 {
     w.sync();
 
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncDownloadOn);
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncBegin);
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncSuccess);
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncDownloadOff);
+    testWaitForSyncStart(w, b);
+    testWaitForSyncStop(w, b);
 }
 
 
 BOOST_FIXTURE_TEST_CASE(testSyncElement, WorkerFixture)
 {
-    w.dispatch(zmq::Part{"hello1"sv});
-    w.dispatch(zmq::Part{"hello2"sv});
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Delivery, "hello1");
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Delivery, "hello2");
+    w.dispatch("t1"sv, zmq::Part{"hello1"sv});
+    w.dispatch("t2"sv, zmq::Part{"hello2"sv});
+    testWaitForTopic(w, mkT("t1", 1, "hello1"), 1);
+    testWaitForTopic(w, mkT("t2", 2, "hello2"), 2);
 
     w.sync();
 
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncDownloadOn);
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncBegin);
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncElement, "hello1");
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncElement, "hello2");
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncSuccess);
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncDownloadOff);
+    testWaitForSyncStart(w, b);
+    testWaitForSyncTopic(w, mkT("t1", 1, "hello1"), 1);
+    testWaitForSyncTopic(w, mkT("t2", 2, "hello2"), 2);
+    testWaitForSyncStop(w, b);
 }
 
 
@@ -390,16 +538,16 @@ BOOST_AUTO_TEST_CASE(testSyncError_Halt)
 
     auto wf = w.start();
 
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Started);
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Started, mkCnf(w.uuid()));
 
     w.sync();
 
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncDownloadOn);
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncBegin);
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncRequest);
 
     w.stop();
 
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncError);
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncError, Uuid{});
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncDownloadOff);
 
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Stopped);
@@ -412,17 +560,368 @@ BOOST_AUTO_TEST_CASE(testSyncError_Timeout)
 
     auto wf = w.start();
 
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Started);
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Started, mkCnf(w.uuid()));
 
     w.sync();
 
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncDownloadOn);
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncBegin);
-    testWaitForEvent(w, 5s, Event::Notification::Success, Event::Type::SyncBegin);
-    testWaitForEvent(w, 5s, Event::Notification::Success, Event::Type::SyncError);
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncRequest);
+    testWaitForEvent(w, 5s, Event::Notification::Success, Event::Type::SyncRequest);
+    testWaitForEvent(w, 5s, Event::Notification::Success, Event::Type::SyncError, Uuid{});
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncDownloadOff);
 
     w.stop();
+}
+
+
+BOOST_FIXTURE_TEST_CASE(testSyncTopicRecentSameWorker, WorkerFixture)
+{
+    w.dispatch("topic"sv, zmq::Part{"hello1"sv});
+    w.dispatch("topic"sv, zmq::Part{"hello2"sv});
+
+    testWaitForTopic(w, mkT("topic", 0, "hello1"), 1);
+    testWaitForTopic(w, mkT("topic", 0, "hello2"), 2);
+
+    w.sync();
+
+    testWaitForSyncStart(w, b);
+    testWaitForSyncTopic(w, mkT("topic", 2, "hello2"), 2);
+    testWaitForSyncStop(w, b);
+}
+
+
+BOOST_FIXTURE_TEST_CASE(testSyncTopicRecentAnotherWorker, WorkerFixture)
+{
+    auto wid2 = Uuid::createNamespaceUuid(Uuid::Ns::Dns, "worker2.net"sv);
+    Worker w2(wid2);
+    auto wf2 = w2.start();
+
+    testWaitForStart(w2);
+
+    w.dispatch("topic"sv, zmq::Part{"hello1"sv});
+    w.dispatch("topic"sv, zmq::Part{"hello1"sv});
+
+    auto t1 = mkT("topic", 2, "hello1");
+    auto t2 = mkT("topic", 1, "hello2").withWorker(wid2);
+
+    testWaitForTopic(w, t1, 1);
+    testWaitForTopic(w, t1, 2);
+    testWaitForTopic(w2, t1, 1);
+    testWaitForTopic(w2, t1, 2);
+
+    w2.dispatch("topic"sv, zmq::Part{"hello2"sv});
+
+    testWaitForTopic(w, t2, 1);
+    testWaitForTopic(w2, t2, 1);
+
+    w.sync();
+
+    testWaitForSyncStart(w, b);
+    testWaitForSyncTopic(w, t2, 1);
+    testWaitForSyncStop(w, b);
+
+    w2.stop();
+    wf2.get();
+
+    testWaitForStop(w2);
+}
+
+
+BOOST_AUTO_TEST_CASE(testTopicSubscriptionInvalid)
+{
+    Worker w(WorkerFixture::wid);
+    w.setTopicNames({"UPDT"sv});
+    auto wf = w.start();
+    BOOST_TEST(w.isRunning());
+    BOOST_REQUIRE_THROW(wf.get(), err::Error);
+    BOOST_TEST(!w.isRunning());
+}
+
+
+BOOST_AUTO_TEST_CASE(testTopicSubscriptionSimple)
+{
+    Broker b(WorkerFixture::bid);
+    Worker w(WorkerFixture::wid);
+
+    w.setTopicNames({"short topic"sv, "very long topic 12345"sv});
+
+    auto bf = b.start();
+    auto wf = w.start();
+
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Started,
+        mkCnf(w.uuid(), 0, {"short topic"sv, "very long topic"sv}));
+
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Online);
+
+    w.dispatch("short topic"sv, zmq::Part{"hello1"sv});
+    w.dispatch("very long topic"sv, zmq::Part{"hello2"sv});
+    w.dispatch("another topic"sv, zmq::Part{"hello3"sv});
+
+    testWaitForTopic(w, mkT("short topic", 0, "hello1"), 1);
+    testWaitForTopic(w, mkT("very long topic", 0, "hello2"), 2);
+
+    testWaitForEvent(w, 3s, Event::Notification::Timeout, Event::Type::Invalid);
+
+    w.stop();
+    b.stop();
+
+    wf.get();
+    bf.get();
+}
+
+
+BOOST_FIXTURE_TEST_CASE(testSeqnNotify, WorkerFixture)
+{
+    // test initial value
+    BOOST_TEST(w.seqNumber() == 0ull);
+
+    auto t1 = mkT("topic", 0, "hello");
+
+    // test final value
+    w.dispatch("topic"sv, zmq::Part{"hello"sv});
+    w.dispatch("topic"sv, zmq::Part{"hello"sv});
+    w.dispatch("topic"sv, zmq::Part{"hello"sv});
+
+    testWaitForTopic(w, t1, 1);
+    testWaitForTopic(w, t1, 2);
+    testWaitForTopic(w, t1, 3);
+
+    BOOST_TEST(w.seqNumber() == 3ull);
+    BOOST_TEST(w.seqNumber() == 3ull);
+    BOOST_TEST(w.seqNumber() == 3ull);
+
+    w.dispatch("topic"sv, zmq::Part{"hello"sv});
+
+    testWaitForTopic(w, t1, 4);
+
+    BOOST_TEST(w.seqNumber() == 4ull);
+
+    // stop
+    w.stop();
+    wf.get();
+
+    testWaitForStop(w);
+
+    // start again
+    wf = w.start();
+
+    testWaitForEvent(w, 1500ms, Event::Notification::Success, Event::Type::Started, mkCnf(w.uuid(), 4, {}));
+    testWaitForEvent(w, 1500ms, Event::Notification::Success, Event::Type::Online);
+
+    w.dispatch("topic"sv, zmq::Part{"hello"sv});
+
+    testWaitForTopic(w, t1, 5);
+
+    BOOST_TEST(w.seqNumber() == 5ull);
+}
+
+
+BOOST_AUTO_TEST_CASE(testSeqnMaxDelivery)
+{
+    // setup two identical workers
+    Broker b(Uuid::createRandomUuid());
+    Worker w1(Uuid::createRandomUuid());
+    Worker w2(w1.uuid());
+    Worker w3(Uuid::createRandomUuid());
+
+    auto bf = b.start();
+    auto wf1 = w1.start();
+    auto wf2 = w2.start();
+    auto wf3 = w3.start();
+
+    for (auto w : {&w1, &w2, &w3})
+        testWaitForStart(*w);
+
+    const auto t1 = Topic{b.uuid(), w1.uuid(), 0, "topic"sv, zmq::Part{"hello"sv}};
+
+    // primary worker increments sequence number.
+    for (auto i = 1; i <= 3; ++i) {
+        w1.dispatch(t1.name(), t1.data());
+
+        for (auto w : {&w1, &w2, &w3})
+            testWaitForTopic(*w, t1, i);
+    }
+
+    b.stop();
+    w1.stop();
+    w2.stop();
+    w3.stop();
+
+    for (auto w : {&w1, &w2, &w3})
+        testWaitForStop(*w);
+
+    // clone worker keeps the maximum delivered sequence number.
+    BOOST_TEST(w1.seqNumber() == 3u);
+    BOOST_TEST(w2.seqNumber() == 3u);
+    BOOST_TEST(w3.seqNumber() == 0u);
+}
+
+
+BOOST_AUTO_TEST_CASE(testBrokerDiscardDelivery)
+{
+    // setup two identical workers
+    Broker b(Uuid::createRandomUuid());
+    Worker w1(Uuid::createRandomUuid());
+    Worker w2(w1.uuid());
+
+    const auto t1 = Topic{b.uuid(), w1.uuid(), 0, "topic"sv, zmq::Part{"hello"sv}};
+    const auto t2 = Topic{b.uuid(), w2.uuid(), 0, "topic"sv, zmq::Part{"hello"sv}};
+
+    auto bf = b.start();
+    auto wf1 = w1.start();
+
+    testWaitForStart(w1);
+
+    // primary worker increments sequence number.
+    for (auto i = 1; i <= 3; ++i) {
+        w1.dispatch(t1.name(), t1.data());
+        testWaitForTopic(w1, t1, i);
+    }
+
+    // clone will dispatch topics, broker shall discard them.
+    auto wf2 = w2.start();
+
+    testWaitForStart(w2);
+
+    for (auto i = 1; i <= 2; ++i)
+        w2.dispatch(t2.name(), t2.data());
+
+    testWaitForEvent(w1, 2s, Event::Notification::Timeout, Event::Type::Invalid);
+    testWaitForEvent(w2, 2s, Event::Notification::Timeout, Event::Type::Invalid);
+
+    b.stop();
+    w1.stop();
+    w2.stop();
+
+    testWaitForStop(w1);
+    testWaitForStop(w2);
+
+    // primary worker keeps previous sequence number.
+    BOOST_TEST(w1.seqNumber() == 3u);
+    BOOST_TEST(w2.seqNumber() == 2u);
+}
+
+
+BOOST_AUTO_TEST_CASE(testWorkerDiscardDelivery)
+{
+    // setup two identical workers
+    Broker b(Uuid::createRandomUuid());
+    Worker w1(Uuid::createRandomUuid());
+    Worker w2(w1.uuid());
+
+    const auto t1 = Topic{b.uuid(), w1.uuid(), 0, "topic"sv, zmq::Part{"hello"sv}};
+    const auto t2 = Topic{b.uuid(), w2.uuid(), 0, "topic"sv, zmq::Part{"hello"sv}};
+
+    auto bf = b.start();
+    auto wf1 = w1.start();
+
+    testWaitForStart(w1);
+
+    // primary worker increments sequence number.
+    for (auto i = 1; i <= 3; ++i) {
+        w1.dispatch(t1.name(), t1.data());
+        testWaitForTopic(w1, t1, i);
+    }
+
+    // clone will dispatch topics, worker shall discard them, restart broker.
+    b.stop();
+    bf.get();
+    bf = b.start();
+    auto wf2 = w2.start();
+
+    testWaitForStart(w2);
+
+    for (auto i = 1; i <= 2; ++i) {
+        w2.dispatch(t2.name(), t2.data());
+        testWaitForTopic(w2, t2, i);
+    }
+
+    testWaitForEvent(w1, 2s, Event::Notification::Timeout, Event::Type::Invalid);
+
+    // primary worker keeps previous sequence number.
+    BOOST_TEST(w1.seqNumber() == 3u);
+    BOOST_TEST(w2.seqNumber() == 2u);
+
+    // primary gets new updates.
+    for (auto i = 3; i <= 4; ++i) {
+        w2.dispatch(t2.name(), t2.data());
+        testWaitForTopic(w2, t2, i);
+    }
+
+    testWaitForTopic(w1, t2, 4);
+
+    b.stop();
+    w1.stop();
+    w2.stop();
+
+    testWaitForStop(w1);
+    testWaitForStop(w2);
+
+    BOOST_TEST(w1.seqNumber() == 4u);
+    BOOST_TEST(w2.seqNumber() == 4u);
+}
+
+
+BOOST_AUTO_TEST_CASE(testWorkerSeqSync)
+{
+    // setup two identical workers
+    Broker b(Uuid::createRandomUuid());
+    Worker w1(Uuid::createRandomUuid());
+    Worker w2(w1.uuid());
+
+    const std::vector<Topic> t{
+        {b.uuid(), w1.uuid(), 0, "topic1"sv, zmq::Part{"hello1"sv}},
+        {b.uuid(), w1.uuid(), 0, "topic2"sv, zmq::Part{"hello2"sv}},
+        {b.uuid(), w1.uuid(), 0, "topic3"sv, zmq::Part{"hello3"sv}},
+        {b.uuid(), w1.uuid(), 0, "topic4"sv, zmq::Part{"hello4"sv}},
+    };
+
+    auto bf = b.start();
+    auto wf1 = w1.start();
+
+    testWaitForStart(w1);
+
+    // primary worker increments sequence number.
+    for (auto i = 0; i < 4; ++i) {
+        w1.dispatch(t[i].name(), t[i].data());
+        testWaitForTopic(w1, t[i], i + 1);
+    }
+
+    BOOST_TEST(w1.seqNumber() == 4u);
+
+    // clone will sync with latest sequence number.
+    auto wf2 = w2.start();
+
+    testWaitForStart(w2);
+
+    BOOST_TEST(w2.seqNumber() == 0u);
+
+    // clone dispatches twice, broker will filter them out.
+    for (auto i = 0; i < 2; ++i)
+        w2.dispatch(t[i].name(), t[i].data());
+
+    testWaitForEvent(w2, 1500ms, Event::Notification::Timeout, Event::Type::Invalid);
+
+    BOOST_TEST(w2.seqNumber() == 2u);
+
+    // clone will get every topic, without sequence number filtering
+    w2.sync();
+
+    testWaitForSyncStart(w2, b);
+
+    for (auto i = 0; i < 4; ++i)
+        testWaitForSyncTopic(w2, t[i], i + 1);
+
+    testWaitForSyncStop(w2, b);
+
+    BOOST_TEST(w2.seqNumber() == 4u);
+
+    b.stop();
+    w1.stop();
+    w2.stop();
+
+    testWaitForStop(w1);
+    testWaitForStop(w2);
 }
 
 

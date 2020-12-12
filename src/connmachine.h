@@ -11,6 +11,8 @@
 #ifndef CONNMACHINE_H
 #define CONNMACHINE_H
 
+#include "fuurin/uuid.h"
+
 #include <functional>
 #include <chrono>
 #include <memory>
@@ -77,6 +79,7 @@ public:
      * Sockets are all closed.
      *
      * \param[in] name Description, used for logs and timers.
+     * \param[in] uuid Uuid, used for logs;
      * \param[in] zctx ZMQ context.
      * \param[in] retry Interval (in ms) for retry attempts.
      * \param[in] timeout Timeout (in ms) for the connection.
@@ -85,7 +88,7 @@ public:
      * \param[in] doPong Function to send reply to a ping.
      * \param[in] onChange Function called whenever the state changes.
      */
-    explicit ConnMachine(std::string_view name, zmq::Context* zctx,
+    explicit ConnMachine(std::string_view name, Uuid uuid, zmq::Context* zctx,
         std::chrono::milliseconds retry, std::chrono::milliseconds timeout,
         CloseFunc doClose, OpenFunc doOpen, PongFunc doPong, ChangeFunc onChange);
 
@@ -106,6 +109,11 @@ public:
      * \return Description for this state machine.
      */
     std::string_view name() const noexcept;
+
+    /**
+     * \return Uuid for this state machine.
+     */
+    Uuid uuid() const noexcept;
 
     /**
      * \return The current state.
@@ -201,6 +209,7 @@ private:
 
 private:
     const std::string_view name_; ///< Name to identify this state machine.
+    const Uuid uuid_;             ///< Uuid of the state machine's compenent.
 
     const CloseFunc doClose_;   ///< Function to close sockets.
     const OpenFunc doOpen_;     ///< Function to open sockets.

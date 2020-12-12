@@ -16,7 +16,6 @@
 #include "fuurin/zmqpartmulti.h"
 #include "fuurin/stopwatch.h"
 #include "failure.h"
-#include "types.h"
 #include "log.h"
 
 #include <boost/scope_exit.hpp>
@@ -33,14 +32,18 @@ namespace fuurin {
  * MAIN TASK
  */
 
-Runner::Runner()
-    : zctx_(std::make_unique<zmq::Context>())
+Runner::Runner(Uuid id)
+    : uuid_(id)
+    , zctx_(std::make_unique<zmq::Context>())
     , zops_(std::make_unique<zmq::Socket>(zctx_.get(), zmq::Socket::PAIR))
     , zopr_(std::make_unique<zmq::Socket>(zctx_.get(), zmq::Socket::PAIR))
     , zevs_(std::make_unique<zmq::Socket>(zctx_.get(), zmq::Socket::RADIO))
     , zevr_(std::make_unique<zmq::Socket>(zctx_.get(), zmq::Socket::DISH))
     , running_(false)
     , token_(0)
+    , endpDelivery_{{"ipc:///tmp/worker_delivery"}}
+    , endpDispatch_{{"ipc:///tmp/worker_dispatch"}}
+    , endpSnapshot_{{"ipc:///tmp/broker_snapshot"}}
 {
     zops_->setEndpoints({"inproc://runner-loop"});
     zopr_->setEndpoints({"inproc://runner-loop"});
@@ -67,9 +70,55 @@ Runner::~Runner() noexcept
 }
 
 
+Uuid Runner::uuid() const
+{
+    return uuid_;
+}
+
+
+void Runner::setEndpoints(const std::vector<std::string>& delivery,
+    const std::vector<std::string>& dispatch,
+    const std::vector<std::string>& snapshot)
+{
+    endpDelivery_ = delivery;
+    endpDispatch_ = dispatch;
+    endpSnapshot_ = snapshot;
+}
+
+
+std::vector<std::string> Runner::endpointDelivery() const
+{
+    return endpDelivery_;
+}
+
+
+std::vector<std::string> Runner::endpointDispatch() const
+{
+    return endpDispatch_;
+}
+
+
+std::vector<std::string> Runner::endpointSnapshot() const
+{
+    return endpSnapshot_;
+}
+
+
 bool Runner::isRunning() const noexcept
 {
     return running_;
+}
+
+
+zmq::Context* Runner::zmqCtx() const noexcept
+{
+    return zctx_.get();
+}
+
+
+zmq::Part Runner::prepareConfiguration() const
+{
+    return zmq::Part{};
 }
 
 
@@ -100,6 +149,8 @@ std::future<void> Runner::start()
         })]() {
             s->run();
         });
+
+    sendOperation(Operation::Type::Start, prepareConfiguration());
 
     commit = true;
     return ret;
@@ -159,13 +210,12 @@ Event Runner::recvEvent()
 
     ASSERT(std::strncmp(r.group(), GROUP_EVENTS, sizeof(GROUP_EVENTS)) == 0, "bad event group");
 
-    auto [tok, evt, pay] = zmq::PartMulti::unpack<token_type_t, Event::type_t, zmq::Part>(r);
-    ASSERT(evt >= toIntegral(Event::Type::Invalid) && evt < toIntegral(Event::Type::COUNT),
-        "Runner::recvEvent: bad event type");
+    auto [tok, ev] = zmq::PartMulti::unpack<token_type_t, zmq::Part>(r);
 
-    return Event{Event::Type(evt),
-        tok == token_ ? Event::Notification::Success : Event::Notification::Discard,
-        std::move(pay)};
+    return Event::fromPart(ev)
+        .withNotification(tok == token_
+                ? Event::Notification::Success
+                : Event::Notification::Discard);
 }
 
 
@@ -177,15 +227,38 @@ void Runner::sendOperation(Operation::Type oper) noexcept
 
 void Runner::sendOperation(Operation::Type oper, zmq::Part&& payload) noexcept
 {
-    const auto opt = Operation::type_t(oper);
-    ASSERT(opt >= toIntegral(Operation::Type::Invalid) && opt < toIntegral(Operation::Type::COUNT),
-        "Runner::sendOperation: bad operation type");
+    sendOperation(zops_.get(), token_, oper, std::move(payload));
+}
 
+
+void Runner::sendOperation(zmq::Socket* sock, token_type_t token, Operation::Type oper, zmq::Part&& payload) noexcept
+{
     try {
-        zops_->send(zmq::Part{token_}, zmq::Part{opt}, payload);
+        sock->send(zmq::Part{token},
+            Operation{oper, Operation::Notification::Success, payload}
+                .toPart());
     } catch (const std::exception& e) {
         LOG_FATAL(log::Arg{"runner"sv}, log::Arg{"operation send threw exception"sv},
             log::Arg{std::string_view(e.what())});
+    }
+}
+
+
+Operation Runner::recvOperation(zmq::Socket* sock, token_type_t token) noexcept
+{
+    try {
+        zmq::Part tok, oper;
+        sock->recv(&tok, &oper);
+        return Operation::fromPart(oper)
+            .withNotification(tok.toUint8() == token
+                    ? Operation::Notification::Success
+                    : Operation::Notification::Discard);
+
+    } catch (const std::exception& e) {
+        LOG_FATAL(log::Arg{"runner"sv}, log::Arg{"operation recv threw exception"sv},
+            log::Arg{std::string_view(e.what())});
+
+        return Operation{};
     }
 }
 
@@ -194,15 +267,14 @@ void Runner::sendOperation(Operation::Type oper, zmq::Part&& payload) noexcept
  * ASYNC TASK
  */
 
-Runner::Session::Session(token_type_t token, CompletionFunc onComplete,
-    const std::unique_ptr<zmq::Context>& zctx,
-    const std::unique_ptr<zmq::Socket>& zoper,
-    const std::unique_ptr<zmq::Socket>& zevent)
-    : token_(token)
-    , docompl_(onComplete)
-    , zctx_(zctx)
-    , zopr_(zoper)
-    , zevs_(zevent)
+Runner::Session::Session(Uuid id, token_type_t token, CompletionFunc onComplete,
+    zmq::Context* zctx, zmq::Socket* zoper, zmq::Socket* zevent)
+    : uuid_{id}
+    , token_{token}
+    , docompl_{onComplete}
+    , zctx_{zctx}
+    , zopr_{zoper}
+    , zevs_{zevent}
 {
 }
 
@@ -225,15 +297,9 @@ void Runner::Session::run()
 
     auto poll = createPoller();
 
-    // generate a start operation
-    {
-        auto oper = Operation{Operation::Type::Start, Operation::Notification::Success};
-        operationReady(&oper);
-    }
-
     for (;;) {
         for (auto s : poll->wait()) {
-            if (s != zopr_.get()) {
+            if (s != zopr_) {
                 socketReady(s);
                 continue;
             }
@@ -255,7 +321,7 @@ void Runner::Session::run()
 
 std::unique_ptr<zmq::PollerWaiter> Runner::Session::createPoller()
 {
-    auto poll = new zmq::Poller{zmq::PollerEvents::Type::Read, zopr_.get()};
+    auto poll = new zmq::Poller{zmq::PollerEvents::Type::Read, zopr_};
     return std::unique_ptr<zmq::PollerWaiter>{poll};
 }
 
@@ -272,32 +338,15 @@ void Runner::Session::socketReady(zmq::Pollable*)
 
 Operation Runner::Session::recvOperation() noexcept
 {
-    zmq::Part tok, oper, payload;
-
-    try {
-        zopr_->recv(&tok, &oper, &payload);
-    } catch (const std::exception& e) {
-        LOG_FATAL(log::Arg{"runner"sv}, log::Arg{"operation recv threw exception"sv},
-            log::Arg{std::string_view(e.what())});
-    }
-
-    const Operation::type_t opt = oper.toUint8();
-    ASSERT(opt >= toIntegral(Operation::Type::Invalid) && opt < toIntegral(Operation::Type::COUNT),
-        "Runner::recvOperation: bad operation type");
-
-    return Operation{Operation::Type(opt),
-        tok.toUint8() == token_ ? Operation::Notification::Success : Operation::Notification::Discard,
-        std::move(payload)};
+    return Runner::recvOperation(zopr_, token_);
 }
 
 
 void Runner::Session::sendEvent(Event::Type ev, zmq::Part&& pay)
 {
-    const auto evt = Event::type_t(ev);
-    ASSERT(evt >= toIntegral(Event::Type::Invalid) && evt < toIntegral(Event::Type::COUNT),
-        "Runner::sendEvent: bad event type");
-
-    zevs_->send(zmq::PartMulti::pack(token_, evt, pay).withGroup(GROUP_EVENTS));
+    zevs_->send(zmq::PartMulti::pack(token_,
+        Event{ev, Event::Notification::Success, pay}.toPart())
+                    .withGroup(GROUP_EVENTS));
 }
 
 } // namespace fuurin

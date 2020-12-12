@@ -246,6 +246,44 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(partMultiStringType, T, partMultiStringTypes)
 }
 
 
+typedef boost::mpl::list<char, unsigned char> partMultiArrayItemTypes;
+
+BOOST_AUTO_TEST_CASE_TEMPLATE(partMultiCharArray, T, partMultiArrayItemTypes)
+{
+    using A = std::array<T, 5>;
+
+    auto mkArr = []() {
+        return A{'a', 'b', 'c', 'd', 'e'};
+    };
+
+    auto val = mkArr();
+    Part a = PartMulti::pack(val);
+    std::tuple<A> t = PartMulti::unpack<A>(a);
+
+    BOOST_TEST(a.size() == val.size());
+    BOOST_TEST(std::tuple_size_v<decltype(t)> == size_t(1));
+    BOOST_TEST(std::get<0>(t).size() == val.size());
+    BOOST_TEST(std::memcmp(std::get<0>(t).data(), val.data(), val.size()) == 0);
+
+    // pack template variations
+    auto val1 = mkArr();
+    auto const val2 = mkArr();
+    auto& val3 = val1;
+    auto const& val4 = mkArr();
+    Part a1 = PartMulti::pack(val1);
+    Part a2 = PartMulti::pack(val2);
+    Part a3 = PartMulti::pack(val3);
+    Part a4 = PartMulti::pack(val4);
+    Part a5 = PartMulti::pack(mkArr());
+
+    BOOST_TEST(std::memcmp(a1.data(), val.data(), val.size()) == 0);
+    BOOST_TEST(std::memcmp(a2.data(), val.data(), val.size()) == 0);
+    BOOST_TEST(std::memcmp(a3.data(), val.data(), val.size()) == 0);
+    BOOST_TEST(std::memcmp(a4.data(), val.data(), val.size()) == 0);
+    BOOST_TEST(std::memcmp(a5.data(), val.data(), val.size()) == 0);
+}
+
+
 BOOST_AUTO_TEST_CASE(partMultiMore)
 {
     Part a = PartMulti::pack(uint32_t(3), uint32_t(14),
@@ -304,6 +342,61 @@ BOOST_AUTO_TEST_CASE(partMultiUnpackStringErr)
     Part b = PartMulti::pack<PartMulti::string_length_t>(1);
     BOOST_REQUIRE_THROW(PartMulti::unpack<std::string>(b),
         fuurin::err::ZMQPartAccessFailed);
+}
+
+
+BOOST_AUTO_TEST_CASE(partMultiPackIter)
+{
+    // Pack same data from a container.
+    std::list<std::string> src = {"rosemary", "basil", "pepper"};
+    Part a = PartMulti::pack(src.begin(), src.end());
+    BOOST_TEST(a.size() == 20u + 19u);
+
+    std::list<std::string> dst1{3};
+    PartMulti::unpack(a, dst1.begin());
+
+    std::string dst2[3];
+    PartMulti::unpack(a, &dst2[0]);
+
+    std::list<std::string> dst3;
+    PartMulti::unpack(a, std::back_inserter(dst3));
+
+    std::list<std::string> dst4;
+    PartMulti::unpack(a, std::front_inserter(dst4));
+    std::reverse(dst4.begin(), dst4.end());
+
+    std::list<std::string> dst5;
+    PartMulti::unpack(a, std::inserter(dst5, dst5.begin()));
+
+    std::list<std::string> dst6;
+    PartMulti::unpack<std::string>(a, [&dst6](const std::string& s) {
+        dst6.push_back(s);
+    });
+
+    BOOST_TEST(src == dst1);
+    BOOST_TEST(src == dst2);
+    BOOST_TEST(src == dst3);
+    BOOST_TEST(src == dst4);
+    BOOST_TEST(src == dst5);
+    BOOST_TEST(src == dst6);
+
+
+    // This one should stress the pack template type inference,
+    // it must not pick the iterator version.
+    Part b = PartMulti::pack<uint8_t, uint8_t>(10u, 20u);
+    auto [n1, n2] = PartMulti::unpack<uint8_t, uint8_t>(b);
+    BOOST_TEST(n1 == 10u);
+    BOOST_TEST(n2 == 20u);
+
+
+    // Pack an empty container.
+    std::list<std::string> empty1;
+    Part c = PartMulti::pack(empty1.begin(), empty1.end());
+    BOOST_TEST(c.size() == 8u);
+
+    std::list<std::string> empty2;
+    PartMulti::unpack(c, std::back_inserter(empty2));
+    BOOST_TEST(empty2.empty());
 }
 
 
@@ -644,6 +737,34 @@ BOOST_AUTO_TEST_CASE(tryTransferMultiPart, *utf::timeout(2))
     BOOST_TEST(m2.toUint32() == b);
 
     transferTeardown({ctx, s1, s2});
+}
+
+
+BOOST_AUTO_TEST_CASE(hasMoreParts, *utf::timeout(2))
+{
+    Context ctx;
+    Socket s1{&ctx, Socket::Type::PUSH};
+    Socket s2{&ctx, Socket::Type::PULL};
+
+    s1.setEndpoints({"inproc://transfer"});
+    s2.setEndpoints({"inproc://transfer"});
+
+    s1.connect();
+    s2.bind();
+
+    int n = s1.send(Part{uint8_t(1)}, Part{uint16_t(2)});
+    BOOST_REQUIRE(n == 3);
+
+    Part r;
+    n = s2.tryRecv(&r);
+    BOOST_REQUIRE(n == 1);
+    BOOST_REQUIRE(r.toUint8() == 1u);
+    BOOST_REQUIRE(r.hasMore());
+
+    n = s2.tryRecv(&r);
+    BOOST_REQUIRE(n == 2);
+    BOOST_REQUIRE(r.toUint16() == 2u);
+    BOOST_REQUIRE(!r.hasMore());
 }
 
 
@@ -1033,6 +1154,106 @@ BOOST_AUTO_TEST_CASE(socketRadioDish)
     BOOST_TEST(s2.recv(&r) == 9);
     BOOST_TEST(r.toString() == "Godfather"s);
     BOOST_TEST("Movies"s == r.group());
+}
+
+
+BOOST_AUTO_TEST_CASE(testHighWaterMarkOption)
+{
+    Context ctx;
+    Socket s1{&ctx, Socket::Type::PUSH};
+    Socket s2{&ctx, Socket::Type::PULL};
+
+    s1.setEndpoints({"inproc://transfer1"});
+    s2.setEndpoints({"inproc://transfer1"});
+
+    const int hwm = 255;
+
+    s1.setHighWaterMark(hwm, hwm);
+    s2.setHighWaterMark(hwm, hwm);
+
+    s1.connect();
+    s2.bind();
+
+    // send until high water mark
+    for (auto v = 0; v <= hwm; ++v) {
+        const int w = s1.trySend(Part{uint8_t(v)});
+        BOOST_REQUIRE(w == 1);
+    }
+
+    // exceeding message
+    bool notSent = false;
+    for (auto v = 0; v <= 10 * hwm; ++v) {
+        const int w = s1.trySend(Part{uint8_t(v)});
+        if (w == -1) {
+            notSent = true;
+            break;
+        }
+    }
+    BOOST_REQUIRE(notSent);
+
+    Poller poll{PollerEvents::Type::Read, 0s, &s2};
+
+    for (auto v = 0; v <= hwm; ++v) {
+        BOOST_REQUIRE(!poll.wait().empty());
+
+        Part r;
+        s2.recv(&r);
+        BOOST_REQUIRE(r.toUint8() == v);
+    }
+}
+
+
+BOOST_AUTO_TEST_CASE(testConflateOption)
+{
+    Context ctx;
+    Socket s1{&ctx, Socket::Type::PUSH};
+    Socket s2{&ctx, Socket::Type::PULL};
+
+    s1.setEndpoints({"inproc://transfer1"});
+    s2.setEndpoints({"inproc://transfer1"});
+
+    s1.setHighWaterMark(1, 1);
+    s2.setHighWaterMark(1, 1);
+
+    s1.setConflate(true);
+    s2.setConflate(true);
+
+    s1.connect();
+    s2.bind();
+
+    for (auto v = 0; v <= 255; ++v) {
+        const int w = s1.trySend(Part{uint8_t(v)});
+        BOOST_REQUIRE(w == 1);
+    }
+
+    Poller poll{PollerEvents::Type::Read, 0s, &s2};
+
+    BOOST_REQUIRE(!poll.wait().empty());
+
+    Part r;
+    s2.recv(&r);
+    BOOST_TEST(r.toUint8() == 255);
+
+    BOOST_REQUIRE(poll.wait().empty());
+}
+
+
+BOOST_AUTO_TEST_CASE(testInprocNoIOThread)
+{
+    Context ctx;
+    Socket s1{&ctx, Socket::Type::PUSH};
+    Socket s2{&ctx, Socket::Type::PULL};
+
+    s1.setEndpoints({"inproc://transfer1"});
+    s2.setEndpoints({"inproc://transfer1"});
+
+    s1.connect();
+    s2.bind();
+
+    Part r;
+    BOOST_REQUIRE(s2.tryRecv(&r) == -1);
+    BOOST_REQUIRE(s1.trySend(Part{uint64_t(1)}) == sizeof(uint64_t));
+    BOOST_REQUIRE(s2.tryRecv(&r) == sizeof(uint64_t));
 }
 
 

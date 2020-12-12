@@ -11,6 +11,8 @@
 #ifndef SYNCMACHINE_H
 #define SYNCMACHINE_H
 
+#include "fuurin/uuid.h"
+
 #include <functional>
 #include <chrono>
 #include <memory>
@@ -101,6 +103,7 @@ public:
      * \brief Constructor.
      *
      * \param[in] name Description, used for logs and timers.
+     * \param[in] uuid Uuid, used for logs;
      * \param[in] zctx ZMQ context.
      * \param[in] maxIndex Maximum index of sockets (must NOT be negative).
      * \param[in] maxRetry Maximum retry count (must NOT be negative).
@@ -110,7 +113,7 @@ public:
      * \param[in] sync \see SyncFunc.
      * \param[in] change \see ChangeFunc.
      */
-    explicit SyncMachine(std::string_view name, zmq::Context* zctx,
+    explicit SyncMachine(std::string_view name, Uuid uuid, zmq::Context* zctx,
         int maxIndex, int maxRetry, std::chrono::milliseconds timeout,
         CloseFunc close, OpenFunc open, SyncFunc sync, ChangeFunc change);
 
@@ -131,6 +134,11 @@ public:
      * \return Description for this state machine.
      */
     std::string_view name() const noexcept;
+
+    /**
+     * \return Uuid for this state machine.
+     */
+    Uuid uuid() const noexcept;
 
     /**
      * \return The current state.
@@ -319,6 +327,7 @@ private:
 
 private:
     const std::string_view name_; ///< Name to identify this state machine.
+    const Uuid uuid_;             ///< Uuid to identify this state machine.
     const int indexMax_;          ///< Maximum sockets' index value.
     const int retryMax_;          ///< Maximum number of retry attempts.
 
