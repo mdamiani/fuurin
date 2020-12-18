@@ -598,7 +598,7 @@ BOOST_AUTO_TEST_CASE(testTopicSubscriptionSimple)
     testWaitForTopic(w, mkT("short topic", 0, "hello1"), 1);
     testWaitForTopic(w, mkT("very long topic", 0, "hello2"), 2);
 
-    testWaitForEvent(w, 3s, Event::Notification::Timeout, Event::Type::Invalid);
+    testWaitForTimeout(w);
 
     w.stop();
     b.stop();
@@ -724,8 +724,8 @@ BOOST_AUTO_TEST_CASE(testBrokerDiscardDelivery)
     for (auto i = 1; i <= 2; ++i)
         w2.dispatch(t2.name(), t2.data());
 
-    testWaitForEvent(w1, 2s, Event::Notification::Timeout, Event::Type::Invalid);
-    testWaitForEvent(w2, 2s, Event::Notification::Timeout, Event::Type::Invalid);
+    testWaitForTimeout(w1);
+    testWaitForTimeout(w2);
 
     b.stop();
     w1.stop();
@@ -774,7 +774,7 @@ BOOST_AUTO_TEST_CASE(testWorkerDiscardDelivery)
         testWaitForTopic(w2, t2, i);
     }
 
-    testWaitForEvent(w1, 2s, Event::Notification::Timeout, Event::Type::Invalid);
+    testWaitForTimeout(w1);
 
     // primary worker keeps previous sequence number.
     BOOST_TEST(w1.seqNumber() == 3u);
@@ -838,7 +838,7 @@ BOOST_AUTO_TEST_CASE(testWorkerSeqSync)
     for (auto i = 0; i < 2; ++i)
         w2.dispatch(t[i].name(), t[i].data());
 
-    testWaitForEvent(w2, 1500ms, Event::Notification::Timeout, Event::Type::Invalid);
+    testWaitForTimeout(w2);
 
     BOOST_TEST(w2.seqNumber() == 2u);
 

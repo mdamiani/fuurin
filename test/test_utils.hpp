@@ -95,4 +95,10 @@ Event testWaitForSyncTopic(Worker& w, Topic t, int seqn)
     return testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncElement, t.withSeqNum(seqn));
 }
 
+
+Event testWaitForTimeout(Worker& w)
+{
+    return testWaitForEvent(w, 3s, Event::Notification::Timeout, Event::Type::Invalid);
+}
+
 #endif // FUURIN_TEST_UTILS_H

@@ -184,21 +184,28 @@ void Broker::BrokerSession::socketReady(zmq::Pollable* pble)
 
 void Broker::BrokerSession::collectWorkerMessage(zmq::Part&& payload)
 {
-    const auto paysz = payload.size();
-    UNUSED(paysz);
-
     if (std::strncmp(payload.group(), WORKER_HUGZ, sizeof(WORKER_HUGZ)) == 0) {
         // TODO: extract the message
         if (!zhugz_->isActive())
             zhugz_->start();
 
     } else if (std::strncmp(payload.group(), WORKER_UPDT, sizeof(WORKER_UPDT)) == 0) {
-        LOG_DEBUG(log::Arg{"broker"sv, uuid_.toShortString()}, log::Arg{"dispatch"sv},
-            log::Arg{"size"sv, int(paysz)});
-
         const auto t = Topic::fromPart(payload).withBroker(uuid_);
-        if (!storeTopic(t))
+
+        if (!storeTopic(t)) {
+            LOG_DEBUG(log::Arg{"broker"sv, uuid_.toShortString()}, log::Arg{"discard"sv},
+                log::Arg{"from"sv, t.worker().toShortString()},
+                log::Arg{"name"sv, std::string_view(t.name())},
+                log::Arg{"seqn"sv, int(t.seqNum())}, // FIXME: fix cast to int.
+                log::Arg{"size"sv, int(t.data().size())});
             return;
+        }
+
+        LOG_DEBUG(log::Arg{"broker"sv, uuid_.toShortString()}, log::Arg{"dispatch"sv},
+            log::Arg{"from"sv, t.worker().toShortString()},
+            log::Arg{"name"sv, std::string_view(t.name())},
+            log::Arg{"seqn"sv, int(t.seqNum())}, // FIXME: fix cast to int.
+            log::Arg{"size"sv, int(t.data().size())});
 
         /**
          * Topic is sent twice, both to the global group

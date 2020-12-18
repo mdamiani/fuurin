@@ -12,8 +12,11 @@
 #include <boost/test/unit_test.hpp>
 #include <boost/test/data/test_case.hpp>
 
+#include "test_utils.hpp"
+
 #include "fuurin/broker.h"
 #include "fuurin/worker.h"
+#include "fuurin/topic.h"
 #include "fuurin/zmqcontext.h"
 #include "fuurin/zmqsocket.h"
 #include "fuurin/zmqpart.h"
@@ -24,6 +27,10 @@
 #include <memory>
 #include <future>
 #include <string_view>
+
+
+#define WORKER_HUGZ "HUGZ"
+#define WORKER_UPDT "UPDT"
 
 
 using namespace fuurin;
@@ -48,6 +55,8 @@ public:
 
         stopRcv_->bind();
         stopSnd_->connect();
+
+        dispatchFrom_->setGroups({WORKER_HUGZ, WORKER_UPDT});
     }
 
     void setEndpoints(const std::string& dispFrom, const std::string& dispTo)
@@ -99,6 +108,16 @@ private:
 };
 
 
+WorkerConfig mkCnf(const Worker& w, Topic::SeqN seqn = 0,
+    const std::vector<Topic::Name>& names = {},
+    const std::vector<std::string>& endp1 = {"ipc:///tmp/worker_delivery"},
+    const std::vector<std::string>& endp2 = {"ipc:///tmp/worker_dispatch"},
+    const std::vector<std::string>& endp3 = {"ipc:///tmp/broker_snapshot"})
+{
+    return WorkerConfig{w.uuid(), seqn, names, endp1, endp2, endp3};
+}
+
+
 BOOST_AUTO_TEST_CASE(testRedundantDispatch)
 {
     Broker b;
@@ -108,9 +127,11 @@ BOOST_AUTO_TEST_CASE(testRedundantDispatch)
 
     const std::vector<std::string> delivery{"ipc:///tmp/worker_delivery"};
     const std::vector<std::string> snapshot{"ipc:///tmp/broker_snapshot"};
+    const std::vector<std::string> dispatch{"ipc:///tmp/dispatch_b1", "ipc:///tmp/dispatch_b2"};
+    const std::vector<std::string> forwards{"ipc:///tmp/dispatch_f1", "ipc:///tmp/dispatch_f2"};
 
-    b.setEndpoints(delivery, {"ipc:///tmp/dispatch_b1", "ipc:///tmp/dispatch_b2"}, snapshot);
-    w.setEndpoints(delivery, {"ipc:///tmp/dispatch_f1", "ipc:///tmp/dispatch_f2"}, snapshot);
+    b.setEndpoints(delivery, dispatch, snapshot);
+    w.setEndpoints(delivery, forwards, snapshot);
     f1.setEndpoints("ipc:///tmp/dispatch_f1", "ipc:///tmp/dispatch_b1");
     f2.setEndpoints("ipc:///tmp/dispatch_f2", "ipc:///tmp/dispatch_b2");
 
@@ -119,8 +140,22 @@ BOOST_AUTO_TEST_CASE(testRedundantDispatch)
     auto f1f = f1.start();
     auto f2f = f2.start();
 
+    testWaitForStart(w, mkCnf(w, 0, {}, delivery, forwards, snapshot));
+
+    auto t1 = Topic{b.uuid(), w.uuid(), 0, "topic1"sv, zmq::Part{"hello1"sv}};
+    auto t2 = Topic{b.uuid(), w.uuid(), 0, "topic2"sv, zmq::Part{"hello2"sv}};
+
+    w.dispatch(t1.name(), t1.data());
+    w.dispatch(t2.name(), t2.data());
+
+    testWaitForTopic(w, t1, 1);
+    testWaitForTopic(w, t2, 2);
+    testWaitForTimeout(w);
+
     b.stop();
     w.stop();
     f1.stop();
     f2.stop();
+
+    testWaitForStop(w);
 }
