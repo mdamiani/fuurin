@@ -49,6 +49,7 @@ public:
         , stopRcv_{std::make_unique<zmq::Socket>(zctx_.get(), zmq::Socket::PAIR)}
         , dispatchFrom_{std::make_unique<zmq::Socket>(zctx_.get(), zmq::Socket::DISH)}
         , dispatchTo_{std::make_unique<zmq::Socket>(zctx_.get(), zmq::Socket::RADIO)}
+        , enabled_{true}
     {
         stopSnd_->setEndpoints({"inproc://forwarder-stop"});
         stopRcv_->setEndpoints({"inproc://forwarder-stop"});
@@ -87,7 +88,8 @@ public:
                 if (s == dispatchFrom_.get()) {
                     zmq::Part p;
                     dispatchFrom_->recv(&p);
-                    dispatchTo_->send(p);
+                    if (enabled_)
+                        dispatchTo_->send(p);
 
                 } else if (s == stopRcv_.get()) {
                     zmq::Part p;
@@ -98,6 +100,11 @@ public:
         }
     }
 
+    void setEnabled(bool v)
+    {
+        enabled_ = v;
+    }
+
 
 private:
     const std::unique_ptr<zmq::Context> zctx_;
@@ -105,6 +112,8 @@ private:
     const std::unique_ptr<zmq::Socket> stopRcv_;
     const std::unique_ptr<zmq::Socket> dispatchFrom_;
     const std::unique_ptr<zmq::Socket> dispatchTo_;
+
+    bool enabled_;
 };
 
 
@@ -118,30 +127,59 @@ WorkerConfig mkCnf(const Worker& w, Topic::SeqN seqn = 0,
 }
 
 
-BOOST_AUTO_TEST_CASE(testRedundantDispatch)
+struct ForwarderFixture
 {
-    Broker b;
+    ForwarderFixture()
+        : w{Uuid::createNamespaceUuid(Uuid::Ns::Dns, "worker.net"sv)}
+        , b{Uuid::createNamespaceUuid(Uuid::Ns::Dns, "broker.net"sv)}
+    {
+        const std::vector<std::string> delivery{"ipc:///tmp/worker_delivery"};
+        const std::vector<std::string> snapshot{"ipc:///tmp/broker_snapshot"};
+        const std::vector<std::string> dispatch{"ipc:///tmp/dispatch_b1", "ipc:///tmp/dispatch_b2"};
+        const std::vector<std::string> forwards{"ipc:///tmp/dispatch_f1", "ipc:///tmp/dispatch_f2"};
+
+        b.setEndpoints(delivery, dispatch, snapshot);
+        w.setEndpoints(delivery, forwards, snapshot);
+        f1.setEndpoints("ipc:///tmp/dispatch_f1", "ipc:///tmp/dispatch_b1");
+        f2.setEndpoints("ipc:///tmp/dispatch_f2", "ipc:///tmp/dispatch_b2");
+
+        bf = b.start();
+        wf = w.start();
+        f1f = f1.start();
+        f2f = f2.start();
+
+        testWaitForStart(w, mkCnf(w, 0, {}, delivery, forwards, snapshot));
+    }
+
+    ~ForwarderFixture()
+    {
+        b.stop();
+        w.stop();
+        f1.stop();
+        f2.stop();
+
+        testWaitForStop(w);
+
+        wf.get();
+        bf.get();
+        f1f.get();
+        f2f.get();
+    }
+
     Worker w;
+    Broker b;
     Forwarder f1;
     Forwarder f2;
 
-    const std::vector<std::string> delivery{"ipc:///tmp/worker_delivery"};
-    const std::vector<std::string> snapshot{"ipc:///tmp/broker_snapshot"};
-    const std::vector<std::string> dispatch{"ipc:///tmp/dispatch_b1", "ipc:///tmp/dispatch_b2"};
-    const std::vector<std::string> forwards{"ipc:///tmp/dispatch_f1", "ipc:///tmp/dispatch_f2"};
+    std::future<void> wf;
+    std::future<void> bf;
+    std::future<void> f1f;
+    std::future<void> f2f;
+};
 
-    b.setEndpoints(delivery, dispatch, snapshot);
-    w.setEndpoints(delivery, forwards, snapshot);
-    f1.setEndpoints("ipc:///tmp/dispatch_f1", "ipc:///tmp/dispatch_b1");
-    f2.setEndpoints("ipc:///tmp/dispatch_f2", "ipc:///tmp/dispatch_b2");
 
-    auto bf = b.start();
-    auto wf = w.start();
-    auto f1f = f1.start();
-    auto f2f = f2.start();
-
-    testWaitForStart(w, mkCnf(w, 0, {}, delivery, forwards, snapshot));
-
+BOOST_FIXTURE_TEST_CASE(testDispatchRedundantFull, ForwarderFixture)
+{
     auto t1 = Topic{b.uuid(), w.uuid(), 0, "topic1"sv, zmq::Part{"hello1"sv}};
     auto t2 = Topic{b.uuid(), w.uuid(), 0, "topic2"sv, zmq::Part{"hello2"sv}};
 
@@ -151,11 +189,27 @@ BOOST_AUTO_TEST_CASE(testRedundantDispatch)
     testWaitForTopic(w, t1, 1);
     testWaitForTopic(w, t2, 2);
     testWaitForTimeout(w);
+}
 
-    b.stop();
-    w.stop();
-    f1.stop();
-    f2.stop();
 
-    testWaitForStop(w);
+BOOST_FIXTURE_TEST_CASE(testDispatchRedundantDegraded, ForwarderFixture)
+{
+    f1.setEnabled(false);
+
+    auto t = Topic{b.uuid(), w.uuid(), 0, "topic1"sv, zmq::Part{"hello1"sv}};
+    w.dispatch(t.name(), t.data());
+
+    testWaitForTopic(w, t, 1);
+}
+
+
+BOOST_FIXTURE_TEST_CASE(testDispatchRedundantFault, ForwarderFixture)
+{
+    f1.setEnabled(false);
+    f2.setEnabled(false);
+
+    auto t = Topic{b.uuid(), w.uuid(), 0, "topic1"sv, zmq::Part{"hello1"sv}};
+    w.dispatch(t.name(), t.data());
+
+    testWaitForTimeout(w);
 }
