@@ -127,9 +127,9 @@ WorkerConfig mkCnf(const Worker& w, Topic::SeqN seqn = 0,
 }
 
 
-struct ForwarderFixture
+struct DispatchFixture
 {
-    ForwarderFixture()
+    DispatchFixture()
         : w{Uuid::createNamespaceUuid(Uuid::Ns::Dns, "worker.net"sv)}
         , b{Uuid::createNamespaceUuid(Uuid::Ns::Dns, "broker.net"sv)}
     {
@@ -151,7 +151,7 @@ struct ForwarderFixture
         testWaitForStart(w, mkCnf(w, 0, {}, delivery, forwards, snapshot));
     }
 
-    ~ForwarderFixture()
+    ~DispatchFixture()
     {
         b.stop();
         w.stop();
@@ -178,7 +178,7 @@ struct ForwarderFixture
 };
 
 
-BOOST_FIXTURE_TEST_CASE(testDispatchRedundantFull, ForwarderFixture)
+BOOST_FIXTURE_TEST_CASE(testDispatchRedundantFull, DispatchFixture)
 {
     auto t1 = Topic{b.uuid(), w.uuid(), 0, "topic1"sv, zmq::Part{"hello1"sv}};
     auto t2 = Topic{b.uuid(), w.uuid(), 0, "topic2"sv, zmq::Part{"hello2"sv}};
@@ -192,7 +192,7 @@ BOOST_FIXTURE_TEST_CASE(testDispatchRedundantFull, ForwarderFixture)
 }
 
 
-BOOST_FIXTURE_TEST_CASE(testDispatchRedundantDegraded, ForwarderFixture)
+BOOST_FIXTURE_TEST_CASE(testDispatchRedundantDegraded, DispatchFixture)
 {
     f1.setEnabled(false);
 
@@ -203,7 +203,7 @@ BOOST_FIXTURE_TEST_CASE(testDispatchRedundantDegraded, ForwarderFixture)
 }
 
 
-BOOST_FIXTURE_TEST_CASE(testDispatchRedundantFault, ForwarderFixture)
+BOOST_FIXTURE_TEST_CASE(testDispatchRedundantFault, DispatchFixture)
 {
     f1.setEnabled(false);
     f2.setEnabled(false);
