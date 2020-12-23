@@ -53,6 +53,7 @@ Worker::Worker(Uuid id, Topic::SeqN initSequence)
     , zseqs_(std::make_unique<zmq::Socket>(zmqCtx(), zmq::Socket::PUSH))
     , zseqr_(std::make_unique<zmq::Socket>(zmqCtx(), zmq::Socket::PULL))
     , seqNum_{initSequence}
+    , subscrAll_{true}
 {
     // MUST be inproc in order to get instant delivery of messages.
     zseqs_->setEndpoints({"inproc://worker-seqn"});
@@ -74,8 +75,16 @@ Worker::~Worker() noexcept
 }
 
 
-void Worker::setTopicNames(const std::vector<Topic::Name>& names)
+void Worker::setTopicsAll()
 {
+    subscrAll_ = true;
+    subscrNames_.clear();
+}
+
+
+void Worker::setTopicsNames(const std::vector<Topic::Name>& names)
+{
+    subscrAll_ = false;
     subscrNames_ = names;
 }
 
@@ -142,6 +151,7 @@ zmq::Part Worker::prepareConfiguration() const
     return WorkerConfig{
         uuid(),
         seqNumber(),
+        subscrAll_,
         subscrNames_,
         endpointDelivery(),
         endpointDispatch(),
@@ -363,8 +373,9 @@ void Worker::WorkerSession::connOpen()
     zdispatch_->setEndpoints({conf_.endpDispatch.begin(), conf_.endpDispatch.end()});
 
     std::list<std::string> groups{BROKER_HUGZ};
-    if (!conf_.topicNames.empty()) {
-        for (const auto& name : conf_.topicNames) {
+
+    if (!conf_.topicsAll) {
+        for (const auto& name : conf_.topicsNames) {
             if (std::string_view(name) == BROKER_UPDT) {
                 throw ERROR(Error, "could not set topic name",
                     log::Arg{"name"sv, std::string_view(BROKER_UPDT)});
@@ -421,7 +432,7 @@ void Worker::WorkerSession::saveConfiguration(const zmq::Part& part)
     conf_ = WorkerConfig::fromPart(part);
 
     subscrTopic_.clear();
-    for (const auto& name : conf_.topicNames) {
+    for (const auto& name : conf_.topicsNames) {
         if (subscrTopic_.put(name, 0) == subscrTopic_.list().end()) {
             // restore state
             conf_ = WorkerConfig{};

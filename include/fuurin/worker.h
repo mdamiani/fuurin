@@ -54,13 +54,18 @@ public:
     virtual ~Worker() noexcept;
 
     /**
+     * \brief Sets every topics to sync with and receive from broker.
+     */
+    void setTopicsAll();
+
+    /**
      * \brief Sets topics to sync with and receive from broker.
      *
-     * If the list of names is empty, then every topic will be received.
+     * If the list of names is empty, then none topic be received.
      *
      * \param[in] names List of topics names.
      */
-    void setTopicNames(const std::vector<Topic::Name>& names);
+    void setTopicsNames(const std::vector<Topic::Name>& names);
 
     /**
      * \brief Sends data to the broker.
@@ -274,6 +279,7 @@ protected:
 
     mutable Topic::SeqN seqNum_; ///< Worker sequence number.
 
+    bool subscrAll_;                       ///< Whether to subscribe to every topic.
     std::vector<Topic::Name> subscrNames_; ///< List of topic names.
 };
 

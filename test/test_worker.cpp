@@ -63,13 +63,13 @@ inline std::ostream& operator<<(std::ostream& os, const std::list<T>& l)
 } // namespace std
 
 
-WorkerConfig mkCnf(Uuid uuid = Uuid{}, Topic::SeqN seqn = 0,
+WorkerConfig mkCnf(Uuid uuid = Uuid{}, Topic::SeqN seqn = 0, bool wildc = true,
     const std::vector<Topic::Name>& names = {},
     const std::vector<std::string>& endp1 = {"ipc:///tmp/worker_delivery"},
     const std::vector<std::string>& endp2 = {"ipc:///tmp/worker_dispatch"},
     const std::vector<std::string>& endp3 = {"ipc:///tmp/broker_snapshot"})
 {
-    return WorkerConfig{uuid, seqn, names, endp1, endp2, endp3};
+    return WorkerConfig{uuid, seqn, wildc, names, endp1, endp2, endp3};
 }
 
 
@@ -434,7 +434,7 @@ BOOST_FIXTURE_TEST_CASE(testWaitForEventDiscard, WorkerFixture)
     testWaitForEvent(w, 1500ms, Event::Notification::Discard, Event::Type::Stopped);
 
     // receive new start event
-    testWaitForEvent(w, 1500ms, Event::Notification::Success, Event::Type::Started, mkCnf(w.uuid(), 3, {}));
+    testWaitForEvent(w, 1500ms, Event::Notification::Success, Event::Type::Started, mkCnf(w.uuid(), 3, true, {}));
     testWaitForEvent(w, 1500ms, Event::Notification::Success, Event::Type::Online);
 
     // produce a new event
@@ -568,7 +568,7 @@ BOOST_FIXTURE_TEST_CASE(testSyncTopicRecentAnotherWorker, WorkerFixture)
 BOOST_AUTO_TEST_CASE(testTopicSubscriptionInvalid)
 {
     Worker w(WorkerFixture::wid);
-    w.setTopicNames({"UPDT"sv});
+    w.setTopicsNames({"UPDT"sv});
     auto wf = w.start();
     BOOST_TEST(w.isRunning());
     BOOST_REQUIRE_THROW(wf.get(), err::Error);
@@ -581,13 +581,13 @@ BOOST_AUTO_TEST_CASE(testTopicSubscriptionSimple)
     Broker b(WorkerFixture::bid);
     Worker w(WorkerFixture::wid);
 
-    w.setTopicNames({"short topic"sv, "very long topic 12345"sv});
+    w.setTopicsNames({"short topic"sv, "very long topic 12345"sv});
 
     auto bf = b.start();
     auto wf = w.start();
 
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Started,
-        mkCnf(w.uuid(), 0, {"short topic"sv, "very long topic"sv}));
+        mkCnf(w.uuid(), 0, false, {"short topic"sv, "very long topic"sv}));
 
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Online);
 
@@ -597,6 +597,33 @@ BOOST_AUTO_TEST_CASE(testTopicSubscriptionSimple)
 
     testWaitForTopic(w, mkT("short topic", 0, "hello1"), 1);
     testWaitForTopic(w, mkT("very long topic", 0, "hello2"), 2);
+
+    testWaitForTimeout(w);
+
+    w.stop();
+    b.stop();
+
+    wf.get();
+    bf.get();
+}
+
+
+BOOST_AUTO_TEST_CASE(testTopicSubscriptionNone)
+{
+    Broker b(WorkerFixture::bid);
+    Worker w(WorkerFixture::wid);
+
+    w.setTopicsNames({});
+
+    auto bf = b.start();
+    auto wf = w.start();
+
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Started, mkCnf(w.uuid(), 0, false, {}));
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Online);
+
+    w.dispatch("topic1"sv, zmq::Part{"hello1"sv});
+    w.dispatch("topic2"sv, zmq::Part{"hello2"sv});
+    w.dispatch("topic3"sv, zmq::Part{"hello3"sv});
 
     testWaitForTimeout(w);
 
@@ -643,7 +670,7 @@ BOOST_FIXTURE_TEST_CASE(testSeqnNotify, WorkerFixture)
     // start again
     wf = w.start();
 
-    testWaitForEvent(w, 1500ms, Event::Notification::Success, Event::Type::Started, mkCnf(w.uuid(), 4, {}));
+    testWaitForEvent(w, 1500ms, Event::Notification::Success, Event::Type::Started, mkCnf(w.uuid(), 4, true, {}));
     testWaitForEvent(w, 1500ms, Event::Notification::Success, Event::Type::Online);
 
     w.dispatch("topic"sv, zmq::Part{"hello"sv});

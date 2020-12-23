@@ -144,13 +144,13 @@ private:
 };
 
 
-WorkerConfig mkCnf(const Worker& w, Topic::SeqN seqn = 0,
+WorkerConfig mkCnf(const Worker& w, Topic::SeqN seqn = 0, bool wildc = true,
     const std::vector<Topic::Name>& names = {},
     const std::vector<std::string>& endp1 = {"ipc:///tmp/worker_delivery"},
     const std::vector<std::string>& endp2 = {"ipc:///tmp/worker_dispatch"},
     const std::vector<std::string>& endp3 = {"ipc:///tmp/broker_snapshot"})
 {
-    return WorkerConfig{w.uuid(), seqn, names, endp1, endp2, endp3};
+    return WorkerConfig{w.uuid(), seqn, wildc, names, endp1, endp2, endp3};
 }
 
 
@@ -175,7 +175,7 @@ struct DispatchFixture
         f1f = f1.start();
         f2f = f2.start();
 
-        testWaitForStart(w, mkCnf(w, 0, {}, delivery, forwards, snapshot));
+        testWaitForStart(w, mkCnf(w, 0, true, {}, delivery, forwards, snapshot));
     }
 
     ~DispatchFixture()
@@ -226,7 +226,7 @@ struct DeliveryFixture
         f1f = f1.start();
         f2f = f2.start();
 
-        testWaitForStart(w, mkCnf(w, 0, {}, delivery, dispatch, snapshot));
+        testWaitForStart(w, mkCnf(w, 0, true, {}, delivery, dispatch, snapshot));
     }
 
     ~DeliveryFixture()

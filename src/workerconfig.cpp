@@ -22,7 +22,8 @@ bool WorkerConfig::operator==(const WorkerConfig& rhs) const
 {
     return uuid == rhs.uuid &&
         seqNum == rhs.seqNum &&
-        topicNames == rhs.topicNames &&
+        topicsAll == rhs.topicsAll &&
+        topicsNames == rhs.topicsNames &&
         endpDelivery == rhs.endpDelivery &&
         endpDispatch == rhs.endpDispatch &&
         endpSnapshot == rhs.endpSnapshot;
@@ -39,9 +40,10 @@ WorkerConfig WorkerConfig::fromPart(const zmq::Part& part)
 {
     WorkerConfig wc;
 
-    const auto [uuid, seqNum, subscr, endp1, endp2, endp3] = zmq::PartMulti::unpack<
+    const auto [uuid, seqNum, getall, subscr, endp1, endp2, endp3] = zmq::PartMulti::unpack<
         Uuid::Bytes,
         Topic::SeqN,
+        bool,
         zmq::Part,
         zmq::Part,
         zmq::Part,
@@ -52,7 +54,8 @@ WorkerConfig WorkerConfig::fromPart(const zmq::Part& part)
 
     wc.uuid = Uuid::fromBytes(uuid);
     wc.seqNum = seqNum;
-    wc.topicNames = std::vector<Topic::Name>(names.begin(), names.end());
+    wc.topicsAll = getall;
+    wc.topicsNames = std::vector<Topic::Name>(names.begin(), names.end());
 
     zmq::PartMulti::unpack(endp1, std::inserter(wc.endpDelivery, wc.endpDelivery.begin()));
     zmq::PartMulti::unpack(endp2, std::inserter(wc.endpDispatch, wc.endpDispatch.begin()));
@@ -64,9 +67,9 @@ WorkerConfig WorkerConfig::fromPart(const zmq::Part& part)
 
 zmq::Part WorkerConfig::toPart() const
 {
-    const std::vector<std::string_view> names{topicNames.begin(), topicNames.end()};
+    const std::vector<std::string_view> names{topicsNames.begin(), topicsNames.end()};
 
-    return zmq::PartMulti::pack(uuid.bytes(), seqNum,
+    return zmq::PartMulti::pack(uuid.bytes(), seqNum, topicsAll,
         zmq::PartMulti::pack(names.begin(), names.end()),
         zmq::PartMulti::pack(endpDelivery.begin(), endpDelivery.end()),
         zmq::PartMulti::pack(endpDispatch.begin(), endpDispatch.end()),
@@ -91,7 +94,8 @@ std::ostream& operator<<(std::ostream& os, const WorkerConfig& wc)
     os << "[";
     os << wc.uuid << ", ";
     os << wc.seqNum << ", ";
-    putList(wc.topicNames) << ", ";
+    os << (wc.topicsAll ? "*" : "+") << ", ";
+    putList(wc.topicsNames) << ", ";
     putList(wc.endpDelivery) << ", ";
     putList(wc.endpDispatch) << ", ";
     putList(wc.endpSnapshot);
