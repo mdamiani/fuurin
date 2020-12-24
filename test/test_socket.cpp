@@ -397,6 +397,15 @@ BOOST_AUTO_TEST_CASE(partMultiPackIter)
     std::list<std::string> empty2;
     PartMulti::unpack(c, std::back_inserter(empty2));
     BOOST_TEST(empty2.empty());
+
+    // Pack with iterator variant and type conversion
+    std::list<uint32_t> srcint{1, 2, 0, 4, 0};
+    auto d = PartMulti::pack<bool>(srcint.begin(), srcint.end());
+    BOOST_TEST(d.size() == size_t(8 + 5));
+
+    std::list<uint32_t> dstint;
+    PartMulti::unpack<bool>(d, std::back_inserter(dstint));
+    BOOST_TEST((dstint == std::list<uint32_t>{1, 1, 0, 1, 0}));
 }
 
 

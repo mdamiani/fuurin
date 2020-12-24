@@ -49,14 +49,11 @@ WorkerConfig WorkerConfig::fromPart(const zmq::Part& part)
         zmq::Part,
         zmq::Part>(part);
 
-    std::vector<std::string_view> names;
-    zmq::PartMulti::unpack(subscr, std::inserter(names, names.begin()));
-
     wc.uuid = Uuid::fromBytes(uuid);
     wc.seqNum = seqNum;
     wc.topicsAll = getall;
-    wc.topicsNames = std::vector<Topic::Name>(names.begin(), names.end());
 
+    zmq::PartMulti::unpack<std::string_view>(subscr, std::inserter(wc.topicsNames, wc.topicsNames.begin()));
     zmq::PartMulti::unpack(endp1, std::inserter(wc.endpDelivery, wc.endpDelivery.begin()));
     zmq::PartMulti::unpack(endp2, std::inserter(wc.endpDispatch, wc.endpDispatch.begin()));
     zmq::PartMulti::unpack(endp3, std::inserter(wc.endpSnapshot, wc.endpSnapshot.begin()));
@@ -67,10 +64,8 @@ WorkerConfig WorkerConfig::fromPart(const zmq::Part& part)
 
 zmq::Part WorkerConfig::toPart() const
 {
-    const std::vector<std::string_view> names{topicsNames.begin(), topicsNames.end()};
-
     return zmq::PartMulti::pack(uuid.bytes(), seqNum, topicsAll,
-        zmq::PartMulti::pack(names.begin(), names.end()),
+        zmq::PartMulti::pack<std::string_view>(topicsNames.begin(), topicsNames.end()),
         zmq::PartMulti::pack(endpDelivery.begin(), endpDelivery.end()),
         zmq::PartMulti::pack(endpDispatch.begin(), endpDispatch.end()),
         zmq::PartMulti::pack(endpSnapshot.begin(), endpSnapshot.end()));

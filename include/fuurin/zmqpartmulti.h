@@ -245,7 +245,8 @@ public:
      * \see pack(Args&&...)
      * \see pack2(Part&, size_t, T&&)
      */
-    template<typename InputIt>
+    ///{@
+    template<typename T, typename InputIt>
     static std::enable_if_t<isIteratorType<InputIt>::value, Part>
     pack(InputIt first, InputIt last)
     {
@@ -258,7 +259,7 @@ public:
         iterable_length_t count = 0;
 
         for (auto item = first; item != last; ++item) {
-            const size_t sz = tsize(*item);
+            const size_t sz = tsize(T(*item));
             if (uint64_t(size) + sz < size ||
                 uint64_t(size) + sz > std::numeric_limits<string_length_t>::max()) {
                 throwCreateError("size exceeds uint32_t max");
@@ -275,11 +276,20 @@ public:
         pos += pack2(pm, pos, count);
 
         for (auto item = first; item != last; ++item) {
-            pos += pack2(pm, pos, *item);
+            pos += pack2(pm, pos, T(*item));
         }
 
         return pm;
     }
+
+    template<typename InputIt>
+    static std::enable_if_t<isIteratorType<InputIt>::value, Part>
+    pack(InputIt first, InputIt last)
+    {
+        using TT = typename isIteratorType<InputIt>::iterator_type;
+        return pack<TT>(first, last);
+    }
+    ///@}
 
 
     /**
@@ -298,7 +308,8 @@ public:
      * \see unpack1(const Part&, size_t)
      */
     template<typename T, typename Visitor>
-    static void unpack(const Part& pm, Visitor visit)
+    static std::enable_if_t<std::is_invocable<Visitor, T>::value, void>
+    unpack(const Part& pm, Visitor visit)
     {
         auto [size, count] = unpack2<string_length_t, iterable_length_t>(pm, 0);
         size_t pos = sizeof(size) + sizeof(count);
@@ -327,15 +338,25 @@ public:
      * \see unpack2(const Part&, size_t)
      * \see unpack1(const Part&, size_t)
      */
+    ///{@
+    template<typename T, typename OutputIt>
+    static std::enable_if_t<isIteratorType<OutputIt>::value, void>
+    unpack(const Part& pm, OutputIt d_first)
+    {
+        using TT = typename isIteratorType<OutputIt>::iterator_type;
+        unpack<T>(pm, [&d_first](T&& v) {
+            *d_first++ = TT(v);
+        });
+    }
+
     template<typename OutputIt>
     static std::enable_if_t<isIteratorType<OutputIt>::value, void>
     unpack(const Part& pm, OutputIt d_first)
     {
-        using T = typename isIteratorType<OutputIt>::iterator_type;
-        unpack<T>(pm, [&d_first](T&& v) {
-            *d_first++ = v;
-        });
+        using TT = typename isIteratorType<OutputIt>::iterator_type;
+        unpack<TT>(pm, d_first);
     }
+    ///@}
 
 
 private:
