@@ -635,6 +635,55 @@ BOOST_AUTO_TEST_CASE(testTopicSubscriptionNone)
 }
 
 
+BOOST_AUTO_TEST_CASE(testTopicDeliveryGroup)
+{
+    Broker b{WorkerFixture::bid};
+    Worker w1{Uuid::createNamespaceUuid(Uuid::Ns::Dns, "worker1.net"sv)};
+    Worker w2{Uuid::createNamespaceUuid(Uuid::Ns::Dns, "worker2.net"sv)};
+
+    w1.setTopicsAll();
+    w2.setTopicsNames({"topic1"sv});
+
+    auto bf = b.start();
+    auto w1f = w1.start();
+    auto w2f = w2.start();
+
+    testWaitForEvent(w1, 2s, Event::Notification::Success, Event::Type::Started,
+        mkCnf(w1.uuid(), 0, true, {}));
+    testWaitForEvent(w1, 2s, Event::Notification::Success, Event::Type::Online);
+
+    testWaitForEvent(w2, 2s, Event::Notification::Success, Event::Type::Started,
+        mkCnf(w2.uuid(), 0, false, {"topic1"sv}));
+    testWaitForEvent(w2, 2s, Event::Notification::Success, Event::Type::Online);
+
+    auto t1 = mkT("topic1", 0, "hello1").withWorker(w1.uuid());
+    auto t2 = mkT("topic2", 0, "hello2").withWorker(w1.uuid());
+    auto t3 = mkT("topic1", 0, "hello3").withWorker(w1.uuid());
+
+    w1.dispatch(t1.name(), t1.data());
+    w1.dispatch(t2.name(), t2.data());
+    w1.dispatch(t3.name(), t3.data());
+
+    testWaitForTopic(w1, t1, 1);
+    testWaitForTopic(w1, t2, 2);
+    testWaitForTopic(w1, t3, 3);
+
+    testWaitForTopic(w2, t1, 1);
+    testWaitForTopic(w2, t3, 3);
+
+    w1.stop();
+    w2.stop();
+    b.stop();
+
+    testWaitForStop(w1);
+    testWaitForStop(w2);
+
+    w1f.get();
+    w2f.get();
+    bf.get();
+}
+
+
 BOOST_FIXTURE_TEST_CASE(testSeqnNotify, WorkerFixture)
 {
     // test initial value
