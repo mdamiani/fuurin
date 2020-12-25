@@ -144,16 +144,6 @@ private:
 };
 
 
-WorkerConfig mkCnf(const Worker& w, Topic::SeqN seqn = 0, bool wildc = true,
-    const std::vector<Topic::Name>& names = {},
-    const std::vector<std::string>& endp1 = {"ipc:///tmp/worker_delivery"},
-    const std::vector<std::string>& endp2 = {"ipc:///tmp/worker_dispatch"},
-    const std::vector<std::string>& endp3 = {"ipc:///tmp/broker_snapshot"})
-{
-    return WorkerConfig{w.uuid(), seqn, wildc, names, endp1, endp2, endp3};
-}
-
-
 struct DispatchFixture
 {
     DispatchFixture()

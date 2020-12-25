@@ -17,8 +17,10 @@
 #include "fuurin/workerconfig.h"
 #include "fuurin/zmqpart.h"
 #include "fuurin/event.h"
+#include "fuurin/topic.h"
 
 #include <chrono>
+#include <vector>
 
 
 using namespace std::literals::chrono_literals;
@@ -100,5 +102,16 @@ Event testWaitForTimeout(Worker& w)
 {
     return testWaitForEvent(w, 3s, Event::Notification::Timeout, Event::Type::Invalid);
 }
+
+
+WorkerConfig mkCnf(const Worker& w, Topic::SeqN seqn = 0, bool wildc = true,
+    const std::vector<Topic::Name>& names = {},
+    const std::vector<std::string>& endp1 = {"ipc:///tmp/worker_delivery"},
+    const std::vector<std::string>& endp2 = {"ipc:///tmp/worker_dispatch"},
+    const std::vector<std::string>& endp3 = {"ipc:///tmp/broker_snapshot"})
+{
+    return WorkerConfig{w.uuid(), seqn, wildc, names, endp1, endp2, endp3};
+}
+
 
 #endif // FUURIN_TEST_UTILS_H
