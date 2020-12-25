@@ -329,3 +329,65 @@ BOOST_FIXTURE_TEST_CASE(testDeliveryRedundantFault, DeliveryFixture)
 
 
 // TODO: tests for redundant snapshot endpoint
+
+
+BOOST_AUTO_TEST_CASE(testDispatchTwoBrokers)
+{
+    // Setup w1 bound to b2 and w2 bound to b2.
+    Broker b1{Uuid::createNamespaceUuid(Uuid::Ns::Dns, "broker1.net"sv)};
+    Broker b2{Uuid::createNamespaceUuid(Uuid::Ns::Dns, "broker2.net"sv)};
+    Worker w1{Uuid::createNamespaceUuid(Uuid::Ns::Dns, "worker1.net"sv)};
+    Worker w2{Uuid::createNamespaceUuid(Uuid::Ns::Dns, "worker2.net"sv)};
+
+    b1.setEndpoints(
+        {"ipc:///tmp/delivery_b1"},
+        {"ipc:///tmp/dispatch_b1"},
+        {"ipc:///tmp/snapshot_b1"});
+    b2.setEndpoints(
+        {"ipc:///tmp/delivery_b2"},
+        {"ipc:///tmp/dispatch_b2"},
+        {"ipc:///tmp/snapshot_b2"});
+    w1.setEndpoints(
+        {"ipc:///tmp/delivery_b1"},
+        {"ipc:///tmp/dispatch_b1", "ipc:///tmp/dispatch_b2"}, // bridge from w1 to b2},
+        {"ipc:///tmp/snapshot_b1"});
+    w2.setEndpoints(
+        {"ipc:///tmp/delivery_b2"},
+        {"ipc:///tmp/dispatch_b2"},
+        {"ipc:///tmp/snapshot_b2"});
+
+    auto b1f = b1.start();
+    auto b2f = b2.start();
+    auto w1f = w1.start();
+    auto w2f = w2.start();
+
+    for (auto w : {&w1, &w2}) {
+        testWaitForStart(*w, mkCnf(w->uuid(), 0,
+                                 std::get<0>(w->topicsNames()), //
+                                 std::get<1>(w->topicsNames()), //
+                                 w->endpointDelivery(),         //
+                                 w->endpointDispatch(),         //
+                                 w->endpointSnapshot()));
+    }
+
+    auto t = Topic{{}, w1.uuid(), 1, "topic"sv, zmq::Part{"hello"sv}};
+
+    w1.dispatch(t.name(), t.data());
+
+    // w2 bound to b2, shall receive topic too.
+    testWaitForTopic(w1, t.withBroker(b1.uuid()), t.seqNum());
+    testWaitForTopic(w2, t.withBroker(b2.uuid()), t.seqNum());
+
+    b1.stop();
+    b2.stop();
+    w1.stop();
+    w2.stop();
+
+    for (auto w : {&w1, &w2})
+        testWaitForStop(*w);
+
+    b1f.get();
+    b2f.get();
+    w1f.get();
+    w2f.get();
+}
