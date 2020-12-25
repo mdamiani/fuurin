@@ -20,6 +20,7 @@
 
 #include <memory>
 #include <vector>
+#include <tuple>
 
 
 namespace fuurin {
@@ -55,6 +56,8 @@ public:
 
     /**
      * \brief Sets every topics to sync with and receive from broker.
+     *
+     * \see setTopicsNames(std::vector<Topic::Name>)
      */
     void setTopicsAll();
 
@@ -64,8 +67,22 @@ public:
      * If the list of names is empty, then none topic be received.
      *
      * \param[in] names List of topics names.
+     *
+     * \see setTopicsAll()
      */
     void setTopicsNames(const std::vector<Topic::Name>& names);
+
+    /**
+     * \brief Returns subscription topics.
+     *
+     * \return A tuple which first element is whether every topics
+     *      were subscribed and the second element (otherwise)
+     *      the specific topic names which were subscribed.
+     *
+     * \see setTopicsNames(std::vector<Topic::Name>)
+     * \see setTopicsAll()
+     */
+    std::tuple<bool, std::vector<Topic::Name>> topicsNames() const;
 
     /**
      * \brief Sends data to the broker.

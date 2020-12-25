@@ -14,6 +14,7 @@
 #include "fuurin/zmqpart.h"
 #include "fuurin/zmqpartmulti.h"
 #include "fuurin/zmqtimer.h"
+#include "fuurin/workerconfig.h"
 #include "syncmachine.h"
 #include "failure.h"
 #include "types.h"
@@ -24,6 +25,7 @@
 #include <string_view>
 #include <type_traits>
 #include <string>
+#include <algorithm>
 
 
 #define BROKER_HUGZ "HUGZ"
@@ -264,34 +266,36 @@ void Broker::BrokerSession::sendHugz()
 void Broker::BrokerSession::receiveWorkerCommand(zmq::Part&& payload)
 {
     // TODO: use snapshot payload
-    auto [req, seqn, params] = zmq::PartMulti::unpack<std::string_view, SyncMachine::seqn_t, zmq::Part>(payload);
+    auto [req, syncseq, params] = zmq::PartMulti::unpack<std::string_view, SyncMachine::seqn_t, zmq::Part>(payload);
 
     if (req != BROKER_SYNC_REQST) {
         LOG_WARN(log::Arg{"broker"sv, uuid_.toShortString()},
             log::Arg{"snapshot"sv, "recv"sv},
             log::Arg{"request"sv, req},
-            log::Arg{"seqn"sv, seqn},
+            log::Arg{"syncseq"sv, syncseq},
             log::Arg{"unknown request"sv});
 
         return;
     }
 
-    replySnapshot(payload.routingID(), seqn, std::move(params));
+    replySnapshot(payload.routingID(), syncseq, std::move(params));
 }
 
 
-void Broker::BrokerSession::replySnapshot(uint32_t rouID, uint8_t seqn, zmq::Part&&)
+void Broker::BrokerSession::replySnapshot(uint32_t rouID, uint8_t syncseq, zmq::Part&& params)
 {
-    static_assert(std::is_same_v<SyncMachine::seqn_t, decltype(seqn)>);
+    static_assert(std::is_same_v<SyncMachine::seqn_t, decltype(syncseq)>);
 
     LOG_DEBUG(log::Arg{"broker"sv, uuid_.toShortString()}, log::Arg{"sync"sv, "reply"sv},
         log::Arg{"elements"sv, int(storTopic_.size())});
+
+    const WorkerConfig conf = WorkerConfig::fromPart(params);
 
     try {
         const auto& errWouldBlock = ERROR(ZMQSocketSendFailed, "",
             log::Arg{log::ec_t{EAGAIN}});
 
-        if (zsnapshot_->trySend(zmq::PartMulti::pack(BROKER_SYNC_BEGIN, seqn, uuid_.toPart())
+        if (zsnapshot_->trySend(zmq::PartMulti::pack(BROKER_SYNC_BEGIN, syncseq, uuid_.toPart())
                                     .withRoutingID(rouID)) == -1) {
             throw errWouldBlock;
         }
@@ -299,12 +303,15 @@ void Broker::BrokerSession::replySnapshot(uint32_t rouID, uint8_t seqn, zmq::Par
             ASSERT(!el.second.list().empty(), "topic entry has empty cache");
             const auto& t = el.second.list().back().second;
 
-            if (zsnapshot_->trySend(zmq::PartMulti::pack(BROKER_SYNC_ELEMN, seqn, t.toPart())
+            if (!conf.topicsAll && std::find(conf.topicsNames.begin(), conf.topicsNames.end(), t.name()) == conf.topicsNames.end())
+                continue;
+
+            if (zsnapshot_->trySend(zmq::PartMulti::pack(BROKER_SYNC_ELEMN, syncseq, t.toPart())
                                         .withRoutingID(rouID)) == -1) {
                 throw errWouldBlock;
             }
         }
-        if (zsnapshot_->trySend(zmq::PartMulti::pack(BROKER_SYNC_COMPL, seqn, uuid_.toPart())
+        if (zsnapshot_->trySend(zmq::PartMulti::pack(BROKER_SYNC_COMPL, syncseq, uuid_.toPart())
                                     .withRoutingID(rouID)) == -1) {
             throw errWouldBlock;
         }

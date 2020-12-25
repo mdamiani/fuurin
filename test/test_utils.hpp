@@ -75,10 +75,10 @@ Event testWaitForTopic(Worker& w, Topic t, int seqn)
 }
 
 
-void testWaitForSyncStart(Worker& w, Broker& b)
+void testWaitForSyncStart(Worker& w, Broker& b, const WorkerConfig& cnf)
 {
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncDownloadOn);
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncRequest);
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncRequest, cnf);
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncBegin, b.uuid());
 }
 

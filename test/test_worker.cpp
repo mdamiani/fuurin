@@ -449,12 +449,12 @@ BOOST_FIXTURE_TEST_CASE(testSyncEmpty, WorkerFixture)
 {
     w.sync();
 
-    testWaitForSyncStart(w, b);
+    testWaitForSyncStart(w, b, mkCnf(w.uuid()));
     testWaitForSyncStop(w, b);
 }
 
 
-BOOST_FIXTURE_TEST_CASE(testSyncElement, WorkerFixture)
+BOOST_FIXTURE_TEST_CASE(testSyncElementAll, WorkerFixture)
 {
     w.dispatch("t1"sv, zmq::Part{"hello1"sv});
     w.dispatch("t2"sv, zmq::Part{"hello2"sv});
@@ -463,10 +463,68 @@ BOOST_FIXTURE_TEST_CASE(testSyncElement, WorkerFixture)
 
     w.sync();
 
-    testWaitForSyncStart(w, b);
+    testWaitForSyncStart(w, b, mkCnf(w.uuid(), 2));
     testWaitForSyncTopic(w, mkT("t1", 1, "hello1"), 1);
     testWaitForSyncTopic(w, mkT("t2", 2, "hello2"), 2);
     testWaitForSyncStop(w, b);
+}
+
+
+BOOST_AUTO_TEST_CASE(testSyncElementFilter)
+{
+    // setup two identical workers
+    Broker b{WorkerFixture::bid};
+    Worker w1(Uuid::createNamespaceUuid(Uuid::Ns::Dns, "worker1.net"sv));
+    Worker w2(Uuid::createNamespaceUuid(Uuid::Ns::Dns, "worker2.net"sv));
+
+    w1.setTopicsAll();
+    w2.setTopicsNames({"topic1"sv, "topic3"sv});
+
+    auto bf = b.start();
+    auto wf1 = w1.start();
+    auto wf2 = w2.start();
+
+    for (auto w : {&w1, &w2}) {
+        testWaitForStart(*w, mkCnf(w->uuid(), 0,
+                                 std::get<0>(w->topicsNames()),   //
+                                 std::get<1>(w->topicsNames()))); //
+    }
+
+    auto t1 = mkT("topic1", 1, "hello").withWorker(w2.uuid());
+    auto t2 = mkT("topic2", 2, "hello").withWorker(w2.uuid());
+    auto t3 = mkT("topic3", 3, "hello").withWorker(w2.uuid());
+    auto t4 = mkT("topic4", 4, "hello").withWorker(w2.uuid());
+
+    // w2 can send every topic and w1 receives every topic
+    for (auto t : {t1, t2, t3, t4}) {
+        w2.dispatch(t.name(), t.data());
+        testWaitForTopic(w1, t, t.seqNum());
+    }
+
+    // w2 receives subscribed topics only
+    for (auto t : {t1, t3})
+        testWaitForTopic(w2, t, t.seqNum());
+
+    // w2 syncs with subscribed topics only
+    w2.sync();
+
+    testWaitForSyncStart(w2, b, mkCnf(w2.uuid(), 4,
+                                    std::get<0>(w2.topicsNames()),   //
+                                    std::get<1>(w2.topicsNames()))); //
+    testWaitForSyncTopic(w2, t1, 1);
+    testWaitForSyncTopic(w2, t3, 3);
+    testWaitForSyncStop(w2, b);
+
+    b.stop();
+    w1.stop();
+    w2.stop();
+
+    for (auto w : {&w1, &w2})
+        testWaitForStop(*w);
+
+    bf.get();
+    wf1.get();
+    wf2.get();
 }
 
 
@@ -475,13 +533,14 @@ BOOST_AUTO_TEST_CASE(testSyncError_Halt)
     Worker w;
 
     auto wf = w.start();
+    auto cnf = mkCnf(w.uuid());
 
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Started, mkCnf(w.uuid()));
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Started, cnf);
 
     w.sync();
 
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncDownloadOn);
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncRequest);
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncRequest, cnf);
 
     w.stop();
 
@@ -497,14 +556,15 @@ BOOST_AUTO_TEST_CASE(testSyncError_Timeout)
     Worker w;
 
     auto wf = w.start();
+    auto cnf = mkCnf(w.uuid());
 
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Started, mkCnf(w.uuid()));
 
     w.sync();
 
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncDownloadOn);
-    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncRequest);
-    testWaitForEvent(w, 5s, Event::Notification::Success, Event::Type::SyncRequest);
+    testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncRequest, cnf);
+    testWaitForEvent(w, 5s, Event::Notification::Success, Event::Type::SyncRequest, cnf);
     testWaitForEvent(w, 5s, Event::Notification::Success, Event::Type::SyncError, Uuid{});
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::SyncDownloadOff);
 
@@ -522,7 +582,7 @@ BOOST_FIXTURE_TEST_CASE(testSyncTopicRecentSameWorker, WorkerFixture)
 
     w.sync();
 
-    testWaitForSyncStart(w, b);
+    testWaitForSyncStart(w, b, mkCnf(w.uuid(), 2));
     testWaitForSyncTopic(w, mkT("topic", 2, "hello2"), 2);
     testWaitForSyncStop(w, b);
 }
@@ -554,7 +614,7 @@ BOOST_FIXTURE_TEST_CASE(testSyncTopicRecentAnotherWorker, WorkerFixture)
 
     w.sync();
 
-    testWaitForSyncStart(w, b);
+    testWaitForSyncStart(w, b, mkCnf(w.uuid(), 2));
     testWaitForSyncTopic(w, t2, 1);
     testWaitForSyncStop(w, b);
 
@@ -581,7 +641,11 @@ BOOST_AUTO_TEST_CASE(testTopicSubscriptionSimple)
     Broker b(WorkerFixture::bid);
     Worker w(WorkerFixture::wid);
 
-    w.setTopicsNames({"short topic"sv, "very long topic 12345"sv});
+    const std::vector<Topic::Name> names{"short topic"sv, "very long topic 12345"sv};
+
+    w.setTopicsNames(names);
+    BOOST_TEST(std::get<0>(w.topicsNames()) == false);
+    BOOST_TEST(std::get<1>(w.topicsNames()) == names);
 
     auto bf = b.start();
     auto wf = w.start();
@@ -614,6 +678,8 @@ BOOST_AUTO_TEST_CASE(testTopicSubscriptionNone)
     Worker w(WorkerFixture::wid);
 
     w.setTopicsNames({});
+    BOOST_TEST(std::get<0>(w.topicsNames()) == false);
+    BOOST_TEST(std::get<1>(w.topicsNames()) == std::vector<Topic::Name>{});
 
     auto bf = b.start();
     auto wf = w.start();
@@ -643,6 +709,11 @@ BOOST_AUTO_TEST_CASE(testTopicDeliveryGroup)
 
     w1.setTopicsAll();
     w2.setTopicsNames({"topic1"sv});
+
+    BOOST_TEST(std::get<0>(w1.topicsNames()) == true);
+    BOOST_TEST(std::get<1>(w1.topicsNames()) == std::vector<Topic::Name>{});
+    BOOST_TEST(std::get<0>(w2.topicsNames()) == false);
+    BOOST_TEST(std::get<1>(w2.topicsNames()) == std::vector<Topic::Name>{"topic1"sv});
 
     auto bf = b.start();
     auto w1f = w1.start();
@@ -921,7 +992,7 @@ BOOST_AUTO_TEST_CASE(testWorkerSeqSync)
     // clone will get every topic, without sequence number filtering
     w2.sync();
 
-    testWaitForSyncStart(w2, b);
+    testWaitForSyncStart(w2, b, mkCnf(w2.uuid(), 2));
 
     for (auto i = 0; i < 4; ++i)
         testWaitForSyncTopic(w2, t[i], i + 1);

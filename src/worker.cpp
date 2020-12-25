@@ -89,6 +89,12 @@ void Worker::setTopicsNames(const std::vector<Topic::Name>& names)
 }
 
 
+std::tuple<bool, std::vector<Topic::Name>> Worker::topicsNames() const
+{
+    return {subscrAll_, subscrNames_};
+}
+
+
 void Worker::dispatch(Topic::Name name, const Topic::Data& data)
 {
     dispatch(name, zmq::Part{data});
@@ -413,17 +419,20 @@ void Worker::WorkerSession::sendAnnounce()
 }
 
 
-void Worker::WorkerSession::sendSync(uint8_t seqn)
+void Worker::WorkerSession::sendSync(uint8_t syncseq)
 {
-    static_assert(std::is_same_v<SyncMachine::seqn_t, decltype(seqn)>);
+    static_assert(std::is_same_v<SyncMachine::seqn_t, decltype(syncseq)>);
 
     LOG_DEBUG(log::Arg{"worker"sv, uuid_.toShortString()},
         log::Arg{"snapshot"sv, "request"sv},
         log::Arg{"status"sv, Event::toString(Event::Type::SyncRequest)});
 
-    // TODO: pass other sync params.
-    zsnapshot_->trySend(zmq::PartMulti::pack(BROKER_SYNC_REQST, seqn, zmq::Part{}));
-    sendEvent(Event::Type::SyncRequest, zmq::Part{});
+    auto conf = conf_;
+    conf.seqNum = seqNum_;
+    auto params = conf.toPart();
+
+    zsnapshot_->trySend(zmq::PartMulti::pack(BROKER_SYNC_REQST, syncseq, zmq::Part{params}));
+    sendEvent(Event::Type::SyncRequest, std::move(params));
 }
 
 

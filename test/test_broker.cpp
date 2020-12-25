@@ -19,6 +19,7 @@
 #include "fuurin/zmqsocket.h"
 #include "fuurin/zmqpart.h"
 #include "fuurin/zmqpartmulti.h"
+#include "fuurin/workerconfig.h"
 #include "fuurin/errors.h"
 #include "fuurin/uuid.h"
 
@@ -123,9 +124,9 @@ protected:
         }
 
 
-        void testReceiveWorkerCommand(zmq::Part&& payload)
+        void testReceiveWorkerCommand(const zmq::Part& payload)
         {
-            receiveWorkerCommand(std::move(payload));
+            receiveWorkerCommand(zmq::Part{payload});
         }
     };
 
@@ -276,7 +277,11 @@ BOOST_AUTO_TEST_CASE(testStoreTopicMultiple)
 }
 
 
-const zmq::Part SREQ = zmq::PartMulti::pack(BROKER_SYNC_REQST, uint8_t(0), zmq::Part{}).withRoutingID(1);
+const WorkerConfig cnfAll{{}, {}, true, {}, {}, {}, {}};
+const WorkerConfig cnfNone{{}, {}, false, {}, {}, {}, {}};
+
+const zmq::Part SREQ = zmq::PartMulti::pack(BROKER_SYNC_REQST, uint8_t(0), cnfAll.toPart()).withRoutingID(1);
+const zmq::Part SREQN = zmq::PartMulti::pack(BROKER_SYNC_REQST, uint8_t(0), cnfNone.toPart()).withRoutingID(1);
 
 BOOST_DATA_TEST_CASE(testReceiverWorkerSync,
     bdata::make({
@@ -292,6 +297,10 @@ BOOST_DATA_TEST_CASE(testReceiverWorkerSync,
             SREQ,
             -1, false, false,
             3, ""sv),
+        std::make_tuple("no topics",
+            SREQN,
+            -1, false, false,
+            2, ""sv),
         std::make_tuple("begin would block",
             SREQ,
             1, true, false,
@@ -353,14 +362,18 @@ BOOST_DATA_TEST_CASE(testReceiverWorkerSync,
     }
 
     if (wantError.empty()) {
-        bts->testReceiveWorkerCommand(zmq::Part{payload});
+        bts->testReceiveWorkerCommand(payload);
 
         if (wantSize > 0) {
             BOOST_TEST(int(bpp->size()) == wantSize);
             if (bpp->size() >= 1)
                 testNotif(bpp->at(0), BROKER_SYNC_BEGIN, 0);
-            if (bpp->size() >= 2)
-                testTopic(bpp->at(1), BROKER_SYNC_ELEMN, 0, t);
+            if (bpp->size() >= 2) {
+                if (payload == SREQ)
+                    testTopic(bpp->at(1), BROKER_SYNC_ELEMN, 0, t);
+                else if (payload == SREQN)
+                    testNotif(bpp->at(1), BROKER_SYNC_COMPL, 0);
+            }
             if (bpp->size() >= 3)
                 testNotif(bpp->at(2), BROKER_SYNC_COMPL, 0);
         } else {
@@ -368,9 +381,9 @@ BOOST_DATA_TEST_CASE(testReceiverWorkerSync,
         }
     } else {
         if (wantError == "ZMQPartAccessFailed"sv) {
-            BOOST_REQUIRE_THROW(bts->testReceiveWorkerCommand(zmq::Part{payload}), err::ZMQPartAccessFailed);
+            BOOST_REQUIRE_THROW(bts->testReceiveWorkerCommand(payload), err::ZMQPartAccessFailed);
         } else if (wantError == "ZMQSocketSendFailed"sv) {
-            BOOST_REQUIRE_THROW(bts->testReceiveWorkerCommand(zmq::Part{payload}), err::ZMQSocketSendFailed);
+            BOOST_REQUIRE_THROW(bts->testReceiveWorkerCommand(payload), err::ZMQSocketSendFailed);
         } else {
             BOOST_FAIL("unexpected error type");
         }
