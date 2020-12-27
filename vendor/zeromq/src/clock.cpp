@@ -41,6 +41,9 @@
 #include <cmnintrin.h>
 #else
 #include <intrin.h>
+#if defined(_M_ARM) || defined(_M_ARM64)
+#include <arm_neon.h>
+#endif
 #endif
 #endif
 
@@ -103,7 +106,7 @@ f_compatible_get_tick_count64 init_compatible_get_tick_count64 ()
     f_compatible_get_tick_count64 func = NULL;
 #if !defined ZMQ_HAVE_WINDOWS_UWP
 
-    HMODULE module = ::LoadLibraryA ("Kernel32.dll");
+    const HMODULE module = ::LoadLibraryA ("Kernel32.dll");
     if (module != NULL)
         func = reinterpret_cast<f_compatible_get_tick_count64> (
           ::GetProcAddress (module, "GetTickCount64"));
@@ -112,7 +115,8 @@ f_compatible_get_tick_count64 init_compatible_get_tick_count64 ()
         func = compatible_get_tick_count64;
 
 #if !defined ZMQ_HAVE_WINDOWS_UWP
-    ::FreeLibrary (module);
+    if (module != NULL)
+        ::FreeLibrary (module);
 #endif
 
     return func;
@@ -200,7 +204,7 @@ uint64_t zmq::clock_t::now_us ()
 
 uint64_t zmq::clock_t::now_ms ()
 {
-    uint64_t tsc = rdtsc ();
+    const uint64_t tsc = rdtsc ();
 
     //  If TSC is not supported, get precise time and chop off the microseconds.
     if (!tsc) {
@@ -234,6 +238,14 @@ uint64_t zmq::clock_t::rdtsc ()
 {
 #if (defined _MSC_VER && (defined _M_IX86 || defined _M_X64))
     return __rdtsc ();
+#elif defined(_MSC_VER) && defined(_M_ARM)   // NC => added for windows ARM
+    return __rdpmccntr64 ();
+#elif defined(_MSC_VER) && defined(_M_ARM64) // NC => added for windows ARM64
+    //return __rdpmccntr64 ();
+    //return __rdtscp (nullptr);
+    // todo: find proper implementation for ARM64
+    static uint64_t snCounter = 0;
+    return ++snCounter;
 #elif (defined __GNUC__ && (defined __i386__ || defined __x86_64__))
     uint32_t low, high;
     __asm__ volatile("rdtsc" : "=a"(low), "=d"(high));

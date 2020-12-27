@@ -45,7 +45,7 @@ namespace zmq
 class io_thread_t;
 class session_base_t;
 
-class pgm_sender_t : public io_object_t, public i_engine
+class pgm_sender_t ZMQ_FINAL : public io_object_t, public i_engine
 {
   public:
     pgm_sender_t (zmq::io_thread_t *parent_, const options_t &options_);
@@ -54,12 +54,13 @@ class pgm_sender_t : public io_object_t, public i_engine
     int init (bool udp_encapsulation_, const char *network_);
 
     //  i_engine interface implementation.
+    bool has_handshake_stage () { return false; };
     void plug (zmq::io_thread_t *io_thread_, zmq::session_base_t *session_);
     void terminate ();
     bool restart_input ();
     void restart_output ();
     void zap_msg_available () {}
-    const char *get_endpoint () const;
+    const endpoint_uri_pair_t &get_endpoint () const;
 
     //  i_poll_events interface implementation.
     void in_event ();
@@ -76,6 +77,8 @@ class pgm_sender_t : public io_object_t, public i_engine
         tx_timer_id = 0xa0,
         rx_timer_id = 0xa1
     };
+
+    const endpoint_uri_pair_t _empty_endpoint;
 
     //  Timers are running.
     bool has_tx_timer;
@@ -113,8 +116,7 @@ class pgm_sender_t : public io_object_t, public i_engine
     //  If zero, there are no data to be sent.
     size_t write_size;
 
-    pgm_sender_t (const pgm_sender_t &);
-    const pgm_sender_t &operator= (const pgm_sender_t &);
+    ZMQ_NON_COPYABLE_NOR_MOVABLE (pgm_sender_t)
 };
 }
 #endif

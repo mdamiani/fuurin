@@ -67,10 +67,13 @@ class thread_ctx_t
     thread_ctx_t ();
 
     //  Start a new thread with proper scheduling parameters.
-    void start_thread (thread_t &thread_, thread_fn *tfn_, void *arg_) const;
+    void start_thread (thread_t &thread_,
+                       thread_fn *tfn_,
+                       void *arg_,
+                       const char *name_ = NULL) const;
 
-    int set (int option_, int optval_);
-    int get (int option_);
+    int set (int option_, const void *optval_, size_t optvallen_);
+    int get (int option_, void *optval_, const size_t *optvallen_);
 
   protected:
     //  Synchronisation of access to context options.
@@ -87,14 +90,14 @@ class thread_ctx_t
 //  Context object encapsulates all the global state associated with
 //  the library.
 
-class ctx_t : public thread_ctx_t
+class ctx_t ZMQ_FINAL : public thread_ctx_t
 {
   public:
     //  Create the context object.
     ctx_t ();
 
     //  Returns false if object is not a context.
-    bool check_tag ();
+    bool check_tag () const;
 
     //  This function is called when user invokes zmq_ctx_term. If there are
     //  no more sockets open it'll cause all the infrastructure to be shut
@@ -112,7 +115,8 @@ class ctx_t : public thread_ctx_t
     int shutdown ();
 
     //  Set and get context properties.
-    int set (int option_, int optval_);
+    int set (int option_, const void *optval_, size_t optvallen_);
+    int get (int option_, void *optval_, const size_t *optvallen_);
     int get (int option_);
 
     //  Create and destroy a socket.
@@ -128,12 +132,13 @@ class ctx_t : public thread_ctx_t
     zmq::io_thread_t *choose_io_thread (uint64_t affinity_);
 
     //  Returns reaper thread object.
-    zmq::object_t *get_reaper ();
+    zmq::object_t *get_reaper () const;
 
     //  Management of inproc endpoints.
     int register_endpoint (const char *addr_, const endpoint_t &endpoint_);
-    int unregister_endpoint (const std::string &addr_, socket_base_t *socket_);
-    void unregister_endpoints (zmq::socket_base_t *socket_);
+    int unregister_endpoint (const std::string &addr_,
+                             const socket_base_t *socket_);
+    void unregister_endpoints (const zmq::socket_base_t *socket_);
     endpoint_t find_endpoint (const char *addr_);
     void pend_connection (const std::string &addr_,
                           const endpoint_t &endpoint_,
@@ -237,8 +242,7 @@ class ctx_t : public thread_ctx_t
     // Should we use zero copy message decoding in this context?
     bool _zero_copy;
 
-    ctx_t (const ctx_t &);
-    const ctx_t &operator= (const ctx_t &);
+    ZMQ_NON_COPYABLE_NOR_MOVABLE (ctx_t)
 
 #ifdef HAVE_FORK
     // the process that created this context. Used to detect forking.
@@ -249,9 +253,10 @@ class ctx_t : public thread_ctx_t
         connect_side,
         bind_side
     };
-    void
+
+    static void
     connect_inproc_sockets (zmq::socket_base_t *bind_socket_,
-                            options_t &bind_options_,
+                            const options_t &bind_options_,
                             const pending_connection_t &pending_connection_,
                             side side_);
 

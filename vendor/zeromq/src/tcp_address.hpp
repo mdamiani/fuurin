@@ -82,13 +82,7 @@ class tcp_address_mask_t
     // Works only with remote hostnames.
     int resolve (const char *name_, bool ipv6_);
 
-    // The opposite to resolve()
-    int to_string (std::string &addr_) const;
-
-    int mask () const;
-
-    bool match_address (const struct sockaddr *ss_,
-                        const socklen_t ss_len_) const;
+    bool match_address (const struct sockaddr *ss_, socklen_t ss_len_) const;
 
   private:
     ip_addr_t _network_address;

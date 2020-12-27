@@ -52,23 +52,16 @@ enum
     //  real-time behaviour (less latency peaks).
     inbound_poll_rate = 100,
 
-    //  Maximal batching size for engines with receiving functionality.
-    //  So, if there are 10 messages that fit into the batch size, all of
-    //  them may be read by a single 'recv' system call, thus avoiding
-    //  unnecessary network stack traversals.
-    in_batch_size = 8192,
-
-    //  Maximal batching size for engines with sending functionality.
-    //  So, if there are 10 messages that fit into the batch size, all of
-    //  them may be written by a single 'send' system call, thus avoiding
-    //  unnecessary network stack traversals.
-    out_batch_size = 8192,
-
     //  Maximal delta between high and low watermark.
     max_wm_delta = 1024,
 
     //  Maximum number of events the I/O thread can process in one go.
     max_io_events = 256,
+
+    //  Maximal batch size of packets forwarded by a ZMQ proxy.
+    //  Increasing this value improves throughput at the expense of
+    //  latency and fairness.
+    proxy_burst_size = 1000,
 
     //  Maximal delay to process command in API thread (in CPU ticks).
     //  3,000,000 ticks equals to 1 - 2 milliseconds on current CPUs.

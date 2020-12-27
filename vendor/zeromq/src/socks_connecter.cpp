@@ -33,7 +33,6 @@
 
 #include "macros.hpp"
 #include "socks_connecter.hpp"
-#include "stream_engine.hpp"
 #include "random.hpp"
 #include "err.hpp"
 #include "ip.hpp"
@@ -58,64 +57,40 @@ zmq::socks_connecter_t::socks_connecter_t (class io_thread_t *io_thread_,
                                            address_t *addr_,
                                            address_t *proxy_addr_,
                                            bool delayed_start_) :
-    own_t (io_thread_, options_),
-    io_object_t (io_thread_),
-    _addr (addr_),
+    stream_connecter_base_t (
+      io_thread_, session_, options_, addr_, delayed_start_),
     _proxy_addr (proxy_addr_),
-    _status (unplugged),
-    _s (retired_fd),
-    _handle (static_cast<handle_t> (NULL)),
-    _handle_valid (false),
-    _delayed_start (delayed_start_),
-    _timer_started (false),
-    _session (session_),
-    _current_reconnect_ivl (options.reconnect_ivl)
+    _auth_method (socks_no_auth_required),
+    _status (unplugged)
 {
-    zmq_assert (_addr);
     zmq_assert (_addr->protocol == protocol_name::tcp);
     _proxy_addr->to_string (_endpoint);
-    _socket = _session->get_socket ();
 }
 
 zmq::socks_connecter_t::~socks_connecter_t ()
 {
-    zmq_assert (_s == retired_fd);
     LIBZMQ_DELETE (_proxy_addr);
 }
 
-void zmq::socks_connecter_t::process_plug ()
+void zmq::socks_connecter_t::set_auth_method_none ()
 {
-    if (_delayed_start)
-        start_timer ();
-    else
-        initiate_connect ();
+    _auth_method = socks_no_auth_required;
+    _auth_username.clear ();
+    _auth_password.clear ();
 }
 
-void zmq::socks_connecter_t::process_term (int linger_)
+void zmq::socks_connecter_t::set_auth_method_basic (
+  const std::string &username_, const std::string &password_)
 {
-    switch (_status) {
-        case unplugged:
-            break;
-        case waiting_for_reconnect_time:
-            cancel_timer (reconnect_timer_id);
-            break;
-        case waiting_for_proxy_connection:
-        case sending_greeting:
-        case waiting_for_choice:
-        case sending_request:
-        case waiting_for_response:
-            rm_fd (_handle);
-            if (_s != retired_fd)
-                close ();
-            break;
-    }
-
-    own_t::process_term (linger_);
+    _auth_method = socks_basic_auth;
+    _auth_username = username_;
+    _auth_password = password_;
 }
 
 void zmq::socks_connecter_t::in_event ()
 {
-    zmq_assert (_status != unplugged && _status != waiting_for_reconnect_time);
+    int expected_status = -1;
+    zmq_assert (_status != unplugged);
 
     if (_status == waiting_for_choice) {
         int rc = _choice_decoder.input (_s);
@@ -127,17 +102,24 @@ void zmq::socks_connecter_t::in_event ()
             if (rc == -1)
                 error ();
             else {
-                std::string hostname = "";
-                uint16_t port = 0;
-                if (parse_address (_addr->address, hostname, port) == -1)
-                    error ();
-                else {
-                    _request_encoder.encode (
-                      socks_request_t (1, hostname, port));
-                    reset_pollin (_handle);
-                    set_pollout (_handle);
-                    _status = sending_request;
-                }
+                if (choice.method == socks_basic_auth)
+                    expected_status = sending_basic_auth_request;
+                else
+                    expected_status = sending_request;
+            }
+        }
+    } else if (_status == waiting_for_auth_response) {
+        int rc = _auth_response_decoder.input (_s);
+        if (rc == 0 || rc == -1)
+            error ();
+        else if (_auth_response_decoder.message_ready ()) {
+            const socks_auth_response_t auth_response =
+              _auth_response_decoder.decode ();
+            rc = process_server_response (auth_response);
+            if (rc == -1)
+                error ();
+            else {
+                expected_status = sending_request;
             }
         }
     } else if (_status == waiting_for_response) {
@@ -150,40 +132,48 @@ void zmq::socks_connecter_t::in_event ()
             if (rc == -1)
                 error ();
             else {
-                //  Create the engine object for this connection.
-                stream_engine_t *engine =
-                  new (std::nothrow) stream_engine_t (_s, options, _endpoint);
-                alloc_assert (engine);
-
-                //  Attach the engine to the corresponding session object.
-                send_attach (_session, engine);
-
-                _socket->event_connected (_endpoint, _s);
-
-                rm_fd (_handle);
+                rm_handle ();
+                create_engine (
+                  _s, get_socket_name<tcp_address_t> (_s, socket_end_local));
                 _s = -1;
                 _status = unplugged;
-
-                //  Shut the connecter down.
-                terminate ();
             }
         }
     } else
         error ();
+
+    if (expected_status == sending_basic_auth_request) {
+        _basic_auth_request_encoder.encode (
+          socks_basic_auth_request_t (_auth_username, _auth_password));
+        reset_pollin (_handle);
+        set_pollout (_handle);
+        _status = sending_basic_auth_request;
+    } else if (expected_status == sending_request) {
+        std::string hostname;
+        uint16_t port = 0;
+        if (parse_address (_addr->address, hostname, port) == -1)
+            error ();
+        else {
+            _request_encoder.encode (socks_request_t (1, hostname, port));
+            reset_pollin (_handle);
+            set_pollout (_handle);
+            _status = sending_request;
+        }
+    }
 }
 
 void zmq::socks_connecter_t::out_event ()
 {
-    zmq_assert (_status == waiting_for_proxy_connection
-                || _status == sending_greeting || _status == sending_request);
+    zmq_assert (
+      _status == waiting_for_proxy_connection || _status == sending_greeting
+      || _status == sending_basic_auth_request || _status == sending_request);
 
     if (_status == waiting_for_proxy_connection) {
         const int rc = static_cast<int> (check_proxy_connection ());
         if (rc == -1)
             error ();
         else {
-            _greeting_encoder.encode (
-              socks_greeting_t (socks_no_auth_required));
+            _greeting_encoder.encode (socks_greeting_t (_auth_method));
             _status = sending_greeting;
         }
     } else if (_status == sending_greeting) {
@@ -195,6 +185,16 @@ void zmq::socks_connecter_t::out_event ()
             reset_pollout (_handle);
             set_pollin (_handle);
             _status = waiting_for_choice;
+        }
+    } else if (_status == sending_basic_auth_request) {
+        zmq_assert (_basic_auth_request_encoder.has_pending_data ());
+        const int rc = _basic_auth_request_encoder.output (_s);
+        if (rc == -1 || rc == 0)
+            error ();
+        else if (!_basic_auth_request_encoder.has_pending_data ()) {
+            reset_pollout (_handle);
+            set_pollin (_handle);
+            _status = waiting_for_auth_response;
         }
     } else {
         zmq_assert (_request_encoder.has_pending_data ());
@@ -209,8 +209,10 @@ void zmq::socks_connecter_t::out_event ()
     }
 }
 
-void zmq::socks_connecter_t::initiate_connect ()
+void zmq::socks_connecter_t::start_connecting ()
 {
+    zmq_assert (_status == unplugged);
+
     //  Open the connecting socket.
     const int rc = connect_to_proxy ();
 
@@ -225,21 +227,24 @@ void zmq::socks_connecter_t::initiate_connect ()
         _handle = add_fd (_s);
         set_pollout (_handle);
         _status = waiting_for_proxy_connection;
-        _socket->event_connect_delayed (_endpoint, zmq_errno ());
+        _socket->event_connect_delayed (
+          make_unconnected_connect_endpoint_pair (_endpoint), zmq_errno ());
     }
     //  Handle any other error condition by eventual reconnect.
     else {
         if (_s != retired_fd)
             close ();
-        start_timer ();
+        add_reconnect_timer ();
     }
 }
 
 int zmq::socks_connecter_t::process_server_response (
   const socks_choice_t &response_)
 {
-    //  We do not support any authentication method for now.
-    return response_.method == 0 ? 0 : -1;
+    return response_.method == socks_no_auth_required
+               || response_.method == socks_basic_auth
+             ? 0
+             : -1;
 }
 
 int zmq::socks_connecter_t::process_server_response (
@@ -248,11 +253,10 @@ int zmq::socks_connecter_t::process_server_response (
     return response_.response_code == 0 ? 0 : -1;
 }
 
-void zmq::socks_connecter_t::timer_event (int id_)
+int zmq::socks_connecter_t::process_server_response (
+  const socks_auth_response_t &response_)
 {
-    zmq_assert (_status == waiting_for_reconnect_time);
-    zmq_assert (id_ == reconnect_timer_id);
-    initiate_connect ();
+    return response_.response_code == 0 ? 0 : -1;
 }
 
 void zmq::socks_connecter_t::error ()
@@ -261,35 +265,12 @@ void zmq::socks_connecter_t::error ()
     close ();
     _greeting_encoder.reset ();
     _choice_decoder.reset ();
+    _basic_auth_request_encoder.reset ();
+    _auth_response_decoder.reset ();
     _request_encoder.reset ();
     _response_decoder.reset ();
-    start_timer ();
-}
-
-void zmq::socks_connecter_t::start_timer ()
-{
-    if (options.reconnect_ivl != -1) {
-        const int interval = get_new_reconnect_ivl ();
-        add_timer (interval, reconnect_timer_id);
-        _status = waiting_for_reconnect_time;
-        _socket->event_connect_retried (_endpoint, interval);
-    }
-}
-
-int zmq::socks_connecter_t::get_new_reconnect_ivl ()
-{
-    //  The new interval is the current interval + random value.
-    const int interval =
-      _current_reconnect_ivl + generate_random () % options.reconnect_ivl;
-
-    //  Only change the current reconnect interval  if the maximum reconnect
-    //  interval was set and if it's larger than the reconnect interval.
-    if (options.reconnect_ivl_max > 0
-        && options.reconnect_ivl_max > options.reconnect_ivl)
-        //  Calculate the next interval
-        _current_reconnect_ivl =
-          std::min (_current_reconnect_ivl * 2, options.reconnect_ivl_max);
-    return interval;
+    _status = unplugged;
+    add_reconnect_timer ();
 }
 
 int zmq::socks_connecter_t::connect_to_proxy ()
@@ -297,49 +278,30 @@ int zmq::socks_connecter_t::connect_to_proxy ()
     zmq_assert (_s == retired_fd);
 
     //  Resolve the address
-    LIBZMQ_DELETE (_proxy_addr->resolved.tcp_addr);
+    if (_proxy_addr->resolved.tcp_addr != NULL) {
+        LIBZMQ_DELETE (_proxy_addr->resolved.tcp_addr);
+    }
+
     _proxy_addr->resolved.tcp_addr = new (std::nothrow) tcp_address_t ();
     alloc_assert (_proxy_addr->resolved.tcp_addr);
-
-    int rc = _proxy_addr->resolved.tcp_addr->resolve (
-      _proxy_addr->address.c_str (), false, options.ipv6);
-    if (rc != 0) {
+    //  Automatic fallback to ipv4 is disabled here since this was the existing
+    //  behaviour, however I don't see a real reason for this. Maybe this can
+    //  be changed to true (and then the parameter can be removed entirely).
+    _s = tcp_open_socket (_proxy_addr->address.c_str (), options, false, false,
+                          _proxy_addr->resolved.tcp_addr);
+    if (_s == retired_fd) {
+        //  TODO we should emit some event in this case!
         LIBZMQ_DELETE (_proxy_addr->resolved.tcp_addr);
         return -1;
     }
     zmq_assert (_proxy_addr->resolved.tcp_addr != NULL);
-    const tcp_address_t *tcp_addr = _proxy_addr->resolved.tcp_addr;
-
-    //  Create the socket.
-    _s = open_socket (tcp_addr->family (), SOCK_STREAM, IPPROTO_TCP);
-    if (_s == retired_fd)
-        return -1;
-
-    //  On some systems, IPv4 mapping in IPv6 sockets is disabled by default.
-    //  Switch it on in such cases.
-    if (tcp_addr->family () == AF_INET6)
-        enable_ipv4_mapping (_s);
-
-    // Set the IP Type-Of-Service priority for this socket
-    if (options.tos != 0)
-        set_ip_type_of_service (_s, options.tos);
-
-    // Bind the socket to a device if applicable
-    if (!options.bound_device.empty ())
-        bind_to_device (_s, options.bound_device);
 
     // Set the socket to non-blocking mode so that we get async connect().
     unblock_socket (_s);
 
-    //  Set the socket buffer limits for the underlying socket.
-    if (options.sndbuf >= 0)
-        set_tcp_send_buffer (_s, options.sndbuf);
-    if (options.rcvbuf >= 0)
-        set_tcp_receive_buffer (_s, options.rcvbuf);
+    const tcp_address_t *const tcp_addr = _proxy_addr->resolved.tcp_addr;
 
-    // Set the IP Type-Of-Service for the underlying socket
-    if (options.tos != 0)
-        set_ip_type_of_service (_s, options.tos);
+    int rc;
 
     // Set a source address for conversations
     if (tcp_addr->has_src_addr ()) {
@@ -355,7 +317,7 @@ int zmq::socks_connecter_t::connect_to_proxy ()
         }
     }
 
-        //  Connect to the remote peer.
+    //  Connect to the remote peer.
 #if defined ZMQ_HAVE_VXWORKS
     rc = ::connect (_s, (sockaddr *) tcp_addr->addr (), tcp_addr->addrlen ());
 #else
@@ -382,7 +344,7 @@ int zmq::socks_connecter_t::connect_to_proxy ()
     return -1;
 }
 
-zmq::fd_t zmq::socks_connecter_t::check_proxy_connection ()
+zmq::fd_t zmq::socks_connecter_t::check_proxy_connection () const
 {
     //  Async connect has finished. Check whether an error occurred
     int err = 0;
@@ -425,26 +387,12 @@ zmq::fd_t zmq::socks_connecter_t::check_proxy_connection ()
     rc = tune_tcp_socket (_s);
     rc = rc
          | tune_tcp_keepalives (
-             _s, options.tcp_keepalive, options.tcp_keepalive_cnt,
-             options.tcp_keepalive_idle, options.tcp_keepalive_intvl);
+           _s, options.tcp_keepalive, options.tcp_keepalive_cnt,
+           options.tcp_keepalive_idle, options.tcp_keepalive_intvl);
     if (rc != 0)
         return -1;
 
     return 0;
-}
-
-void zmq::socks_connecter_t::close ()
-{
-    zmq_assert (_s != retired_fd);
-#ifdef ZMQ_HAVE_WINDOWS
-    const int rc = closesocket (_s);
-    wsa_assert (rc != SOCKET_ERROR);
-#else
-    const int rc = ::close (_s);
-    errno_assert (rc == 0);
-#endif
-    _socket->event_closed (_endpoint, _s);
-    _s = retired_fd;
 }
 
 int zmq::socks_connecter_t::parse_address (const std::string &address_,

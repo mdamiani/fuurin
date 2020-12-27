@@ -77,10 +77,7 @@ static int sleep_ms (unsigned int ms_)
 {
     if (ms_ == 0)
         return 0;
-#if defined ZMQ_HAVE_WINDOWS
-    Sleep (ms_ > 0 ? ms_ : INFINITE);
-    return 0;
-#elif defined ZMQ_HAVE_ANDROID
+#if defined ZMQ_HAVE_ANDROID
     usleep (ms_ * 1000);
     return 0;
 #elif defined ZMQ_HAVE_VXWORKS
@@ -186,10 +183,14 @@ void zmq::signaler_t::send ()
     ssize_t sz = write (_w, &inc, sizeof (inc));
     errno_assert (sz == sizeof (inc));
 #elif defined ZMQ_HAVE_WINDOWS
-    unsigned char dummy = 0;
-    const int nbytes =
-      ::send (_w, reinterpret_cast<char *> (&dummy), sizeof (dummy), 0);
-    wsa_assert (nbytes != SOCKET_ERROR);
+    const char dummy = 0;
+    int nbytes;
+    do {
+        nbytes = ::send (_w, &dummy, sizeof (dummy), 0);
+        wsa_assert (nbytes != SOCKET_ERROR);
+        // wsa_assert does not abort on WSAEWOULDBLOCK. If we get this, we retry.
+    } while (nbytes == SOCKET_ERROR);
+    // Given the small size of dummy (should be 1) expect that send was able to send everything.
     zmq_assert (nbytes == sizeof (dummy));
 #elif defined ZMQ_HAVE_VXWORKS
     unsigned char dummy = 0;
@@ -226,7 +227,7 @@ void zmq::signaler_t::send ()
 #endif
 }
 
-int zmq::signaler_t::wait (int timeout_)
+int zmq::signaler_t::wait (int timeout_) const
 {
 #ifdef HAVE_FORK
     if (unlikely (pid != getpid ())) {

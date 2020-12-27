@@ -33,7 +33,10 @@
 #if !defined ZMQ_HAVE_WINDOWS
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <netdb.h>
 #endif
+
+#include "address.hpp"
 
 namespace zmq
 {
@@ -48,7 +51,7 @@ union ip_addr_t
     uint16_t port () const;
 
     const struct sockaddr *as_sockaddr () const;
-    socklen_t sockaddr_len () const;
+    zmq_socklen_t sockaddr_len () const;
 
     void set_port (uint16_t);
 
@@ -65,12 +68,14 @@ class ip_resolver_options_t
     ip_resolver_options_t &ipv6 (bool ipv6_);
     ip_resolver_options_t &expect_port (bool expect_);
     ip_resolver_options_t &allow_dns (bool allow_);
+    ip_resolver_options_t &allow_path (bool allow_);
 
     bool bindable ();
     bool allow_nic_name ();
     bool ipv6 ();
     bool expect_port ();
     bool allow_dns ();
+    bool allow_path ();
 
   private:
     bool _bindable_wanted;
@@ -78,12 +83,14 @@ class ip_resolver_options_t
     bool _ipv6_wanted;
     bool _port_expected;
     bool _dns_allowed;
+    bool _path_allowed;
 };
 
 class ip_resolver_t
 {
   public:
     ip_resolver_t (ip_resolver_options_t opts_);
+    virtual ~ip_resolver_t (){};
 
     int resolve (ip_addr_t *ip_addr_, const char *name_);
 

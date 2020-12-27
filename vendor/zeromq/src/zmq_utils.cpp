@@ -63,19 +63,19 @@ void *zmq_stopwatch_start ()
     uint64_t *watch = static_cast<uint64_t *> (malloc (sizeof (uint64_t)));
     alloc_assert (watch);
     *watch = zmq::clock_t::now_us ();
-    return (void *) watch;
+    return static_cast<void *> (watch);
 }
 
 unsigned long zmq_stopwatch_intermediate (void *watch_)
 {
-    uint64_t end = zmq::clock_t::now_us ();
-    uint64_t start = *static_cast<uint64_t *> (watch_);
+    const uint64_t end = zmq::clock_t::now_us ();
+    const uint64_t start = *static_cast<uint64_t *> (watch_);
     return static_cast<unsigned long> (end - start);
 }
 
 unsigned long zmq_stopwatch_stop (void *watch_)
 {
-    unsigned long res = zmq_stopwatch_intermediate (watch_);
+    const unsigned long res = zmq_stopwatch_intermediate (watch_);
     free (watch_);
     return res;
 }
@@ -84,7 +84,7 @@ void *zmq_threadstart (zmq_thread_fn *func_, void *arg_)
 {
     zmq::thread_t *thread = new (std::nothrow) zmq::thread_t;
     alloc_assert (thread);
-    thread->start (func_, arg_);
+    thread->start (func_, arg_, "ZMQapp");
     return thread;
 }
 
@@ -166,6 +166,11 @@ uint8_t *zmq_z85_decode (uint8_t *dest_, const char *string_)
     unsigned int byte_nbr = 0;
     unsigned int char_nbr = 0;
     uint32_t value = 0;
+    size_t src_len = strlen (string_);
+
+    if (src_len < 5 || src_len % 5 != 0)
+        goto error_inval;
+
     while (string_[char_nbr]) {
         //  Accumulate value in base 85
         if (UINT32_MAX / 85 < value) {
@@ -173,12 +178,12 @@ uint8_t *zmq_z85_decode (uint8_t *dest_, const char *string_)
             goto error_inval;
         }
         value *= 85;
-        uint8_t index = string_[char_nbr++] - 32;
+        const uint8_t index = string_[char_nbr++] - 32;
         if (index >= sizeof (decoder)) {
             //  Invalid z85 encoding, character outside range
             goto error_inval;
         }
-        uint32_t summand = decoder[index];
+        const uint32_t summand = decoder[index];
         if (summand == 0xFF || summand > (UINT32_MAX - value)) {
             //  Invalid z85 encoding, invalid character or represented value exceeds 0xffffffff
             goto error_inval;
@@ -223,7 +228,7 @@ int zmq_curve_keypair (char *z85_public_key_, char *z85_secret_key_)
 
     zmq::random_open ();
 
-    int res = crypto_box_keypair (public_key, secret_key);
+    const int res = crypto_box_keypair (public_key, secret_key);
     zmq_z85_encode (z85_public_key_, public_key, 32);
     zmq_z85_encode (z85_secret_key_, secret_key, 32);
 

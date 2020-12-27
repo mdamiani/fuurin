@@ -27,19 +27,26 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+// TODO remove this workaround for handling libsodium/tweetnacl
+
+//  To define SIZE_MAX with older compilers
+#define __STDC_LIMIT_MACROS
+
+#if defined ZMQ_CUSTOM_PLATFORM_HPP
+#include "platform.hpp"
+#else
+#include "../src/platform.hpp"
+#endif
+
+#ifndef ZMQ_USE_TWEETNACL
+#define ZMQ_USE_TWEETNACL
+#endif
+#ifdef ZMQ_USE_LIBSODIUM
+#undef ZMQ_USE_LIBSODIUM
+#endif
+
 #include "testutil.hpp"
 #include "testutil_security.hpp"
-#if defined(ZMQ_HAVE_WINDOWS)
-#include <winsock2.h>
-#include <ws2tcpip.h>
-#include <stdexcept>
-#define close closesocket
-#else
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <unistd.h>
-#endif
 #include <unity.h>
 
 #include "../src/tweetnacl.h"
@@ -48,21 +55,6 @@
 
 char error_message_buffer[256];
 
-#if defined(_MSC_VER) && _MSC_VER < 1900
-#define snprintf _snprintf
-#endif
-
-const char *zmq_errno_message ()
-{
-    snprintf (error_message_buffer, sizeof (error_message_buffer),
-              "errno=%i (%s)", zmq_errno (), zmq_strerror (zmq_errno ()));
-    return error_message_buffer;
-}
-
-#define TEST_ASSERT_ZMQ_ERRNO(condition)                                       \
-    TEST_ASSERT_MESSAGE ((condition), zmq_errno_message ())
-
-void *ctx;
 void *handler;
 void *zap_thread;
 void *server;
@@ -71,14 +63,15 @@ char my_endpoint[MAX_SOCKET_STRING];
 
 void setUp ()
 {
-    setup_context_and_server_side (&ctx, &handler, &zap_thread, &server,
-                                   &server_mon, my_endpoint);
+    setup_test_context ();
+    setup_context_and_server_side (&handler, &zap_thread, &server, &server_mon,
+                                   my_endpoint);
 }
 
 void tearDown ()
 {
-    shutdown_context_and_server_side (ctx, zap_thread, server, server_mon,
-                                      handler);
+    shutdown_context_and_server_side (zap_thread, server, server_mon, handler);
+    teardown_test_context ();
 }
 
 const int timeout = 250;
@@ -91,15 +84,14 @@ const char large_routing_id[] = "0123456789012345678901234567890123456789"
                                 "0123456789012345678901234567890123456789"
                                 "012345678901234";
 
-static void zap_handler_large_routing_id (void *ctx_)
+static void zap_handler_large_routing_id (void * /*unused_*/)
 {
-    zap_handler_generic (ctx_, zap_ok, large_routing_id);
+    zap_handler_generic (zap_ok, large_routing_id);
 }
 
-void expect_new_client_curve_bounce_fail (void *ctx_,
-                                          char *server_public_,
-                                          char *client_public_,
-                                          char *client_secret_,
+void expect_new_client_curve_bounce_fail (const char *server_public_,
+                                          const char *client_public_,
+                                          const char *client_secret_,
                                           char *my_endpoint_,
                                           void *server_,
                                           void **client_mon_ = NULL,
@@ -109,20 +101,18 @@ void expect_new_client_curve_bounce_fail (void *ctx_,
     curve_client_data_t curve_client_data = {server_public_, client_public_,
                                              client_secret_};
     expect_new_client_bounce_fail (
-      ctx_, my_endpoint_, server_, socket_config_curve_client,
-      &curve_client_data, client_mon_, expected_client_event_,
-      expected_client_value_);
+      my_endpoint_, server_, socket_config_curve_client, &curve_client_data,
+      client_mon_, expected_client_event_, expected_client_value_);
 }
 
-void test_null_key (void *ctx_,
-                    void *server_,
+void test_null_key (void *server_,
                     void *server_mon_,
                     char *my_endpoint_,
                     char *server_public_,
                     char *client_public_,
                     char *client_secret_)
 {
-    expect_new_client_curve_bounce_fail (ctx_, server_public_, client_public_,
+    expect_new_client_curve_bounce_fail (server_public_, client_public_,
                                          client_secret_, my_endpoint_, server_);
 
     int handshake_failed_encryption_event_count =
@@ -148,12 +138,10 @@ void test_curve_security_with_valid_credentials ()
     curve_client_data_t curve_client_data = {
       valid_server_public, valid_client_public, valid_client_secret};
     void *client_mon;
-    void *client =
-      create_and_connect_client (ctx, my_endpoint, socket_config_curve_client,
-                                 &curve_client_data, &client_mon);
+    void *client = create_and_connect_client (
+      my_endpoint, socket_config_curve_client, &curve_client_data, &client_mon);
     bounce (server, client);
-    int rc = zmq_close (client);
-    TEST_ASSERT_ZMQ_ERRNO (rc == 0);
+    test_context_socket_close (client);
 
     int event = get_monitor_event_with_timeout (server_mon, NULL, NULL, -1);
     assert (event == ZMQ_EVENT_HANDSHAKE_SUCCEEDED);
@@ -165,8 +153,7 @@ void test_curve_security_with_valid_credentials ()
 
     assert_no_more_monitor_events_with_timeout (client_mon, timeout);
 
-    rc = zmq_close (client_mon);
-    TEST_ASSERT_ZMQ_ERRNO (rc == 0);
+    test_context_socket_close (client_mon);
 }
 
 void test_curve_security_with_bogus_client_credentials ()
@@ -177,7 +164,7 @@ void test_curve_security_with_bogus_client_credentials ()
     zmq_curve_keypair (bogus_public, bogus_secret);
 
     expect_new_client_curve_bounce_fail (
-      ctx, valid_server_public, bogus_public, bogus_secret, my_endpoint, server,
+      valid_server_public, bogus_public, bogus_secret, my_endpoint, server,
       NULL, ZMQ_EVENT_HANDSHAKE_FAILED_AUTH, 400);
 
     int server_event_count = 0;
@@ -196,10 +183,9 @@ void expect_zmtp_mechanism_mismatch (void *client_,
                                      void *server_mon_)
 {
     //  This must be caught by the curve_server class, not passed to ZAP
-    int rc = zmq_connect (client_, my_endpoint_);
-    TEST_ASSERT_ZMQ_ERRNO (rc == 0);
+    TEST_ASSERT_SUCCESS_ERRNO (zmq_connect (client_, my_endpoint_));
     expect_bounce_fail (server_, client_);
-    close_zero_linger (client_);
+    test_context_socket_close_zero_linger (client_);
 
     expect_monitor_event_multiple (server_mon_,
                                    ZMQ_EVENT_HANDSHAKE_FAILED_PROTOCOL,
@@ -210,51 +196,26 @@ void expect_zmtp_mechanism_mismatch (void *client_,
 
 void test_curve_security_with_null_client_credentials ()
 {
-    void *client = zmq_socket (ctx, ZMQ_DEALER);
-    TEST_ASSERT_NOT_NULL (client);
+    void *client = test_context_socket (ZMQ_DEALER);
 
     expect_zmtp_mechanism_mismatch (client, my_endpoint, server, server_mon);
 }
 
 void test_curve_security_with_plain_client_credentials ()
 {
-    void *client = zmq_socket (ctx, ZMQ_DEALER);
-    TEST_ASSERT_NOT_NULL (client);
-    int rc = zmq_setsockopt (client, ZMQ_PLAIN_USERNAME, "admin", 5);
-    TEST_ASSERT_ZMQ_ERRNO (rc == 0);
-    rc = zmq_setsockopt (client, ZMQ_PLAIN_PASSWORD, "password", 8);
-    TEST_ASSERT_ZMQ_ERRNO (rc == 0);
+    void *client = test_context_socket (ZMQ_DEALER);
+    TEST_ASSERT_SUCCESS_ERRNO (
+      zmq_setsockopt (client, ZMQ_PLAIN_USERNAME, "admin", 5));
+    TEST_ASSERT_SUCCESS_ERRNO (
+      zmq_setsockopt (client, ZMQ_PLAIN_PASSWORD, "password", 8));
 
     expect_zmtp_mechanism_mismatch (client, my_endpoint, server, server_mon);
-}
-
-fd_t connect_vanilla_socket (char *my_endpoint_)
-{
-    fd_t s;
-    struct sockaddr_in ip4addr;
-
-    unsigned short int port;
-    int rc = sscanf (my_endpoint_, "tcp://127.0.0.1:%hu", &port);
-    TEST_ASSERT_EQUAL_INT (1, rc);
-
-    ip4addr.sin_family = AF_INET;
-    ip4addr.sin_port = htons (port);
-#if defined(ZMQ_HAVE_WINDOWS) && (_WIN32_WINNT < 0x0600)
-    ip4addr.sin_addr.s_addr = inet_addr ("127.0.0.1");
-#else
-    inet_pton (AF_INET, "127.0.0.1", &ip4addr.sin_addr);
-#endif
-
-    s = socket (AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    rc = connect (s, (struct sockaddr *) &ip4addr, sizeof (ip4addr));
-    TEST_ASSERT_GREATER_THAN_INT (-1, rc);
-    return s;
 }
 
 void test_curve_security_unauthenticated_message ()
 {
     // Unauthenticated messages from a vanilla socket shouldn't be received
-    fd_t s = connect_vanilla_socket (my_endpoint);
+    fd_t s = connect_socket (my_endpoint);
     // send anonymous ZMTP/1.0 greeting
     send (s, "\x01\x00", 2, 0);
     // send sneaky message that shouldn't be received
@@ -281,21 +242,16 @@ template <size_t N> void send (fd_t fd_, const char (&data_)[N])
     send_all (fd_, data_, N - 1);
 }
 
-void send_greeting (fd_t s_)
+template <size_t N> void send (fd_t fd_, const uint8_t (&data_)[N])
 {
-    send (s_, "\xff\0\0\0\0\0\0\0\0\x7f");            // signature
-    send (s_, "\x03\x00");                            // version 3.0
-    send (s_, "CURVE\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"); // mechanism CURVE
-    send (s_, "\0");                                  // as-server == false
-    send (s_, "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0");
+    send_all (fd_, reinterpret_cast<const char *> (&data_), N);
 }
 
 void test_curve_security_invalid_hello_wrong_length ()
 {
-    fd_t s = connect_vanilla_socket (my_endpoint);
+    fd_t s = connect_socket (my_endpoint);
 
-    // send GREETING
-    send_greeting (s);
+    send (s, zmtp_greeting_curve);
 
     // send CURVE HELLO of wrong size
     send (s, "\x04\x06\x05HELLO");
@@ -326,8 +282,8 @@ zmq::curve_client_tools_t make_curve_client_tools ()
                                       valid_server_public_decoded);
 }
 
-#ifndef htonll
-uint64_t htonll (uint64_t value_)
+// same as htonll, which is only available on few platforms (recent Windows, but not on Linux, e.g.(
+static uint64_t host_to_network (uint64_t value_)
 {
     // The answer is 42
     static const int num = 42;
@@ -339,11 +295,9 @@ uint64_t htonll (uint64_t value_)
           htonl (static_cast<uint32_t> (value_ & 0xFFFFFFFFLL));
 
         return (static_cast<uint64_t> (low_part) << 32) | high_part;
-    } else {
-        return value_;
     }
+    return value_;
 }
-#endif
 
 template <size_t N> void send_command (fd_t s_, char (&command_)[N])
 {
@@ -353,24 +307,23 @@ template <size_t N> void send_command (fd_t s_, char (&command_)[N])
         send_all (s_, &len, 1);
     } else {
         send (s_, "\x06");
-        uint64_t len = htonll (N);
-        send_all (s_, (char *) &len, 8);
+        uint64_t len = host_to_network (N);
+        send_all (s_, reinterpret_cast<char *> (&len), 8);
     }
     send_all (s_, command_, N);
 }
 
 void test_curve_security_invalid_hello_command_name ()
 {
-    fd_t s = connect_vanilla_socket (my_endpoint);
+    fd_t s = connect_socket (my_endpoint);
 
-    send_greeting (s);
+    send (s, zmtp_greeting_curve);
 
     zmq::curve_client_tools_t tools = make_curve_client_tools ();
 
     // send CURVE HELLO with a misspelled command name (but otherwise correct)
     char hello[hello_length];
-    int rc = tools.produce_hello (hello, 0);
-    TEST_ASSERT_ZMQ_ERRNO (rc == 0);
+    TEST_ASSERT_SUCCESS_ERRNO (tools.produce_hello (hello, 0));
     hello[5] = 'X';
 
     send_command (s, hello);
@@ -384,16 +337,15 @@ void test_curve_security_invalid_hello_command_name ()
 
 void test_curve_security_invalid_hello_version ()
 {
-    fd_t s = connect_vanilla_socket (my_endpoint);
+    fd_t s = connect_socket (my_endpoint);
 
-    send_greeting (s);
+    send (s, zmtp_greeting_curve);
 
     zmq::curve_client_tools_t tools = make_curve_client_tools ();
 
     // send CURVE HELLO with a wrong version number (but otherwise correct)
     char hello[hello_length];
-    int rc = tools.produce_hello (hello, 0);
-    TEST_ASSERT_ZMQ_ERRNO (rc == 0);
+    TEST_ASSERT_SUCCESS_ERRNO (tools.produce_hello (hello, 0));
     hello[6] = 2;
 
     send_command (s, hello);
@@ -419,7 +371,7 @@ void recv_all (fd_t fd_, uint8_t *data_, socket_size_t len_)
 {
     socket_size_t received = 0;
     while (received < len_) {
-        int res = recv (fd_, (char *) data_, len_, 0);
+        int res = recv (fd_, reinterpret_cast<char *> (data_), len_, 0);
         TEST_ASSERT_GREATER_THAN_INT (0, res);
 
         data_ += res;
@@ -437,15 +389,14 @@ void recv_greeting (fd_t fd_)
 fd_t connect_exchange_greeting_and_send_hello (
   char *my_endpoint_, zmq::curve_client_tools_t &tools_)
 {
-    fd_t s = connect_vanilla_socket (my_endpoint_);
+    fd_t s = connect_socket (my_endpoint_);
 
-    send_greeting (s);
+    send (s, zmtp_greeting_curve);
     recv_greeting (s);
 
     // send valid CURVE HELLO
     char hello[hello_length];
-    int rc = tools_.produce_hello (hello, 0);
-    TEST_ASSERT_ZMQ_ERRNO (rc == 0);
+    TEST_ASSERT_SUCCESS_ERRNO (tools_.produce_hello (hello, 0));
 
     send_command (s, hello);
     return s;
@@ -485,10 +436,11 @@ fd_t connect_exchange_greeting_and_hello_welcome (
     recv_all (s, welcome, welcome_length + 2);
 
     uint8_t cn_precom[crypto_box_BEFORENMBYTES];
-    int res = tools_.process_welcome (welcome + 2, welcome_length, cn_precom);
-    TEST_ASSERT_ZMQ_ERRNO (res == 0);
+    TEST_ASSERT_SUCCESS_ERRNO (
+      tools_.process_welcome (welcome + 2, welcome_length, cn_precom));
 
-    res = get_monitor_event_with_timeout (server_mon_, NULL, NULL, timeout_);
+    const int res =
+      get_monitor_event_with_timeout (server_mon_, NULL, NULL, timeout_);
     TEST_ASSERT_EQUAL_INT (-1, res);
 
     return s;
@@ -569,8 +521,7 @@ void test_curve_security_invalid_keysize (void *ctx_)
     errno = 0;
     rc = zmq_setsockopt (client, ZMQ_CURVE_SECRETKEY, valid_client_secret, 123);
     assert (rc == -1 && errno == EINVAL);
-    rc = zmq_close (client);
-    TEST_ASSERT_ZMQ_ERRNO (rc == 0);
+    TEST_ASSERT_SUCCESS_ERRNO (zmq_close (client));
 }
 
 // TODO why isn't this const?
@@ -580,7 +531,7 @@ void test_null_server_key ()
 {
     //  Check CURVE security with a null server key
     //  This will be caught by the curve_server class, not passed to ZAP
-    test_null_key (ctx, server, server_mon, my_endpoint, null_key,
+    test_null_key (server, server_mon, my_endpoint, null_key,
                    valid_client_public, valid_client_secret);
 }
 
@@ -588,7 +539,7 @@ void test_null_client_public_key ()
 {
     //  Check CURVE security with a null client public key
     //  This will be caught by the curve_server class, not passed to ZAP
-    test_null_key (ctx, server, server_mon, my_endpoint, valid_server_public,
+    test_null_key (server, server_mon, my_endpoint, valid_server_public,
                    null_key, valid_client_secret);
 }
 
@@ -596,7 +547,7 @@ void test_null_client_secret_key ()
 {
     //  Check CURVE security with a null client public key
     //  This will be caught by the curve_server class, not passed to ZAP
-    test_null_key (ctx, server, server_mon, my_endpoint, valid_server_public,
+    test_null_key (server, server_mon, my_endpoint, valid_server_public,
                    valid_client_public, null_key);
 }
 
@@ -638,18 +589,18 @@ int main (void)
     //  test with a large routing id (resulting in large metadata)
     fprintf (stderr,
              "test_curve_security_with_valid_credentials (large routing id)\n");
-    setup_context_and_server_side (
-      &ctx, &handler, &zap_thread, &server, &server_mon, my_endpoint,
-      &zap_handler_large_routing_id, &socket_config_curve_server,
-      &valid_server_secret, large_routing_id);
+    setup_test_context ();
+    setup_context_and_server_side (&handler, &zap_thread, &server, &server_mon,
+                                   my_endpoint, &zap_handler_large_routing_id,
+                                   &socket_config_curve_server,
+                                   &valid_server_secret, large_routing_id);
     test_curve_security_with_valid_credentials ();
-    shutdown_context_and_server_side (ctx, zap_thread, server, server_mon,
-                                      handler);
+    shutdown_context_and_server_side (zap_thread, server, server_mon, handler);
+    teardown_test_context ();
 
-    ctx = zmq_ctx_new ();
+    void *ctx = zmq_ctx_new ();
     test_curve_security_invalid_keysize (ctx);
-    int rc = zmq_ctx_term (ctx);
-    TEST_ASSERT_ZMQ_ERRNO (rc == 0);
+    TEST_ASSERT_SUCCESS_ERRNO (zmq_ctx_term (ctx));
 
     zmq::random_close ();
 

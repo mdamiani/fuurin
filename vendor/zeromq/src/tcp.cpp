@@ -32,6 +32,7 @@
 #include "ip.hpp"
 #include "tcp.hpp"
 #include "err.hpp"
+#include "options.hpp"
 
 #if !defined ZMQ_HAVE_WINDOWS
 #include <fcntl.h>
@@ -39,6 +40,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
+#include <unistd.h>
 #ifdef ZMQ_HAVE_VXWORKS
 #include <sockLib.h>
 #endif
@@ -58,9 +60,10 @@ int zmq::tune_tcp_socket (fd_t s_)
     //  so using Nagle wouldn't improve throughput in anyway, but it would
     //  hurt latency.
     int nodelay = 1;
-    int rc = setsockopt (s_, IPPROTO_TCP, TCP_NODELAY,
-                         reinterpret_cast<char *> (&nodelay), sizeof (int));
-    tcp_assert_tuning_error (s_, rc);
+    const int rc =
+      setsockopt (s_, IPPROTO_TCP, TCP_NODELAY,
+                  reinterpret_cast<char *> (&nodelay), sizeof (int));
+    assert_success_or_recoverable (s_, rc);
     if (rc != 0)
         return rc;
 
@@ -69,7 +72,7 @@ int zmq::tune_tcp_socket (fd_t s_)
     int nodelack = 1;
     rc = setsockopt (s_, IPPROTO_TCP, TCP_NODELACK, (char *) &nodelack,
                      sizeof (int));
-    tcp_assert_tuning_error (s_, rc);
+    assert_success_or_recoverable (s_, rc);
 #endif
     return rc;
 }
@@ -79,7 +82,7 @@ int zmq::set_tcp_send_buffer (fd_t sockfd_, int bufsize_)
     const int rc =
       setsockopt (sockfd_, SOL_SOCKET, SO_SNDBUF,
                   reinterpret_cast<char *> (&bufsize_), sizeof bufsize_);
-    tcp_assert_tuning_error (sockfd_, rc);
+    assert_success_or_recoverable (sockfd_, rc);
     return rc;
 }
 
@@ -88,7 +91,7 @@ int zmq::set_tcp_receive_buffer (fd_t sockfd_, int bufsize_)
     const int rc =
       setsockopt (sockfd_, SOL_SOCKET, SO_RCVBUF,
                   reinterpret_cast<char *> (&bufsize_), sizeof bufsize_);
-    tcp_assert_tuning_error (sockfd_, rc);
+    assert_success_or_recoverable (sockfd_, rc);
     return rc;
 }
 
@@ -118,10 +121,10 @@ int zmq::tune_tcp_keepalives (fd_t s_,
         keepalive_opts.keepaliveinterval =
           keepalive_intvl_ != -1 ? keepalive_intvl_ * 1000 : 1000;
         DWORD num_bytes_returned;
-        int rc = WSAIoctl (s_, SIO_KEEPALIVE_VALS, &keepalive_opts,
-                           sizeof (keepalive_opts), NULL, 0,
-                           &num_bytes_returned, NULL, NULL);
-        tcp_assert_tuning_error (s_, rc);
+        const int rc = WSAIoctl (s_, SIO_KEEPALIVE_VALS, &keepalive_opts,
+                                 sizeof (keepalive_opts), NULL, 0,
+                                 &num_bytes_returned, NULL, NULL);
+        assert_success_or_recoverable (s_, rc);
         if (rc == SOCKET_ERROR)
             return rc;
     }
@@ -131,7 +134,7 @@ int zmq::tune_tcp_keepalives (fd_t s_,
         int rc =
           setsockopt (s_, SOL_SOCKET, SO_KEEPALIVE,
                       reinterpret_cast<char *> (&keepalive_), sizeof (int));
-        tcp_assert_tuning_error (s_, rc);
+        assert_success_or_recoverable (s_, rc);
         if (rc != 0)
             return rc;
 
@@ -139,7 +142,7 @@ int zmq::tune_tcp_keepalives (fd_t s_,
         if (keepalive_cnt_ != -1) {
             int rc = setsockopt (s_, IPPROTO_TCP, TCP_KEEPCNT, &keepalive_cnt_,
                                  sizeof (int));
-            tcp_assert_tuning_error (s_, rc);
+            assert_success_or_recoverable (s_, rc);
             if (rc != 0)
                 return rc;
         }
@@ -149,7 +152,7 @@ int zmq::tune_tcp_keepalives (fd_t s_,
         if (keepalive_idle_ != -1) {
             int rc = setsockopt (s_, IPPROTO_TCP, TCP_KEEPIDLE,
                                  &keepalive_idle_, sizeof (int));
-            tcp_assert_tuning_error (s_, rc);
+            assert_success_or_recoverable (s_, rc);
             if (rc != 0)
                 return rc;
         }
@@ -158,7 +161,7 @@ int zmq::tune_tcp_keepalives (fd_t s_,
         if (keepalive_idle_ != -1) {
             int rc = setsockopt (s_, IPPROTO_TCP, TCP_KEEPALIVE,
                                  &keepalive_idle_, sizeof (int));
-            tcp_assert_tuning_error (s_, rc);
+            assert_success_or_recoverable (s_, rc);
             if (rc != 0)
                 return rc;
         }
@@ -169,7 +172,7 @@ int zmq::tune_tcp_keepalives (fd_t s_,
         if (keepalive_intvl_ != -1) {
             int rc = setsockopt (s_, IPPROTO_TCP, TCP_KEEPINTVL,
                                  &keepalive_intvl_, sizeof (int));
-            tcp_assert_tuning_error (s_, rc);
+            assert_success_or_recoverable (s_, rc);
             if (rc != 0)
                 return rc;
         }
@@ -191,16 +194,16 @@ int zmq::tune_tcp_maxrt (fd_t sockfd_, int timeout_)
 #if defined(ZMQ_HAVE_WINDOWS) && defined(TCP_MAXRT)
     // msdn says it's supported in >= Vista, >= Windows Server 2003
     timeout_ /= 1000; // in seconds
-    int rc =
+    const int rc =
       setsockopt (sockfd_, IPPROTO_TCP, TCP_MAXRT,
                   reinterpret_cast<char *> (&timeout_), sizeof (timeout_));
-    tcp_assert_tuning_error (sockfd_, rc);
+    assert_success_or_recoverable (sockfd_, rc);
     return rc;
 // FIXME: should be ZMQ_HAVE_TCP_USER_TIMEOUT
 #elif defined(TCP_USER_TIMEOUT)
     int rc = setsockopt (sockfd_, IPPROTO_TCP, TCP_USER_TIMEOUT, &timeout_,
                          sizeof (timeout_));
-    tcp_assert_tuning_error (sockfd_, rc);
+    assert_success_or_recoverable (sockfd_, rc);
     return rc;
 #else
     return 0;
@@ -211,7 +214,7 @@ int zmq::tcp_write (fd_t s_, const void *data_, size_t size_)
 {
 #ifdef ZMQ_HAVE_WINDOWS
 
-    int nbytes = send (s_, (char *) data_, static_cast<int> (size_), 0);
+    const int nbytes = send (s_, (char *) data_, static_cast<int> (size_), 0);
 
     //  If not a single byte can be written to the socket in non-blocking mode
     //  we'll get an error (this may happen during the speculative write).
@@ -314,62 +317,18 @@ int zmq::tcp_read (fd_t s_, void *data_, size_t size_)
 #endif
 }
 
-void zmq::tcp_assert_tuning_error (zmq::fd_t s_, int rc_)
-{
-    if (rc_ == 0)
-        return;
-
-    //  Check whether an error occurred
-    int err = 0;
-#if defined ZMQ_HAVE_HPUX || defined ZMQ_HAVE_VXWORKS
-    int len = sizeof err;
-#else
-    socklen_t len = sizeof err;
-#endif
-
-    int rc = getsockopt (s_, SOL_SOCKET, SO_ERROR,
-                         reinterpret_cast<char *> (&err), &len);
-
-    //  Assert if the error was caused by 0MQ bug.
-    //  Networking problems are OK. No need to assert.
-#ifdef ZMQ_HAVE_WINDOWS
-    zmq_assert (rc == 0);
-    if (err != 0) {
-        wsa_assert (err == WSAECONNREFUSED || err == WSAECONNRESET
-                    || err == WSAECONNABORTED || err == WSAEINTR
-                    || err == WSAETIMEDOUT || err == WSAEHOSTUNREACH
-                    || err == WSAENETUNREACH || err == WSAENETDOWN
-                    || err == WSAENETRESET || err == WSAEACCES
-                    || err == WSAEINVAL || err == WSAEADDRINUSE);
-    }
-#else
-    //  Following code should handle both Berkeley-derived socket
-    //  implementations and Solaris.
-    if (rc == -1)
-        err = errno;
-    if (err != 0) {
-        errno = err;
-        errno_assert (errno == ECONNREFUSED || errno == ECONNRESET
-                      || errno == ECONNABORTED || errno == EINTR
-                      || errno == ETIMEDOUT || errno == EHOSTUNREACH
-                      || errno == ENETUNREACH || errno == ENETDOWN
-                      || errno == ENETRESET || errno == EINVAL);
-    }
-#endif
-}
-
 void zmq::tcp_tune_loopback_fast_path (const fd_t socket_)
 {
 #if defined ZMQ_HAVE_WINDOWS && defined SIO_LOOPBACK_FAST_PATH
     int sio_loopback_fastpath = 1;
     DWORD number_of_bytes_returned = 0;
 
-    int rc = WSAIoctl (socket_, SIO_LOOPBACK_FAST_PATH, &sio_loopback_fastpath,
-                       sizeof sio_loopback_fastpath, NULL, 0,
-                       &number_of_bytes_returned, 0, 0);
+    const int rc = WSAIoctl (
+      socket_, SIO_LOOPBACK_FAST_PATH, &sio_loopback_fastpath,
+      sizeof sio_loopback_fastpath, NULL, 0, &number_of_bytes_returned, 0, 0);
 
     if (SOCKET_ERROR == rc) {
-        DWORD last_error = ::WSAGetLastError ();
+        const DWORD last_error = ::WSAGetLastError ();
 
         if (WSAEOPNOTSUPP == last_error) {
             // This system is not Windows 8 or Server 2012, and the call is not supported.
@@ -380,4 +339,70 @@ void zmq::tcp_tune_loopback_fast_path (const fd_t socket_)
 #else
     LIBZMQ_UNUSED (socket_);
 #endif
+}
+
+zmq::fd_t zmq::tcp_open_socket (const char *address_,
+                                const zmq::options_t &options_,
+                                bool local_,
+                                bool fallback_to_ipv4_,
+                                zmq::tcp_address_t *out_tcp_addr_)
+{
+    //  Convert the textual address into address structure.
+    int rc = out_tcp_addr_->resolve (address_, local_, options_.ipv6);
+    if (rc != 0)
+        return retired_fd;
+
+    //  Create the socket.
+    fd_t s = open_socket (out_tcp_addr_->family (), SOCK_STREAM, IPPROTO_TCP);
+
+    //  IPv6 address family not supported, try automatic downgrade to IPv4.
+    if (s == retired_fd && fallback_to_ipv4_
+        && out_tcp_addr_->family () == AF_INET6 && errno == EAFNOSUPPORT
+        && options_.ipv6) {
+        rc = out_tcp_addr_->resolve (address_, local_, false);
+        if (rc != 0) {
+            return retired_fd;
+        }
+        s = open_socket (AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    }
+
+    if (s == retired_fd) {
+        return retired_fd;
+    }
+
+    //  On some systems, IPv4 mapping in IPv6 sockets is disabled by default.
+    //  Switch it on in such cases.
+    if (out_tcp_addr_->family () == AF_INET6)
+        enable_ipv4_mapping (s);
+
+    // Set the IP Type-Of-Service priority for this socket
+    if (options_.tos != 0)
+        set_ip_type_of_service (s, options_.tos);
+
+    // Set the socket to loopback fastpath if configured.
+    if (options_.loopback_fastpath)
+        tcp_tune_loopback_fast_path (s);
+
+    // Bind the socket to a device if applicable
+    if (!options_.bound_device.empty ())
+        if (bind_to_device (s, options_.bound_device) == -1)
+            goto setsockopt_error;
+
+    //  Set the socket buffer limits for the underlying socket.
+    if (options_.sndbuf >= 0)
+        set_tcp_send_buffer (s, options_.sndbuf);
+    if (options_.rcvbuf >= 0)
+        set_tcp_receive_buffer (s, options_.rcvbuf);
+
+    return s;
+
+setsockopt_error:
+#ifdef ZMQ_HAVE_WINDOWS
+    rc = closesocket (s);
+    wsa_assert (rc != SOCKET_ERROR);
+#else
+    rc = ::close (s);
+    errno_assert (rc == 0);
+#endif
+    return retired_fd;
 }

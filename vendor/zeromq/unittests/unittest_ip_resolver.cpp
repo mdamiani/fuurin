@@ -18,11 +18,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include <unity.h>
+#include "../src/macros.hpp"
 #include "../tests/testutil.hpp"
+#include "../tests/testutil_unity.hpp"
 #include "../unittests/unittest_resolver_common.hpp"
 
 #include <ip_resolver.hpp>
 #include <ip.hpp>
+
+#ifndef _WIN32
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netdb.h>
+#endif
 
 void setUp ()
 {
@@ -32,7 +40,7 @@ void tearDown ()
 {
 }
 
-class test_ip_resolver_t : public zmq::ip_resolver_t
+class test_ip_resolver_t ZMQ_FINAL : public zmq::ip_resolver_t
 {
   public:
     test_ip_resolver_t (zmq::ip_resolver_options_t opts_) :
@@ -48,10 +56,10 @@ class test_ip_resolver_t : public zmq::ip_resolver_t
         const char *ipv6;
     };
 
-    virtual int do_getaddrinfo (const char *node_,
-                                const char *service_,
-                                const struct addrinfo *hints_,
-                                struct addrinfo **res_)
+    int do_getaddrinfo (const char *node_,
+                        const char *service_,
+                        const struct addrinfo *hints_,
+                        struct addrinfo **res_) ZMQ_FINAL
     {
         static const struct dns_lut_t dns_lut[] = {
           {"ip.zeromq.org", "10.100.0.1", "fdf5:d058:d656::1"},
@@ -61,7 +69,7 @@ class test_ip_resolver_t : public zmq::ip_resolver_t
         unsigned lut_len = sizeof (dns_lut) / sizeof (dns_lut[0]);
         struct addrinfo ai;
 
-        assert (service_ == NULL);
+        TEST_ASSERT_NULL (service_);
 
         bool ipv6 = (hints_->ai_family == AF_INET6);
         bool no_dns = (hints_->ai_flags & AI_NUMERICHOST) != 0;
@@ -98,7 +106,7 @@ class test_ip_resolver_t : public zmq::ip_resolver_t
         return zmq::ip_resolver_t::do_getaddrinfo (ip, NULL, &ai, res_);
     }
 
-    virtual unsigned int do_if_nametoindex (const char *ifname_)
+    unsigned int do_if_nametoindex (const char *ifname_) ZMQ_FINAL
     {
         static const char *dummy_interfaces[] = {
           "lo0",
@@ -150,11 +158,12 @@ static void test_resolve (zmq::ip_resolver_options_t opts_,
     int rc = resolver.resolve (&addr, name_);
 
     if (expected_addr_ == NULL) {
+        // TODO also check the expected errno
         TEST_ASSERT_EQUAL (-1, rc);
         return;
-    } else {
-        TEST_ASSERT_EQUAL (0, rc);
     }
+    TEST_ASSERT_SUCCESS_ERRNO (rc);
+
 
     validate_address (family, &addr, expected_addr_, expected_port_,
                       expected_zone_, expected_addr_v4_failover_);
@@ -803,9 +812,7 @@ static void test_addr (int family_, const char *addr_, bool multicast_)
     test_ip_resolver_t resolver (resolver_opts);
     zmq::ip_addr_t addr;
 
-    int rc = resolver.resolve (&addr, addr_);
-
-    assert (rc == 0);
+    TEST_ASSERT_SUCCESS_ERRNO (resolver.resolve (&addr, addr_));
 
     TEST_ASSERT_EQUAL (family_, addr.family ());
     TEST_ASSERT_EQUAL (multicast_, addr.is_multicast ());

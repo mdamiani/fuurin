@@ -37,6 +37,7 @@
 #include <pthread.h>
 #endif
 #include <set>
+#include <cstring>
 
 namespace zmq
 {
@@ -52,13 +53,14 @@ typedef void(thread_fn) (void *);
 class thread_t
 {
   public:
-    inline thread_t () :
+    thread_t () :
         _tfn (NULL),
         _arg (NULL),
         _started (false),
         _thread_priority (ZMQ_THREAD_PRIORITY_DFLT),
         _thread_sched_policy (ZMQ_THREAD_SCHED_POLICY_DFLT)
     {
+        memset (_name, 0, sizeof (_name));
     }
 
 #ifdef ZMQ_HAVE_VXWORKS
@@ -72,7 +74,9 @@ class thread_t
 
     //  Creates OS thread. 'tfn' is main thread function. It'll be passed
     //  'arg' as an argument.
-    void start (thread_fn *tfn_, void *arg_);
+    //  Name is 16 characters max including terminating NUL. Thread naming is
+    //  implemented only for pthread, and windows when a debugger is attached.
+    void start (thread_fn *tfn_, void *arg_, const char *name_);
 
     //  Returns whether the thread was started, i.e. start was called.
     bool get_started () const;
@@ -90,21 +94,24 @@ class thread_t
                                   int scheduling_policy_,
                                   const std::set<int> &affinity_cpus_);
 
-    // Sets the thread name, 16 characters max including terminating NUL.
-    // Only implemented for pthread. Has no effect on other platforms.
-    void setThreadName (const char *name_);
-
     //  These are internal members. They should be private, however then
     //  they would not be accessible from the main C routine of the thread.
     void applySchedulingParameters ();
+    void applyThreadName ();
     thread_fn *_tfn;
     void *_arg;
+    char _name[16];
 
   private:
     bool _started;
 
 #ifdef ZMQ_HAVE_WINDOWS
     HANDLE _descriptor;
+#if defined _WIN32_WCE
+    DWORD _thread_id;
+#else
+    unsigned int _thread_id;
+#endif
 #elif defined ZMQ_HAVE_VXWORKS
     int _descriptor;
     enum
@@ -122,8 +129,7 @@ class thread_t
     int _thread_sched_policy;
     std::set<int> _thread_affinity_cpus;
 
-    thread_t (const thread_t &);
-    const thread_t &operator= (const thread_t &);
+    ZMQ_NON_COPYABLE_NOR_MOVABLE (thread_t)
 };
 }
 

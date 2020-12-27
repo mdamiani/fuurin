@@ -8,20 +8,13 @@
  # file, You can obtain one at http://mozilla.org/MPL/2.0/.
  ##
 
-cmake_minimum_required(VERSION 3.5.1)
+cmake_minimum_required(VERSION 3.15.3)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 project(fuurin)
 
 set(CMAKE_CXX_STANDARD 17)
-
-add_definitions(
-    -Wall
-    -Wextra
-    -DBOOST_SCOPE_EXIT_CONFIG_USE_LAMBDAS
-    -DZMQ_BUILD_DRAFT_API
-)
 
 include(BuildType)
 include(Sanitizer)
@@ -42,8 +35,11 @@ ExternalProject_Add(zeromq
         -D BUILD_SHARED=OFF
         -D BUILD_STATIC=ON
         -D ENABLE_DRAFTS=ON
+        -D WITH_TLS=OFF
+        -D ENABLE_CURVE=OFF
         -D CMAKE_BUILD_TYPE=Release
 )
+
 
 set(LIB_SOURCES
     src/fuurin.cpp
@@ -112,6 +108,22 @@ link_directories(${3RDPARTY_DIR}/lib)
 
 add_library(fuurin_shared SHARED ${LIB_SOURCES})
 add_library(fuurin_static STATIC ${LIB_SOURCES})
+
+set(LIB_COMPILE_FLAGS
+    -Wall
+    -Wextra
+)
+
+set(LIB_COMPILE_DEFS
+    BOOST_SCOPE_EXIT_CONFIG_USE_LAMBDAS
+    ZMQ_BUILD_DRAFT_API
+)
+
+target_compile_options(fuurin_shared PUBLIC ${LIB_COMPILE_FLAGS})
+target_compile_options(fuurin_static PUBLIC ${LIB_COMPILE_FLAGS})
+
+target_compile_definitions(fuurin_shared PUBLIC ${LIB_COMPILE_DEFS})
+target_compile_definitions(fuurin_static PUBLIC ${LIB_COMPILE_DEFS})
 
 set_target_properties(fuurin_shared PROPERTIES
     OUTPUT_NAME ${PROJECT_NAME}
