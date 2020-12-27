@@ -12,6 +12,8 @@ AC_CONFIG_AUX_DIR(config)
 AC_CONFIG_MACRO_DIR(config)
 AC_CONFIG_HEADERS([src/platform.hpp])
 AM_INIT_AUTOMAKE(foreign subdir-objects tar-ustar dist-zip)
+# Allow "configure --disable-maintainer-mode" to disable timestamp checking 
+AM_MAINTAINER_MODE([enable])
 
 m4_pattern_allow([AC_PROG_CC_C99])
 m4_include([m4/ax_check_compile_flag.m4])
@@ -19,6 +21,7 @@ m4_include([m4/ax_cxx_compile_stdcxx_11.m4])
 m4_include([m4/ax_code_coverage.m4])
 m4_include([m4/ax_valgrind_check.m4])
 m4_include([m4/ax_check_vscript.m4])
+m4_include([m4/ax_func_posix_memalign.m4])
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
 
 # This lets us use PACKAGE_VERSION in Makefiles
@@ -46,9 +49,11 @@ AC_SUBST(PACKAGE_VERSION)
 # ZeroMQ version 4.2.5: 6:5:1 (ABI version 5)
 # ZeroMQ version 4.3.0: 7:0:2 (ABI version 5)
 # ZeroMQ version 4.3.1: 7:1:2 (ABI version 5)
+# ZeroMQ version 4.3.2: 7:2:2 (ABI version 5)
+# ZeroMQ version 4.3.3: 7:3:2 (ABI version 5)
 #
 # libzmq -version-info current:revision:age
-LTVER="7:1:2"
+LTVER="7:3:2"
 AC_SUBST(LTVER)
 
 # Take a copy of original flags
@@ -77,6 +82,7 @@ AC_LIBTOOL_WIN32_DLL
 AC_PROG_LIBTOOL
 AX_VALGRIND_CHECK
 AX_CHECK_VSCRIPT
+AX_FUNC_POSIX_MEMALIGN
 
 AC_ARG_ENABLE([force-CXX98-compat],
     [AS_HELP_STRING([--enable-force-CXX98-compat], [force C++98 build [default=disabled]])])
@@ -137,15 +143,51 @@ if test "x$zmq_militant" = "xyes"; then
     AC_DEFINE(ZMQ_ACT_MILITANT, 1, [Enable militant API assertions])
 fi
 
+# Disable IPC on unsupported platforms.
+case "${host_os}" in
+    *vxworks*|*openvms*|*mingw*)
+        ;;
+    *)
+        AC_DEFINE(ZMQ_HAVE_IPC, 1, [Have AF_UNIX sockets for ipc transport])
+        ;;
+esac
+
+# Data race/deadlock detection
+# NOTE: Running libzmq under TSAN doesn't make much sense -- synchronization in libzmq is to some extent
+# handled by the code "knowing" what threads are allowed to do, rather than by enforcing those
+# restrictions, so TSAN generates a lot of (presumably) false positives from libzmq.
+# The settings below are intended to enable libzmq to be built with minimal support for TSAN
+# such that it can be used along with other code that is also built with TSAN.
+AC_MSG_CHECKING([whether to enable TSan])
+AC_ARG_ENABLE(thread-sanitizer, [AS_HELP_STRING([--enable-thread-sanitizer=yes/no],
+                  [Build with clang Thread Sanitizer instrumentation])],
+                  [ZMQ_TSAN="$enableval"])
+
+if test "x${ZMQ_TSAN}" = "xyes"; then
+    TSAN_FLAGS="-fno-omit-frame-pointer -fsanitize=thread"
+    TSAN_CCFLAGS="${TSAN_CCFLAGS} -mllvm -tsan-instrument-memory-accesses=0"
+    TSAN_CCFLAGS="${TSAN_CCFLAGS} -mllvm -tsan-instrument-atomics=0"
+    TSAN_CCFLAGS="${TSAN_CCFLAGS} -mllvm -tsan-instrument-func-entry-exit=1"
+    CFLAGS="${CFLAGS} ${TSAN_FLAGS} ${TSAN_CCFLAGS}"
+    CXXFLAGS="${CXXFLAGS} ${TSAN_FLAGS} ${TSAN_CCFLAGS}"
+    LDFLAGS="${LDFLAGS} ${TSAN_FLAGS} -pie"
+
+    AM_CONDITIONAL(ENABLE_TSAN, true)
+    AC_MSG_RESULT([yes])
+else
+    AM_CONDITIONAL(ENABLE_TSAN, false)
+    AC_MSG_RESULT([no])
+fi
+
 # Memory mis-use detection
 AC_MSG_CHECKING([whether to enable ASan])
 AC_ARG_ENABLE(address-sanitizer, [AS_HELP_STRING([--enable-address-sanitizer=yes/no],
                   [Build with GCC Address Sanitizer instrumentation])],
                   [ZMQ_ASAN="$enableval"])
 
-if test "x${ZMQ_ASAN}" == "xyes"; then
-    CFLAGS="${CFLAGS} -fsanitize=address"
-    CXXFLAGS="${CXXFLAGS} -fsanitize=address"
+if test "x${ZMQ_ASAN}" = "xyes"; then
+    CFLAGS="${CFLAGS} -fsanitize=address -fsanitize=undefined -fsanitize=leak -fno-sanitize-recover=all"
+    CXXFLAGS="${CXXFLAGS} -fsanitize=address -fsanitize=undefined -fsanitize=leak -fno-sanitize-recover=all"
 
     AM_CONDITIONAL(ENABLE_ASAN, true)
     AC_MSG_RESULT([yes])
@@ -154,7 +196,7 @@ else
     AC_MSG_RESULT([no])
 fi
 
-# By default compiling with -Werror except OSX and on Solaris when building
+# By default compiling with -Werror except on OSX and Solaris when building
 # with libsodium.
 AC_ARG_ENABLE([Werror],
     [AS_HELP_STRING([--disable-Werror], [disable Werror compiler flag [default=enabled]])],
@@ -229,17 +271,14 @@ case "${host_os}" in
         ;;
     *dragonfly*)
         CPPFLAGS="-D__BSD_VISIBLE $CPPFLAGS"
+        AC_DEFINE(ZMQ_HAVE_FREEBSD, 1, [Have DragonFly OS])
         AC_DEFINE(ZMQ_HAVE_DRAGONFLY, 1, [Have DragonFly OS])
         ;;
     *darwin*)
         # Define on Darwin to enable all library features
         CPPFLAGS="-D_DARWIN_C_SOURCE $CPPFLAGS"
         libzmq_pedantic="no"
-        libzmq_werror="no"
         AC_DEFINE(ZMQ_HAVE_OSX, 1, [Have DarwinOSX OS])
-        AC_LANG_PUSH([C++])
-        LIBZMQ_CHECK_LANG_FLAG_PREPEND([-Wno-uninitialized])
-        AC_LANG_POP([C++])
         ;;
     *haiku*)
         AC_DEFINE(ZMQ_HAVE_HAIKU, 1, [Have Haiku OS])
@@ -278,7 +317,7 @@ case "${host_os}" in
         AC_DEFINE(ZMQ_HAVE_QNXNTO, 1, [Have QNX Neutrino OS])
         AC_CHECK_LIB(socket, socket)
         ;;
-    *aix*)
+    *aix*|*os400*)
         AC_DEFINE(ZMQ_HAVE_AIX, 1, [Have AIX OS])
         ;;
     *hpux*)
@@ -374,6 +413,12 @@ LIBZMQ_CHECK_DOC_BUILD
 
 # Check polling system, set appropriate macro in src/platform.hpp
 LIBZMQ_CHECK_POLLER
+
+# Check cacheline size, set appropriate macro in src/platform.hpp
+LIBZMQ_CHECK_CACHELINE
+
+# Check condition variable implementation, set appropriate macro in src/platform.hpp
+LIBZMQ_CHECK_CV_IMPL
 
 # Checks for header files.
 AC_HEADER_STDC
@@ -472,16 +517,20 @@ AC_ARG_WITH([libgssapi_krb5], [AS_HELP_STRING([--with-libgssapi_krb5],
 # conditionally require libgssapi_krb5
 if test "x$require_libgssapi_krb5_ext" != "xno"; then
     PKG_CHECK_MODULES([gssapi_krb5], [krb5-gssapi], [
+        have_gssapi_library="yes"
         PKGCFG_NAMES_PRIVATE="$PKGCFG_NAMES_PRIVATE krb5-gssapi"
     ], [
         AC_CHECK_HEADERS(gssapi/gssapi_generic.h)
         AC_SEARCH_LIBS([gss_init_sec_context], [gssapi_krb5 gssapi],
-            AC_DEFINE(HAVE_LIBGSSAPI_KRB5, [1], [Enabled GSSAPI security]),
+            have_gssapi_library="yes",
             AC_MSG_ERROR(libgssapi_krb5 is needed for GSSAPI security))
         PKGCFG_LIBS_PRIVATE="$PKGCFG_LIBS_PRIVATE -lgssapi_krb5"
     ])
 fi
-AM_CONDITIONAL(BUILD_GSSAPI, test "x$require_libgssapi_krb5_ext" != "xno")
+if test "x$have_gssapi_library" = "xyes"; then
+    AC_DEFINE(HAVE_LIBGSSAPI_KRB5, [1], [Enabled GSSAPI security])
+fi
+AM_CONDITIONAL(BUILD_GSSAPI, test "x$have_gssapi_library" = "xyes")
 
 # Select curve encryption library, defaults to tweetnacl
 # To use libsodium instead, use --with-libsodium (must be installed)
@@ -510,11 +559,16 @@ elif test "x$with_libsodium" = "xyes"; then
     curve_library="libsodium"
     enable_curve="yes"
 
-    # On Solaris, libsodium depends on libssp
     case "${host_os}" in
         *solaris*)
+            dnl On Solaris, libsodium depends on libssp
             LDFLAGS="-lssp $LDFLAGS"
             libzmq_pedantic="no"
+            libzmq_werror="no"
+        ;;
+        *darwin*)
+            dnl On Darwin, building with libsodium causes
+            dnl macro redefinition warnings
             libzmq_werror="no"
         ;;
     esac
@@ -533,8 +587,57 @@ AM_CONDITIONAL(ENABLE_CURVE_KEYGEN, test "x$enable_curve" = "xyes" -a "x$zmq_ena
 AM_CONDITIONAL(USE_LIBSODIUM, test "$curve_library" = "libsodium")
 AM_CONDITIONAL(USE_TWEETNACL, test "$curve_library" = "tweetnacl")
 AM_CONDITIONAL(HAVE_CURVE, test "x$curve_library" != "x")
-
 AM_CONDITIONAL(USE_WEPOLL, test "$poller" = "wepoll")
+
+# Check requiring packages for WebSocket
+ws_crypto_library=""
+
+AC_ARG_ENABLE([ws],
+    [AS_HELP_STRING([--enable-ws], [Enable WebSocket transport [default=state of DRAFT]])],
+    [enable_ws=$enableval],
+    [enable_ws=$enable_drafts])
+
+AC_ARG_WITH([nss],
+    [AS_HELP_STRING([--with-nss], [use nss instead of built-in sha1 [default=no]])])
+
+AC_ARG_WITH([tls],
+    [AS_HELP_STRING([--with-tls], [Enable TLS (WSS transport) [default=no]])])
+
+if test "x$enable_ws" != "xno"; then
+    if test "x$with_tls" = "xyes"; then
+        PKG_CHECK_MODULES([GNUTLS], [gnutls >= 3.1.4], [
+            PKGCFG_NAMES_PRIVATE="$PKGCFG_NAMES_PRIVATE gnutls >= 3.1.4"
+            ws_crypto_library="gnutls"
+            AC_DEFINE(ZMQ_USE_GNUTLS, [1], [Use GNUTLS for TLS])
+            AC_DEFINE(ZMQ_HAVE_WS, [1], [Using websocket])
+            AC_DEFINE(ZMQ_HAVE_WSS, [1], [WSS enabled])
+            AC_MSG_NOTICE(Using gnutls)
+        ],[
+          AC_MSG_ERROR([GnuTLS is not installed. Install it, then run configure again])
+        ])
+    elif test "x$with_nss" = "xyes"; then
+        PKG_CHECK_MODULES([NSS3], [nss], [
+            PKGCFG_NAMES_PRIVATE="$PKGCFG_NAMES_PRIVATE nss"
+            AC_DEFINE(ZMQ_USE_NSS, [1], [Using NSS])
+            AC_DEFINE(ZMQ_HAVE_WS, [1], [Using websocket])
+            ws_crypto_library="nss"
+            AC_MSG_NOTICE(Using NSS)
+        ], [
+            AC_MSG_ERROR([nss is not installed. Install it, then run configure again])
+        ])
+    else
+        AC_DEFINE(ZMQ_HAVE_WS, [1], [Using websocket])
+        AC_DEFINE(ZMQ_USE_BUILTIN_SHA1, [1], [Using built-in sha1])
+        AC_MSG_NOTICE(Using builting SHA1)
+        ws_crypto_library="builtin"
+    fi
+fi
+
+AM_CONDITIONAL(HAVE_WS, test "x$ws_crypto_library" != "x")
+AM_CONDITIONAL(USE_NSS, test "x$ws_crypto_library" = "xnss")
+AM_CONDITIONAL(USE_BUILTIN_SHA1, test "x$ws_crypto_library" = "xbuiltin")
+AM_CONDITIONAL(USE_GNUTLS, test "x$ws_crypto_library" = "xgnutls")
+AM_CONDITIONAL(HAVE_WSS, test "x$ws_crypto_library" = "xgnutls")
 
 # build using pgm
 have_pgm_library="no"
@@ -546,13 +649,18 @@ AC_ARG_WITH([pgm], [AS_HELP_STRING([--with-pgm],
 
 # conditionally require pgm package
 if test "x$with_pgm_ext" != "xno"; then
-    PKG_CHECK_MODULES([pgm], [openpgm-5.2 >= 5.2], [
+    PKG_CHECK_MODULES([pgm], [openpgm-5.3 >= 5.3], [
         have_pgm_library="yes"
-        PKGCFG_NAMES_PRIVATE="$PKGCFG_NAMES_PRIVATE openpgm-5.2 >= 5.2"
+        PKGCFG_NAMES_PRIVATE="$PKGCFG_NAMES_PRIVATE openpgm-5.3 >= 5.3"
     ], [
-        PKG_CHECK_MODULES([pgm], [openpgm-5.1 >= 5.1], [
+        PKG_CHECK_MODULES([pgm], [openpgm-5.2 >= 5.2], [
             have_pgm_library="yes"
-            PKGCFG_NAMES_PRIVATE="$PKGCFG_NAMES_PRIVATE openpgm-5.1 >= 5.1"
+            PKGCFG_NAMES_PRIVATE="$PKGCFG_NAMES_PRIVATE openpgm-5.2 >= 5.2"
+        ], [
+            PKG_CHECK_MODULES([pgm], [openpgm-5.1 >= 5.1], [
+                have_pgm_library="yes"
+                PKGCFG_NAMES_PRIVATE="$PKGCFG_NAMES_PRIVATE openpgm-5.1 >= 5.1"
+            ])
         ])
     ])
 fi
@@ -649,7 +757,7 @@ AM_CONDITIONAL(ON_GNU, test "x$libzmq_on_gnu" = "xyes")
 
 # Check for __atomic_Xxx compiler intrinsics
 AC_LANG_PUSH([C++])
-AX_CHECK_COMPILE_FLAG([-Wno-atomic-alignment],
+AX_CHECK_COMPILE_FLAG([-Watomic-alignment],
     [CXXFLAGS+=" -Wno-atomic-alignment"],
     [],
     [-Werror])
@@ -662,8 +770,61 @@ AC_LANG_POP([C++])
 
 # Checks for library functions.
 AC_TYPE_SIGNAL
-AC_CHECK_FUNCS(perror gettimeofday clock_gettime memset socket getifaddrs freeifaddrs fork posix_memalign mkdtemp accept4)
+AC_CHECK_FUNCS(perror gettimeofday clock_gettime memset socket getifaddrs freeifaddrs fork mkdtemp accept4)
 AC_CHECK_HEADERS([alloca.h])
+
+# string.h doesn't seem to be included by default in Fedora 30
+AC_MSG_CHECKING([whether strnlen is available])
+AC_COMPILE_IFELSE(
+	[AC_LANG_PROGRAM(
+		[[#include <string.h>]],
+		[[size_t bar = strnlen ("foo", 1); (void)bar; return 0;]])
+	],[
+		AC_MSG_RESULT([yes])
+		AC_DEFINE(HAVE_STRNLEN, [1],
+		    [strnlen is available])
+	],[
+		AC_MSG_RESULT([no])
+])
+
+AC_ARG_ENABLE([libbsd],
+    [AS_HELP_STRING([--enable-libbsd],
+        [enable libbsd [default=auto]])],
+    [enable_libbsd=$enableval],
+    [enable_libbsd="auto"])
+
+if test "x$enable_libbsd" != "xno"; then
+    PKG_CHECK_MODULES(LIBBSD, [libbsd],
+        [
+            AC_DEFINE(ZMQ_HAVE_LIBBSD, 1, [The libbsd library is to be used])
+            AC_SUBST([LIBBSD_CFLAGS])
+            AC_SUBST([LIBBSD_LIBS])
+            PKGCFG_NAMES_PRIVATE="$PKGCFG_NAMES_PRIVATE libbsd"
+            found_libbsd="yes"
+        ],
+        [
+            found_libbsd="no"
+            if test "x$enable_libbsd" = "xyes"; then
+                AC_MSG_ERROR([Cannot find libbsd])
+            else
+                AC_MSG_WARN([Cannot find libbsd])
+            fi
+        ])
+fi
+if test "x$found_libbsd" != "xyes"; then
+    AC_MSG_CHECKING([whether strlcpy is available])
+    AC_COMPILE_IFELSE(
+        [AC_LANG_PROGRAM(
+            [[#include <string.h>]],
+            [[char buf [100]; size_t bar = strlcpy (buf, "foo", 100); (void)bar; return 0;]])
+        ],[
+            AC_MSG_RESULT([yes])
+            AC_DEFINE(ZMQ_HAVE_STRLCPY, [1],
+                [strlcpy is available])
+        ],[
+            AC_MSG_RESULT([no])
+    ])
+fi
 
 # pthread_setname is non-posix, and there are at least 4 different implementations
 AC_MSG_CHECKING([whether signature of pthread_setname_np() has 1 argument])
@@ -877,15 +1038,48 @@ AM_CONDITIONAL([WITH_CLANG_FORMAT], [$WITH_CLANG_FORMAT])
 # unittests will not build without the static libzmq.a
 AM_CONDITIONAL(ENABLE_STATIC, test "x$enable_static" = "xyes")
 
+# build using a fuzzing engine - fuzzers will be built separately and statically
+AC_ARG_WITH([fuzzing-engine], [AS_HELP_STRING([--with-fuzzing-engine],
+    [build libzmq with an exernal fuzzing engine [default=no]])],
+    [have_fuzzing_engine_ext=$withval],
+    [have_fuzzing_engine_ext=no])
+AC_ARG_WITH([fuzzing-installdir],
+    AS_HELP_STRING([--with-fuzzing-installdir=PATH],
+        [Path where to install fuzzer binaries]),
+    [fuzzing_installdir="$withval"])
+
+if test "x$have_fuzzing_engine_ext" != "xno" && test "x$fuzzing_installdir" != "x" && test "x$enable_static" = "xyes"; then
+    FUZZING_ENGINE_LIB="${have_fuzzing_engine_ext}"
+    FUZZING_INSTALLDIR="${fuzzing_installdir}"
+    AC_SUBST(FUZZING_ENGINE_LIB)
+    AC_SUBST(FUZZING_INSTALLDIR)
+    AC_DEFINE(ZMQ_USE_FUZZING_ENGINE, 1, [fuzz tests will be built with fuzzing engine])
+fi
+AM_CONDITIONAL(FUZZING_ENGINE_LIB, test "x$FUZZING_ENGINE_LIB" != "x")
+
 # clang 6 has a warning that does not make sense on multi-platform code
 AC_LANG_PUSH([C])
-AX_CHECK_COMPILE_FLAG([-Wno-tautological-constant-compare],
+AX_CHECK_COMPILE_FLAG([-Wtautological-constant-compare],
     [CFLAGS+=" -Wno-tautological-constant-compare"],
     [],
     [-Werror])
 AC_LANG_POP([C])
-AX_CHECK_COMPILE_FLAG([-Wno-tautological-constant-compare],
+AX_CHECK_COMPILE_FLAG([-Wtautological-constant-compare],
     [CXXFLAGS+=" -Wno-tautological-constant-compare"],
+    [],
+    [-Werror])
+
+# LTO is enabled by default on SUSE Tumbleweed and RPM lint generates an error if
+# the flag is not used to compile archives:
+# E: lto-no-text-in-archive
+AC_LANG_PUSH([C])
+AX_CHECK_COMPILE_FLAG([-ffat-lto-objects],
+    [CFLAGS+=" -ffat-lto-objects"],
+    [],
+    [-Werror])
+AC_LANG_POP([C])
+AX_CHECK_COMPILE_FLAG([-ffat-lto-objects],
+    [CXXFLAGS+=" -ffat-lto-objects"],
     [],
     [-Werror])
 

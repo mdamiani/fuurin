@@ -691,7 +691,7 @@ int main (int, char **)
             return t;
         }
         ])],
-        [AC_MSG_RESULT(yes) ; libzmq_cv_has_atomic_instrisics="yes" ; $1],
+        [AC_MSG_RESULT(yes) ; libzmq_cv_has_atomic_instrisics="yes" PKGCFG_LIBS_PRIVATE="$PKGCFG_LIBS_PRIVATE -latomic" ; $1],
         [AC_MSG_RESULT(no) ; libzmq_cv_has_atomic_instrisics="no" LIBS=$save_LIBS ; $2])
     fi
 }])
@@ -1058,12 +1058,12 @@ AC_DEFUN([LIBZMQ_CHECK_POLLER], [{
         [AS_HELP_STRING([--with-api-poller],
         [choose zmq_poll(er)_* API polling system manually. Valid values are 'poll', 'select', or 'auto'. [default=auto]])])
 
-    if test "x$with_poller" == "x"; then
+    if test "x$with_poller" = "x"; then
         pollers=auto
     else
         pollers=$with_poller
     fi
-    if test "$pollers" == "auto"; then
+    if test "$pollers" = "auto"; then
         # We search for pollers in this order
         pollers="kqueue epoll devpoll pollset poll select"
     fi
@@ -1145,13 +1145,13 @@ AC_DEFUN([LIBZMQ_CHECK_POLLER], [{
     if test $poller_found -eq 0; then
         AC_MSG_ERROR([None of '$pollers' are valid pollers on this platform])
     fi
-    if test "x$with_api_poller" == "x"; then
+    if test "x$with_api_poller" = "x"; then
         with_api_poller=auto
     fi
-	if test "x$with_api_poller" == "xauto"; then
-		if test $poller == "select"; then
+	if test "x$with_api_poller" = "xauto"; then
+		if test $poller = "select"; then
 			api_poller=select
-		elif test $poller == "wepoll"; then
+		elif test $poller = "wepoll"; then
 			api_poller=select
 		else		
 			api_poller=poll
@@ -1159,13 +1159,74 @@ AC_DEFUN([LIBZMQ_CHECK_POLLER], [{
 	else
 		api_poller=$with_api_poller
 	fi
-	if test "$api_poller" == "select"; then
+	if test "$api_poller" = "select"; then
 		AC_MSG_NOTICE([Using 'select' zmq_poll(er)_* API polling system])
 		AC_DEFINE(ZMQ_POLL_BASED_ON_SELECT, 1, [Use 'select' zmq_poll(er)_* API polling system])
-	elif test "$api_poller" == "poll"; then
+	elif test "$api_poller" = "poll"; then
 		AC_MSG_NOTICE([Using 'poll' zmq_poll(er)_* API polling system])
 		AC_DEFINE(ZMQ_POLL_BASED_ON_POLL, 1, [Use 'poll' zmq_poll(er)_* API polling system])
 	else
         AC_MSG_ERROR([Invalid API poller '$api_poller' specified])
 	fi
+}])
+
+dnl ##############################################################################
+dnl # LIBZMQ_CHECK_CACHELINE                                                     #
+dnl # Check cacheline size for alignment purposes                                #
+dnl ##############################################################################
+AC_DEFUN([LIBZMQ_CHECK_CACHELINE], [{
+
+    zmq_cacheline_size=64
+    AC_CHECK_TOOL(libzmq_getconf, getconf)
+    if ! test "x$libzmq_getconf" = "x"; then
+        zmq_cacheline_size=$($libzmq_getconf LEVEL1_DCACHE_LINESIZE 2>/dev/null || echo 64)
+        if test "x$zmq_cacheline_size" = "x0" -o  "x$zmq_cacheline_size" = "x-1"; then
+            # getconf on some architectures does not know the size, try to fallback to
+            # the value the kernel knows on Linux
+            zmq_cacheline_size=$(cat /sys/devices/system/cpu/cpu0/cache/index0/coherency_line_size 2>/dev/null || echo 64)
+        fi
+    fi
+	AC_MSG_NOTICE([Using "$zmq_cacheline_size" bytes alignment for lock-free data structures])
+	AC_DEFINE_UNQUOTED(ZMQ_CACHELINE_SIZE, $zmq_cacheline_size, [Using "$zmq_cacheline_size" bytes alignment for lock-free data structures])
+}])
+
+dnl ################################################################################
+dnl # LIBZMQ_CHECK_CV_IMPL([action-if-found], [action-if-not-found])               #
+dnl # Choose condition variable implementation                                     #
+dnl ################################################################################
+
+AC_DEFUN([LIBZMQ_CHECK_CV_IMPL], [{
+    # Allow user to override condition variable autodetection
+    AC_ARG_WITH([cv-impl],
+        [AS_HELP_STRING([--with-cv-impl],
+        [choose condition variable implementation manually. Valid values are 'stl11', 'pthread', 'none', or 'auto'. [default=auto]])])
+
+    if test "x$with_cv_impl" = "x"; then
+        cv_impl=auto
+    else
+        cv_impl=$with_cv_impl
+    fi
+    case $host_os in
+      vxworks*)
+        cv_impl="vxworks"
+        AC_DEFINE(ZMQ_USE_CV_IMPL_VXWORKS, 1, [Use vxworks condition variable implementation.])
+      ;;
+    esac
+    if test "$cv_impl" = "auto" || test "$cv_impl" = "stl11"; then
+        AC_LANG_PUSH([C++])
+        AC_CHECK_HEADERS(condition_variable, [stl11="yes"
+            AC_DEFINE(ZMQ_USE_CV_IMPL_STL11, 1, [Use stl11 condition variable implementation.])],
+            [stl11="no"])
+        AC_LANG_POP([C++])
+        if test "$cv_impl" = "stl11" && test "x$stl11" = "xno"; then
+            AC_MSG_ERROR([--with-cv-impl set to stl11 but cannot find condition_variable])
+        fi
+    fi
+    if test "$cv_impl" = "pthread" || test "x$stl11" = "xno"; then
+        AC_DEFINE(ZMQ_USE_CV_IMPL_PTHREADS, 1, [Use pthread condition variable implementation.])
+    fi
+    if test "$cv_impl" = "none"; then
+        AC_DEFINE(ZMQ_USE_CV_IMPL_NONE, 1, [Use no condition variable implementation.])
+    fi
+       AC_MSG_NOTICE([Using "$cv_impl" condition variable implementation.])
 }])

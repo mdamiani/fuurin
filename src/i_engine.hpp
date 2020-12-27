@@ -30,6 +30,9 @@
 #ifndef __ZMQ_I_ENGINE_HPP_INCLUDED__
 #define __ZMQ_I_ENGINE_HPP_INCLUDED__
 
+#include "endpoint.hpp"
+#include "macros.hpp"
+
 namespace zmq
 {
 class io_thread_t;
@@ -38,7 +41,18 @@ class io_thread_t;
 
 struct i_engine
 {
-    virtual ~i_engine () {}
+    enum error_reason_t
+    {
+        protocol_error,
+        connection_error,
+        timeout_error
+    };
+
+    virtual ~i_engine () ZMQ_DEFAULT;
+
+    //  Indicate if the engine has an handshake stage.
+    //  If engine has handshake stage, engine must call session.engine_ready when the handshake is complete.
+    virtual bool has_handshake_stage () = 0;
 
     //  Plug the engine to the session.
     virtual void plug (zmq::io_thread_t *io_thread_,
@@ -61,7 +75,7 @@ struct i_engine
 
     virtual void zap_msg_available () = 0;
 
-    virtual const char *get_endpoint () const = 0;
+    virtual const endpoint_uri_pair_t &get_endpoint () const = 0;
 };
 }
 

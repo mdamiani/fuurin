@@ -30,15 +30,9 @@
 #include "testutil.hpp"
 #include "testutil_unity.hpp"
 
-void setUp ()
-{
-    setup_test_context ();
-}
+#include <string.h>
 
-void tearDown ()
-{
-    teardown_test_context ();
-}
+SETUP_TEARDOWN_TESTCONTEXT
 
 static const int SERVER = 0;
 static const int CLIENT = 1;
@@ -174,7 +168,8 @@ void test_stream_disconnect ()
               zmq_msg_recv (&data_frame, sockets[SERVER], 0));
 
             // Make sure payload matches what we expect.
-            const char *const data = (const char *) zmq_msg_data (&data_frame);
+            const char *const data =
+              static_cast<const char *> (zmq_msg_data (&data_frame));
             const size_t size = zmq_msg_size (&data_frame);
             // 0-length frame is a disconnection notification.  The server
             // should receive it as the last step in the dialogue.
@@ -228,7 +223,8 @@ void test_stream_disconnect ()
             TEST_ASSERT_GREATER_THAN_INT (0, zmq_msg_size (&data_frame));
 
             // Make sure payload matches what we expect.
-            const char *const data = (const char *) zmq_msg_data (&data_frame);
+            const char *const data =
+              static_cast<const char *> (zmq_msg_data (&data_frame));
             const size_t size = zmq_msg_size (&data_frame);
             TEST_ASSERT_EQUAL_INT (strlen (dialog[step].text), size);
             TEST_ASSERT_EQUAL_STRING_LEN (dialog[step].text, data, size);

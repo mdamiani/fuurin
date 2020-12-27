@@ -42,7 +42,7 @@ macro(zmq_check_o_cloexec)
 int main(int argc, char *argv [])
 {
     int s = open (\"/dev/null\", O_CLOEXEC | O_RDONLY);
-    return (s == -1);
+    return s == -1;
 }
 "
     ZMQ_HAVE_O_CLOEXEC)
@@ -273,7 +273,7 @@ int main(int argc, char *argv [])
     return 0;
 }
 "
-    ZMQ_HAVE_PTHREAD_SETAFFINITY)
+    ZMQ_HAVE_PTHREAD_SET_AFFINITY)
   set(CMAKE_REQUIRED_FLAGS ${SAVE_CMAKE_REQUIRED_FLAGS})
 endmacro()
 

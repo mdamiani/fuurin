@@ -30,17 +30,7 @@
 #include "testutil.hpp"
 #include "testutil_unity.hpp"
 
-#include <unity.h>
-
-void setUp ()
-{
-    setup_test_context ();
-}
-
-void tearDown ()
-{
-    teardown_test_context ();
-}
+SETUP_TEARDOWN_TESTCONTEXT
 
 //  Issue 566 describes a problem in libzmq v4.0.0 where a dealer to router
 //  connection would fail randomly. The test works when the two sockets are
@@ -66,7 +56,8 @@ void test_issue_566 ()
         //  Create dealer with unique explicit routing id
         //  We assume the router learns this out-of-band
         void *dealer = zmq_socket (ctx2, ZMQ_DEALER);
-        char routing_id[10];
+        //  Leave space for NULL char from sprintf, gcc warning
+        char routing_id[11];
         sprintf (routing_id, "%09d", cycle);
         TEST_ASSERT_SUCCESS_ERRNO (
           zmq_setsockopt (dealer, ZMQ_ROUTING_ID, routing_id, 10));

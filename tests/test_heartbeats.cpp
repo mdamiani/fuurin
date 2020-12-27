@@ -26,10 +26,13 @@
 typedef SOCKET raw_socket;
 #else
 #include <arpa/inet.h>
+#include <unistd.h>
 typedef int raw_socket;
 #endif
 
 #include <limits.h>
+#include <stdlib.h>
+#include <string.h>
 
 // TODO remove this here, either ensure that UINT16_MAX is always properly
 // defined or handle this at a more central location
@@ -39,16 +42,7 @@ typedef int raw_socket;
 
 #include "testutil_unity.hpp"
 
-void setUp ()
-{
-    setup_test_context ();
-}
-
-void tearDown ()
-{
-    teardown_test_context ();
-}
-
+SETUP_TEARDOWN_TESTCONTEXT
 
 //  Read one event off the monitor socket; return value and address
 //  by reference, if not null, and event number by value. Returns -1
@@ -56,7 +50,7 @@ void tearDown ()
 
 static int get_monitor_event (void *monitor_)
 {
-    for (int i = 0; i < 2; i++) {
+    for (int i = 0; i < 10; i++) {
         //  First frame in message contains event number and value
         zmq_msg_t msg;
         TEST_ASSERT_SUCCESS_ERRNO (zmq_msg_init (&msg));
@@ -66,8 +60,8 @@ static int get_monitor_event (void *monitor_)
         }
         TEST_ASSERT_TRUE (zmq_msg_more (&msg));
 
-        uint8_t *data = (uint8_t *) zmq_msg_data (&msg);
-        uint16_t event = *(uint16_t *) (data);
+        uint8_t *data = static_cast<uint8_t *> (zmq_msg_data (&msg));
+        uint16_t event = *reinterpret_cast<uint16_t *> (data);
 
         //  Second frame in message contains event address
         TEST_ASSERT_SUCCESS_ERRNO (zmq_msg_init (&msg));
@@ -97,29 +91,24 @@ static void recv_with_retry (raw_socket fd_, char *buffer_, int bytes_)
 
 static void mock_handshake (raw_socket fd_, int mock_ping_)
 {
-    const uint8_t zmtp_greeting[33] = {0xff, 0, 0, 0,   0,   0,   0,   0, 0,
-                                       0x7f, 3, 0, 'N', 'U', 'L', 'L', 0};
     char buffer[128];
     memset (buffer, 0, sizeof (buffer));
-    memcpy (buffer, zmtp_greeting, sizeof (zmtp_greeting));
+    memcpy (buffer, zmtp_greeting_null, sizeof (zmtp_greeting_null));
 
-    int rc = TEST_ASSERT_SUCCESS_RAW_ERRNO (send (fd_, buffer, 64, 0));
-    TEST_ASSERT_EQUAL_INT (64, rc);
+    int rc = TEST_ASSERT_SUCCESS_RAW_ERRNO (
+      send (fd_, buffer, sizeof (zmtp_greeting_null), 0));
+    TEST_ASSERT_EQUAL_INT (sizeof (zmtp_greeting_null), rc);
 
-    recv_with_retry (fd_, buffer, 64);
-
-    const uint8_t zmtp_ready[43] = {
-      4,   41,  5,   'R', 'E', 'A', 'D', 'Y', 11,  'S', 'o', 'c', 'k', 'e', 't',
-      '-', 'T', 'y', 'p', 'e', 0,   0,   0,   6,   'D', 'E', 'A', 'L', 'E', 'R',
-      8,   'I', 'd', 'e', 'n', 't', 'i', 't', 'y', 0,   0,   0,   0};
+    recv_with_retry (fd_, buffer, sizeof (zmtp_greeting_null));
 
     memset (buffer, 0, sizeof (buffer));
-    memcpy (buffer, zmtp_ready, 43);
-    rc = TEST_ASSERT_SUCCESS_RAW_ERRNO (send (fd_, buffer, 43, 0));
-    TEST_ASSERT_EQUAL_INT (43, rc);
+    memcpy (buffer, zmtp_ready_dealer, sizeof (zmtp_ready_dealer));
+    rc = TEST_ASSERT_SUCCESS_RAW_ERRNO (
+      send (fd_, buffer, sizeof (zmtp_ready_dealer), 0));
+    TEST_ASSERT_EQUAL_INT (sizeof (zmtp_ready_dealer), rc);
 
     //  greeting
-    recv_with_retry (fd_, buffer, 43);
+    recv_with_retry (fd_, buffer, sizeof (zmtp_ready_dealer));
 
     if (mock_ping_) {
         //  test PING context - should be replicated in the PONG
@@ -232,21 +221,7 @@ static void test_heartbeat_timeout (int server_type_, int mock_ping_)
     prep_server_socket (!mock_ping_, 0, &server, &server_mon, my_endpoint,
                         MAX_SOCKET_STRING, server_type_);
 
-    struct sockaddr_in ip4addr;
-    raw_socket s;
-
-    ip4addr.sin_family = AF_INET;
-    ip4addr.sin_port = htons (atoi (strrchr (my_endpoint, ':') + 1));
-#if defined(ZMQ_HAVE_WINDOWS) && (_WIN32_WINNT < 0x0600)
-    ip4addr.sin_addr.s_addr = inet_addr ("127.0.0.1");
-#else
-    inet_pton (AF_INET, "127.0.0.1", &ip4addr.sin_addr);
-#endif
-
-    s = socket (AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    rc = TEST_ASSERT_SUCCESS_RAW_ERRNO (
-      connect (s, (struct sockaddr *) &ip4addr, sizeof ip4addr));
-    TEST_ASSERT_GREATER_THAN_INT (-1, rc);
+    fd_t s = connect_socket (my_endpoint);
 
     // Mock a ZMTP 3 client so we can forcibly time out a connection
     mock_handshake (s, mock_ping_);
@@ -374,6 +349,11 @@ DEFINE_TESTS (pull, push, ZMQ_PULL, ZMQ_PUSH)
 DEFINE_TESTS (sub, pub, ZMQ_SUB, ZMQ_PUB)
 DEFINE_TESTS (pair, pair, ZMQ_PAIR, ZMQ_PAIR)
 
+#ifdef ZMQ_BUILD_DRAFT_API
+DEFINE_TESTS (gather, scatter, ZMQ_GATHER, ZMQ_SCATTER)
+DEFINE_TESTS (client, server, ZMQ_CLIENT, ZMQ_SERVER)
+#endif
+
 const int deciseconds_per_millisecond = 100;
 const int heartbeat_ttl_max =
   (UINT16_MAX + 1) * deciseconds_per_millisecond - 1;
@@ -418,7 +398,9 @@ void test_setsockopt_heartbeat_ttl_near_zero ()
 
 int main (void)
 {
-    setup_test_environment ();
+    //  The test cases are very long-running. The default timeout of 60 seconds
+    //  is not always enough.
+    setup_test_environment (90);
 
     UNITY_BEGIN ();
 
@@ -446,6 +428,17 @@ int main (void)
     RUN_TEST (test_heartbeat_notimeout_pull_push_with_curve);
     RUN_TEST (test_heartbeat_notimeout_sub_pub_with_curve);
     RUN_TEST (test_heartbeat_notimeout_pair_pair_with_curve);
+
+#ifdef ZMQ_BUILD_DRAFT_API
+    RUN_TEST (test_heartbeat_ttl_client_server);
+    RUN_TEST (test_heartbeat_ttl_gather_scatter);
+
+    RUN_TEST (test_heartbeat_notimeout_client_server);
+    RUN_TEST (test_heartbeat_notimeout_gather_scatter);
+
+    RUN_TEST (test_heartbeat_notimeout_client_server_with_curve);
+    RUN_TEST (test_heartbeat_notimeout_gather_scatter_with_curve);
+#endif
 
     return UNITY_END ();
 }

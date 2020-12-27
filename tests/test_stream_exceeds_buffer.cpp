@@ -30,22 +30,9 @@
 #include "testutil.hpp"
 #include "testutil_unity.hpp"
 
-void setUp ()
-{
-    setup_test_context ();
-}
+#include <string.h>
 
-void tearDown ()
-{
-    teardown_test_context ();
-}
-
-#if defined(ZMQ_HAVE_WINDOWS)
-#include <winsock2.h>
-#include <ws2tcpip.h>
-#include <stdexcept>
-#define close closesocket
-#endif
+SETUP_TEARDOWN_TESTCONTEXT
 
 void test_stream_exceeds_buffer ()
 {
@@ -54,33 +41,7 @@ void test_stream_exceeds_buffer ()
     unsigned char rcvbuf[msgsize];
     char my_endpoint[MAX_SOCKET_STRING];
 
-    int server_sock =
-      TEST_ASSERT_SUCCESS_RAW_ERRNO (socket (AF_INET, SOCK_STREAM, 0));
-    int enable = 1;
-    TEST_ASSERT_SUCCESS_RAW_ERRNO (setsockopt (server_sock, SOL_SOCKET,
-                                               SO_REUSEADDR, (char *) &enable,
-                                               sizeof (enable)));
-
-    struct sockaddr_in saddr;
-    memset (&saddr, 0, sizeof (saddr));
-    saddr.sin_family = AF_INET;
-    saddr.sin_addr.s_addr = INADDR_ANY;
-#if !defined(_WIN32_WINNT) || (_WIN32_WINNT >= 0x0600)
-    saddr.sin_port = 0;
-#else
-    saddr.sin_port = htons (12345);
-#endif
-
-    TEST_ASSERT_SUCCESS_RAW_ERRNO (
-      bind (server_sock, (struct sockaddr *) &saddr, sizeof (saddr)));
-    TEST_ASSERT_SUCCESS_RAW_ERRNO (listen (server_sock, 1));
-
-#if !defined(_WIN32_WINNT) || (_WIN32_WINNT >= 0x0600)
-    socklen_t saddr_len = sizeof (saddr);
-    TEST_ASSERT_SUCCESS_RAW_ERRNO (
-      getsockname (server_sock, (struct sockaddr *) &saddr, &saddr_len));
-#endif
-    sprintf (my_endpoint, "tcp://127.0.0.1:%d", ntohs (saddr.sin_port));
+    int server_sock = bind_socket_resolve_port ("127.0.0.1", "0", my_endpoint);
 
     void *zsock = test_context_socket (ZMQ_STREAM);
     TEST_ASSERT_SUCCESS_ERRNO (zmq_connect (zsock, my_endpoint));

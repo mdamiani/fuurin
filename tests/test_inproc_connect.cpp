@@ -30,15 +30,7 @@
 #include "testutil.hpp"
 #include "testutil_unity.hpp"
 
-void setUp ()
-{
-    setup_test_context ();
-}
-
-void tearDown ()
-{
-    teardown_test_context ();
-}
+SETUP_TEARDOWN_TESTCONTEXT
 
 static void pusher (void * /*unused*/)
 {
@@ -160,7 +152,7 @@ void test_connect_before_bind_ctx_term ()
         // Connect first
         void *connect_socket = test_context_socket (ZMQ_ROUTER);
 
-        char ep[20];
+        char ep[32];
         sprintf (ep, "inproc://cbbrr%d", i);
         TEST_ASSERT_SUCCESS_ERRNO (zmq_connect (connect_socket, ep));
 
@@ -244,10 +236,8 @@ void test_simultaneous_connect_bind_threads ()
 
     // Spawn all threads as simultaneously as possible
     for (unsigned int i = 0; i < no_of_times; ++i) {
-        threads[i * 2 + 0] =
-          zmq_threadstart (&simult_conn, (void *) thr_args[i]);
-        threads[i * 2 + 1] =
-          zmq_threadstart (&simult_bind, (void *) thr_args[i]);
+        threads[i * 2 + 0] = zmq_threadstart (&simult_conn, thr_args[i]);
+        threads[i * 2 + 1] = zmq_threadstart (&simult_bind, thr_args[i]);
     }
 
     // Close all threads

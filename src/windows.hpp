@@ -43,10 +43,6 @@
 #define _WIN32_WINNT 0x0600
 #endif
 
-#if defined ZMQ_HAVE_WINDOWS_UWP
-#define _WIN32_WINNT _WIN32_WINNT_WIN10
-#endif
-
 #ifdef __MINGW32__
 //  Require Windows XP or higher with MinGW for getaddrinfo().
 #if (_WIN32_WINNT >= 0x0501)
@@ -94,4 +90,11 @@ static inline int poll (struct pollfd *pfd, unsigned long nfds, int timeout)
 #ifndef AI_NUMERICSERV
 #define AI_NUMERICSERV 0x0400
 #endif
+#endif
+
+//  In MSVC prior to v14, snprintf is not available
+//  The closest implementation is the _snprintf_s function
+#if defined(_MSC_VER) && _MSC_VER < 1900
+#define snprintf(buffer_, count_, format_, ...)                                \
+    _snprintf_s (buffer_, count_, _TRUNCATE, format_, __VA_ARGS__)
 #endif

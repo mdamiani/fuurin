@@ -35,25 +35,7 @@
 
 //  Condition variable class encapsulates OS mutex in a platform-independent way.
 
-#ifdef ZMQ_HAVE_WINDOWS
-
-#include "windows.hpp"
-#if defined(_MSC_VER)
-#if _MSC_VER >= 1800
-#define _SUPPORT_CONDITION_VARIABLE 1
-#else
-#define _SUPPORT_CONDITION_VARIABLE 0
-#endif
-#else
-#if _cplusplus >= 201103L
-#define _SUPPORT_CONDITION_VARIABLE 1
-#else
-#define _SUPPORT_CONDITION_VARIABLE 0
-#endif
-#endif
-
-// Condition variable is supported from Windows Vista only, to use condition variable define _WIN32_WINNT to 0x0600
-#if _WIN32_WINNT < 0x0600 && !_SUPPORT_CONDITION_VARIABLE
+#if defined(ZMQ_USE_CV_IMPL_NONE)
 
 namespace zmq
 {
@@ -61,8 +43,6 @@ class condition_variable_t
 {
   public:
     inline condition_variable_t () { zmq_assert (false); }
-
-    inline ~condition_variable_t () {}
 
     inline int wait (mutex_t *mutex_, int timeout_)
     {
@@ -72,30 +52,20 @@ class condition_variable_t
 
     inline void broadcast () { zmq_assert (false); }
 
-  private:
-    //  Disable copy construction and assignment.
-    condition_variable_t (const condition_variable_t &);
-    void operator= (const condition_variable_t &);
+    ZMQ_NON_COPYABLE_NOR_MOVABLE (condition_variable_t)
 };
 }
 
-#else
+#elif defined(ZMQ_USE_CV_IMPL_WIN32API)
 
-#if _SUPPORT_CONDITION_VARIABLE || defined(ZMQ_HAVE_WINDOWS_TARGET_XP)
-#include <condition_variable>
-#include <mutex>
-#endif
+#include "windows.hpp"
 
 namespace zmq
 {
-
-#if !defined(ZMQ_HAVE_WINDOWS_TARGET_XP) && _WIN32_WINNT >= 0x0600
 class condition_variable_t
 {
   public:
     inline condition_variable_t () { InitializeConditionVariable (&_cv); }
-
-    inline ~condition_variable_t () {}
 
     inline int wait (mutex_t *mutex_, int timeout_)
     {
@@ -118,58 +88,51 @@ class condition_variable_t
   private:
     CONDITION_VARIABLE _cv;
 
-    //  Disable copy construction and assignment.
-    condition_variable_t (const condition_variable_t &);
-    void operator= (const condition_variable_t &);
+    ZMQ_NON_COPYABLE_NOR_MOVABLE (condition_variable_t)
 };
-#else
+}
+
+#elif defined(ZMQ_USE_CV_IMPL_STL11)
+
+#include <condition_variable>
+
+namespace zmq
+{
 class condition_variable_t
 {
   public:
-    inline condition_variable_t () {}
+    condition_variable_t () ZMQ_DEFAULT;
 
-    inline ~condition_variable_t () {}
-
-    inline int wait (mutex_t *mutex_, int timeout_)
+    int wait (mutex_t *mutex_, int timeout_)
     {
-        std::unique_lock<std::mutex> lck (_mtx); // lock mtx
-        mutex_->unlock ();                       // unlock mutex_
+        // this assumes that the mutex mutex_ has been locked by the caller
         int res = 0;
         if (timeout_ == -1) {
             _cv.wait (
-              lck); // unlock mtx and wait cv.notify_all(), lock mtx after cv.notify_all()
-        } else if (_cv.wait_for (lck, std::chrono::milliseconds (timeout_))
+              *mutex_); // unlock mtx and wait cv.notify_all(), lock mtx after cv.notify_all()
+        } else if (_cv.wait_for (*mutex_, std::chrono::milliseconds (timeout_))
                    == std::cv_status::timeout) {
             // time expired
             errno = EAGAIN;
             res = -1;
         }
-        lck.unlock ();   // unlock mtx
-        mutex_->lock (); // lock mutex_
         return res;
     }
 
-    inline void broadcast ()
+    void broadcast ()
     {
-        std::unique_lock<std::mutex> lck (_mtx); // lock mtx
+        // this assumes that the mutex associated with _cv has been locked by the caller
         _cv.notify_all ();
     }
 
   private:
-    std::condition_variable _cv;
-    std::mutex _mtx;
+    std::condition_variable_any _cv;
 
-    //  Disable copy construction and assignment.
-    condition_variable_t (const condition_variable_t &);
-    void operator= (const condition_variable_t &);
+    ZMQ_NON_COPYABLE_NOR_MOVABLE (condition_variable_t)
 };
-
-#endif
 }
 
-#endif
-
-#elif defined ZMQ_HAVE_VXWORKS
+#elif defined(ZMQ_USE_CV_IMPL_VXWORKS)
 
 #include <sysLib.h>
 
@@ -178,7 +141,7 @@ namespace zmq
 class condition_variable_t
 {
   public:
-    inline condition_variable_t () {}
+    inline condition_variable_t () ZMQ_DEFAULT;
 
     inline ~condition_variable_t ()
     {
@@ -248,12 +211,11 @@ class condition_variable_t
     mutex_t _listenersMutex;
     std::vector<SEM_ID> _listeners;
 
-    // Disable copy construction and assignment.
-    condition_variable_t (const condition_variable_t &);
-    const condition_variable_t &operator= (const condition_variable_t &);
+    ZMQ_NON_COPYABLE_NOR_MOVABLE (condition_variable_t)
 };
 }
-#else
+
+#elif defined(ZMQ_USE_CV_IMPL_PTHREADS)
 
 #include <pthread.h>
 
@@ -297,13 +259,14 @@ class condition_variable_t
             timeout.tv_sec = 0;
             timeout.tv_nsec = 0;
 #else
-            clock_gettime (CLOCK_MONOTONIC, &timeout);
+            rc = clock_gettime (CLOCK_MONOTONIC, &timeout);
+            posix_assert (rc);
 #endif
 
             timeout.tv_sec += timeout_ / 1000;
             timeout.tv_nsec += (timeout_ % 1000) * 1000000;
 
-            if (timeout.tv_nsec > 1000000000) {
+            if (timeout.tv_nsec >= 1000000000) {
                 timeout.tv_sec++;
                 timeout.tv_nsec -= 1000000000;
             }
@@ -341,13 +304,10 @@ class condition_variable_t
   private:
     pthread_cond_t _cond;
 
-    // Disable copy construction and assignment.
-    condition_variable_t (const condition_variable_t &);
-    const condition_variable_t &operator= (const condition_variable_t &);
+    ZMQ_NON_COPYABLE_NOR_MOVABLE (condition_variable_t)
 };
 }
 
 #endif
-
 
 #endif

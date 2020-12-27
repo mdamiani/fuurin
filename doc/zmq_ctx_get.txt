@@ -39,9 +39,9 @@ The 'ZMQ_MAX_MSGSZ' argument returns the maximum size of a message
 allowed for this context. Default value is INT_MAX.
 
 
-ZMQ_ZERO_COPY_RCV: Get message decoding strategy
+ZMQ_ZERO_COPY_RECV: Get message decoding strategy
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The 'ZMQ_ZERO_COPY_RCV' argument return whether message decoder uses a zero copy
+The 'ZMQ_ZERO_COPY_RECV' argument return whether message decoder uses a zero copy
 strategy when receiving messages. Default value is 1.
 NOTE: in DRAFT state, not yet available in stable releases.
 
@@ -67,12 +67,6 @@ setting ZMQ_BLOCKY to false on all new contexts.
 ZMQ_THREAD_SCHED_POLICY: Get scheduling policy for I/O threads
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The 'ZMQ_THREAD_SCHED_POLICY' argument returns the scheduling policy for
-internal context's thread pool.
-
-
-ZMQ_THREAD_PRIORITY: Get scheduling priority for I/O threads
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The 'ZMQ_THREAD_PRIORITY' argument returns the scheduling priority for
 internal context's thread pool.
 
 

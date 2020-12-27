@@ -56,8 +56,11 @@ zmq::io_thread_t::~io_thread_t ()
 
 void zmq::io_thread_t::start ()
 {
+    char name[16] = "";
+    snprintf (name, sizeof (name), "IO/%u",
+              get_tid () - zmq::ctx_t::reaper_tid - 1);
     //  Start the underlying I/O thread.
-    _poller->start ();
+    _poller->start (name);
 }
 
 void zmq::io_thread_t::stop ()
@@ -70,7 +73,7 @@ zmq::mailbox_t *zmq::io_thread_t::get_mailbox ()
     return &_mailbox;
 }
 
-int zmq::io_thread_t::get_load ()
+int zmq::io_thread_t::get_load () const
 {
     return _poller->get_load ();
 }
@@ -104,7 +107,7 @@ void zmq::io_thread_t::timer_event (int)
     zmq_assert (false);
 }
 
-zmq::poller_t *zmq::io_thread_t::get_poller ()
+zmq::poller_t *zmq::io_thread_t::get_poller () const
 {
     zmq_assert (_poller);
     return _poller;

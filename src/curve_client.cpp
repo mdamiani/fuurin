@@ -38,12 +38,17 @@
 #include "curve_client.hpp"
 #include "wire.hpp"
 #include "curve_client_tools.hpp"
+#include "secure_allocator.hpp"
 
 zmq::curve_client_t::curve_client_t (session_base_t *session_,
-                                     const options_t &options_) :
+                                     const options_t &options_,
+                                     const bool downgrade_sub_) :
     mechanism_base_t (session_, options_),
-    curve_mechanism_base_t (
-      session_, options_, "CurveZMQMESSAGEC", "CurveZMQMESSAGES"),
+    curve_mechanism_base_t (session_,
+                            options_,
+                            "CurveZMQMESSAGEC",
+                            "CurveZMQMESSAGES",
+                            downgrade_sub_),
     _state (send_hello),
     _tools (options_.curve_public_key,
             options_.curve_secret_key,
@@ -127,8 +132,8 @@ zmq::mechanism_t::status_t zmq::curve_client_t::status () const
         return mechanism_t::ready;
     if (_state == error_received)
         return mechanism_t::error;
-    else
-        return mechanism_t::handshaking;
+
+    return mechanism_t::handshaking;
 }
 
 int zmq::curve_client_t::produce_hello (msg_t *msg_)
@@ -136,7 +141,7 @@ int zmq::curve_client_t::produce_hello (msg_t *msg_)
     int rc = msg_->init_size (200);
     errno_assert (rc == 0);
 
-    rc = _tools.produce_hello (msg_->data (), cn_nonce);
+    rc = _tools.produce_hello (msg_->data (), get_and_inc_nonce ());
     if (rc == -1) {
         session->get_socket ()->event_handshake_failed_protocol (
           session->get_endpoint (), ZMQ_PROTOCOL_ERROR_ZMTP_CRYPTOGRAPHIC);
@@ -149,15 +154,14 @@ int zmq::curve_client_t::produce_hello (msg_t *msg_)
         return -1;
     }
 
-    cn_nonce++;
-
     return 0;
 }
 
 int zmq::curve_client_t::process_welcome (const uint8_t *msg_data_,
                                           size_t msg_size_)
 {
-    int rc = _tools.process_welcome (msg_data_, msg_size_, cn_precom);
+    const int rc = _tools.process_welcome (msg_data_, msg_size_,
+                                           get_writable_precom_buffer ());
 
     if (rc == -1) {
         session->get_socket ()->event_handshake_failed_protocol (
@@ -175,20 +179,18 @@ int zmq::curve_client_t::process_welcome (const uint8_t *msg_data_,
 int zmq::curve_client_t::produce_initiate (msg_t *msg_)
 {
     const size_t metadata_length = basic_properties_len ();
-    unsigned char *metadata_plaintext =
-      static_cast<unsigned char *> (malloc (metadata_length));
-    alloc_assert (metadata_plaintext);
+    std::vector<unsigned char, secure_allocator_t<unsigned char> >
+      metadata_plaintext (metadata_length);
 
-    add_basic_properties (metadata_plaintext, metadata_length);
+    add_basic_properties (&metadata_plaintext[0], metadata_length);
 
-    size_t msg_size = 113 + 128 + crypto_box_BOXZEROBYTES + metadata_length;
+    const size_t msg_size =
+      113 + 128 + crypto_box_BOXZEROBYTES + metadata_length;
     int rc = msg_->init_size (msg_size);
     errno_assert (rc == 0);
 
-    rc = _tools.produce_initiate (msg_->data (), msg_size, cn_nonce,
-                                  metadata_plaintext, metadata_length);
-
-    free (metadata_plaintext);
+    rc = _tools.produce_initiate (msg_->data (), msg_size, get_and_inc_nonce (),
+                                  &metadata_plaintext[0], metadata_length);
 
     if (-1 == rc) {
         session->get_socket ()->event_handshake_failed_protocol (
@@ -197,8 +199,6 @@ int zmq::curve_client_t::produce_initiate (msg_t *msg_)
         // TODO see comment in produce_hello
         return -1;
     }
-
-    cn_nonce++;
 
     return 0;
 }
@@ -217,24 +217,21 @@ int zmq::curve_client_t::process_ready (const uint8_t *msg_data_,
     const size_t clen = (msg_size_ - 14) + crypto_box_BOXZEROBYTES;
 
     uint8_t ready_nonce[crypto_box_NONCEBYTES];
-    uint8_t *ready_plaintext =
-      static_cast<uint8_t *> (malloc (crypto_box_ZEROBYTES + clen));
-    alloc_assert (ready_plaintext);
-    uint8_t *ready_box =
-      static_cast<uint8_t *> (malloc (crypto_box_BOXZEROBYTES + 16 + clen));
-    alloc_assert (ready_box);
+    std::vector<uint8_t, secure_allocator_t<uint8_t> > ready_plaintext (
+      crypto_box_ZEROBYTES + clen);
+    std::vector<uint8_t> ready_box (crypto_box_BOXZEROBYTES + 16 + clen);
 
-    memset (ready_box, 0, crypto_box_BOXZEROBYTES);
-    memcpy (ready_box + crypto_box_BOXZEROBYTES, msg_data_ + 14,
+    std::fill (ready_box.begin (), ready_box.begin () + crypto_box_BOXZEROBYTES,
+               0);
+    memcpy (&ready_box[crypto_box_BOXZEROBYTES], msg_data_ + 14,
             clen - crypto_box_BOXZEROBYTES);
 
     memcpy (ready_nonce, "CurveZMQREADY---", 16);
     memcpy (ready_nonce + 16, msg_data_ + 6, 8);
-    cn_peer_nonce = get_uint64 (msg_data_ + 6);
+    set_peer_nonce (get_uint64 (msg_data_ + 6));
 
-    int rc = crypto_box_open_afternm (ready_plaintext, ready_box, clen,
-                                      ready_nonce, cn_precom);
-    free (ready_box);
+    int rc = crypto_box_open_afternm (&ready_plaintext[0], &ready_box[0], clen,
+                                      ready_nonce, get_precom_buffer ());
 
     if (rc != 0) {
         session->get_socket ()->event_handshake_failed_protocol (
@@ -243,9 +240,8 @@ int zmq::curve_client_t::process_ready (const uint8_t *msg_data_,
         return -1;
     }
 
-    rc = parse_metadata (ready_plaintext + crypto_box_ZEROBYTES,
+    rc = parse_metadata (&ready_plaintext[crypto_box_ZEROBYTES],
                          clen - crypto_box_ZEROBYTES);
-    free (ready_plaintext);
 
     if (rc == 0)
         _state = connected;
