@@ -199,7 +199,7 @@ BOOST_AUTO_TEST_CASE(testStoreTopicSingle)
     auto stw = b.testSession->getStorageWorker();
 
     Topic::Name nm("hello"sv);
-    Topic t{Uuid{}, TestBroker::wid, 5, nm, zmq::Part{"data"sv}};
+    Topic t{Uuid{}, TestBroker::wid, 5, nm, zmq::Part{"data"sv}, Topic::State};
 
     BOOST_TEST(stt->empty());
     BOOST_TEST((stt->find(nm) == stt->list().end()));
@@ -240,8 +240,8 @@ BOOST_AUTO_TEST_CASE(testStoreTopicMultiple)
 
     Topic::Name nm1("hello1"sv);
     Topic::Name nm2("hello2"sv);
-    Topic t1{Uuid{}, wid1, 5, nm1, zmq::Part{"data"sv}};
-    Topic t2{Uuid{}, wid2, 7, nm2, zmq::Part{"data"sv}};
+    Topic t1{Uuid{}, wid1, 5, nm1, zmq::Part{"data"sv}, Topic::State};
+    Topic t2{Uuid{}, wid2, 7, nm2, zmq::Part{"data"sv}, Topic::State};
 
     // store topics
     BOOST_TEST(bts->storeTopic(t1));

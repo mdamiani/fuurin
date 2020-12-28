@@ -11,12 +11,15 @@
 #include "fuurin/topic.h"
 #include "fuurin/errors.h"
 #include "fuurin/zmqpartmulti.h"
+#include "failure.h"
+#include "types.h"
 
 #include <zmq.h> // ZMQ_GROUP_MAX_LENGTH
 
 #include <string_view>
 #include <algorithm>
 #include <cstring>
+#include <type_traits>
 
 
 using namespace std::literals::string_view_literals;
@@ -93,26 +96,29 @@ bool Topic::Name::operator!=(const Name& rhs) const
 
 Topic::Topic()
     : seqn_{0}
+    , type_{State}
 {
 }
 
 
-Topic::Topic(const Uuid& broker, const Uuid& worker, const SeqN& seqn, const Name& name, const Data& data)
+Topic::Topic(const Uuid& broker, const Uuid& worker, const SeqN& seqn, const Name& name, const Data& data, Type type)
     : broker_{broker}
     , worker_{worker}
     , seqn_{seqn}
     , name_{name}
     , data_{data}
+    , type_{type}
 {
 }
 
 
-Topic::Topic(Uuid&& broker, Uuid&& worker, SeqN&& seqn, Name&& name, Data&& data)
+Topic::Topic(Uuid&& broker, Uuid&& worker, SeqN&& seqn, Name&& name, Data&& data, Type type)
     : broker_{broker}
     , worker_{worker}
     , seqn_{seqn}
     , name_{name}
     , data_{data}
+    , type_{type}
 {
 }
 
@@ -144,15 +150,15 @@ Uuid& Topic::worker() noexcept
 }
 
 
-const Topic::SeqN& Topic::seqNum() const noexcept
+Topic::SeqN Topic::seqNum() const noexcept
 {
     return seqn_;
 }
 
 
-Topic::SeqN& Topic::seqNum() noexcept
+Topic::Type Topic::type() const noexcept
 {
-    return seqn_;
+    return type_;
 }
 
 
@@ -208,16 +214,16 @@ Topic& Topic::withWorker(Uuid&& v)
 }
 
 
-Topic& Topic::withSeqNum(const SeqN& v)
+Topic& Topic::withSeqNum(SeqN v)
 {
     seqn_ = v;
     return *this;
 }
 
 
-Topic& Topic::withSeqNum(SeqN&& v)
+Topic& Topic::withType(Type v)
 {
-    seqn_ = std::move(v);
+    type_ = v;
     return *this;
 }
 
@@ -268,21 +274,33 @@ bool Topic::operator!=(const Topic& rhs) const
 
 Topic Topic::fromPart(const zmq::Part& part)
 {
-    auto [seqn, brok, work, name, data] = zmq::PartMulti::unpack<Topic::SeqN,
-        Uuid::Bytes, Uuid::Bytes, std::string_view, zmq::Part>(part);
+    auto [seqn, type, brok, work, name, data] = zmq::PartMulti::unpack<SeqN,
+        std::underlying_type_t<Type>, Uuid::Bytes, Uuid::Bytes,
+        std::string_view, zmq::Part>(part);
+
+    ASSERT(type >= toIntegral(Type::State) &&
+            type <= toIntegral(Type::Event),
+        "Topic::fromPart: bad topic type");
 
     return Topic{Uuid::fromBytes(brok), Uuid::fromBytes(work),
-        std::move(seqn), std::move(name), std::move(data)};
+        std::move(seqn), std::move(name), std::move(data), Type(type)};
 }
 
 
 zmq::Part Topic::toPart() const
 {
-    return zmq::PartMulti::pack(seqn_, broker_.bytes(), worker_.bytes(), std::string_view(name_), data_);
+    const auto type = static_cast<std::underlying_type_t<Type>>(type_);
+
+    ASSERT(type >= toIntegral(Type::State) &&
+            type <= toIntegral(Type::Event),
+        "Topic::toPart: bad topic type");
+
+    return zmq::PartMulti::pack(seqn_, type, broker_.bytes(), worker_.bytes(),
+        std::string_view(name_), data_);
 }
 
 
-zmq::Part& Topic::withSeqNum(zmq::Part& part, Topic::SeqN val)
+zmq::Part& Topic::withSeqNum(zmq::Part& part, SeqN val)
 {
     const zmq::Part buf{val};
 
@@ -293,6 +311,22 @@ zmq::Part& Topic::withSeqNum(zmq::Part& part, Topic::SeqN val)
 
     std::copy_n(buf.data(), buf.size(), part.data());
     return part;
+}
+
+
+std::ostream& operator<<(std::ostream& os, Topic::Type v)
+{
+    switch (v) {
+    case Topic::State:
+        os << "state";
+        break;
+
+    case Topic::Event:
+        os << "event";
+        break;
+    };
+
+    return os;
 }
 
 
@@ -310,7 +344,8 @@ std::ostream& operator<<(std::ostream& os, const Topic& t)
        << t.worker() << ", "
        << t.seqNum() << ", "
        << t.name() << ", "
-       << t.data().size()
+       << t.data().size() << ", "
+       << t.type()
        << "]";
 
     return os;

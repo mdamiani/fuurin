@@ -108,7 +108,7 @@ const Uuid WorkerFixture::bid = Uuid::createNamespaceUuid(Uuid::Ns::Dns, "broker
 Topic mkT(const std::string& name, Topic::SeqN seqn, const std::string& pay)
 {
     using f = WorkerFixture;
-    return Topic{f::bid, f::wid, seqn, name, zmq::Part{pay}};
+    return Topic{f::bid, f::wid, seqn, name, zmq::Part{pay}, Topic::State};
 }
 
 
@@ -149,7 +149,7 @@ BOOST_AUTO_TEST_CASE(testDeliverUuid)
 BOOST_AUTO_TEST_CASE(testTopicPart)
 {
     using f = WorkerFixture;
-    const Topic t1{f::bid, f::wid, 256, "topic/test"sv, zmq::Part{"topic/data"sv}};
+    const Topic t1{f::bid, f::wid, 256, "topic/test"sv, zmq::Part{"topic/data"sv}, Topic::State};
     const Topic t2{Topic::fromPart(t1.toPart())};
 
     BOOST_TEST(t1 == t2);
@@ -161,7 +161,7 @@ BOOST_AUTO_TEST_CASE(testTopicPatchSeqNum)
     using f = WorkerFixture;
     const Topic::Name name{"topic/test"sv};
     const Topic::Data data{"topic/data"sv};
-    const Topic t1{f::bid, f::wid, 256, name, data};
+    const Topic t1{f::bid, f::wid, 256, name, data, Topic::State};
     zmq::Part p1 = t1.toPart();
 
     const Topic t2{Topic::fromPart(p1)};
@@ -814,7 +814,7 @@ BOOST_AUTO_TEST_CASE(testSeqnMaxDelivery)
     for (auto w : {&w1, &w2, &w3})
         testWaitForStart(*w);
 
-    const auto t1 = Topic{b.uuid(), w1.uuid(), 0, "topic"sv, zmq::Part{"hello"sv}};
+    const auto t1 = Topic{b.uuid(), w1.uuid(), 0, "topic"sv, zmq::Part{"hello"sv}, Topic::State};
 
     // primary worker increments sequence number.
     for (auto i = 1; i <= 3; ++i) {
@@ -846,8 +846,8 @@ BOOST_AUTO_TEST_CASE(testBrokerDiscardDelivery)
     Worker w1(Uuid::createRandomUuid());
     Worker w2(w1.uuid());
 
-    const auto t1 = Topic{b.uuid(), w1.uuid(), 0, "topic"sv, zmq::Part{"hello"sv}};
-    const auto t2 = Topic{b.uuid(), w2.uuid(), 0, "topic"sv, zmq::Part{"hello"sv}};
+    const auto t1 = Topic{b.uuid(), w1.uuid(), 0, "topic"sv, zmq::Part{"hello"sv}, Topic::State};
+    const auto t2 = Topic{b.uuid(), w2.uuid(), 0, "topic"sv, zmq::Part{"hello"sv}, Topic::State};
 
     auto bf = b.start();
     auto wf1 = w1.start();
@@ -891,8 +891,8 @@ BOOST_AUTO_TEST_CASE(testWorkerDiscardDelivery)
     Worker w1(Uuid::createRandomUuid());
     Worker w2(w1.uuid());
 
-    const auto t1 = Topic{b.uuid(), w1.uuid(), 0, "topic"sv, zmq::Part{"hello"sv}};
-    const auto t2 = Topic{b.uuid(), w2.uuid(), 0, "topic"sv, zmq::Part{"hello"sv}};
+    const auto t1 = Topic{b.uuid(), w1.uuid(), 0, "topic"sv, zmq::Part{"hello"sv}, Topic::State};
+    const auto t2 = Topic{b.uuid(), w2.uuid(), 0, "topic"sv, zmq::Part{"hello"sv}, Topic::State};
 
     auto bf = b.start();
     auto wf1 = w1.start();
@@ -952,10 +952,10 @@ BOOST_AUTO_TEST_CASE(testWorkerSeqSync)
     Worker w2(w1.uuid());
 
     const std::vector<Topic> t{
-        {b.uuid(), w1.uuid(), 0, "topic1"sv, zmq::Part{"hello1"sv}},
-        {b.uuid(), w1.uuid(), 0, "topic2"sv, zmq::Part{"hello2"sv}},
-        {b.uuid(), w1.uuid(), 0, "topic3"sv, zmq::Part{"hello3"sv}},
-        {b.uuid(), w1.uuid(), 0, "topic4"sv, zmq::Part{"hello4"sv}},
+        {b.uuid(), w1.uuid(), 0, "topic1"sv, zmq::Part{"hello1"sv}, Topic::State},
+        {b.uuid(), w1.uuid(), 0, "topic2"sv, zmq::Part{"hello2"sv}, Topic::State},
+        {b.uuid(), w1.uuid(), 0, "topic3"sv, zmq::Part{"hello3"sv}, Topic::State},
+        {b.uuid(), w1.uuid(), 0, "topic4"sv, zmq::Part{"hello4"sv}, Topic::State},
     };
 
     auto bf = b.start();

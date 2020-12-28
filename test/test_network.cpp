@@ -248,8 +248,8 @@ struct DeliveryFixture
 
 BOOST_FIXTURE_TEST_CASE(testDispatchRedundantFull, DispatchFixture)
 {
-    auto t1 = Topic{b.uuid(), w.uuid(), 0, "topic1"sv, zmq::Part{"hello1"sv}};
-    auto t2 = Topic{b.uuid(), w.uuid(), 0, "topic2"sv, zmq::Part{"hello2"sv}};
+    auto t1 = Topic{b.uuid(), w.uuid(), 0, "topic1"sv, zmq::Part{"hello1"sv}, Topic::State};
+    auto t2 = Topic{b.uuid(), w.uuid(), 0, "topic2"sv, zmq::Part{"hello2"sv}, Topic::State};
 
     w.dispatch(t1.name(), t1.data());
     w.dispatch(t2.name(), t2.data());
@@ -263,7 +263,7 @@ BOOST_FIXTURE_TEST_CASE(testDispatchRedundantDegraded, DispatchFixture)
 {
     f1.setEnabled(false);
 
-    auto t = Topic{b.uuid(), w.uuid(), 0, "topic1"sv, zmq::Part{"hello1"sv}};
+    auto t = Topic{b.uuid(), w.uuid(), 0, "topic1"sv, zmq::Part{"hello1"sv}, Topic::State};
     w.dispatch(t.name(), t.data());
 
     testWaitForTopic(w, t, 1);
@@ -275,7 +275,7 @@ BOOST_FIXTURE_TEST_CASE(testDispatchRedundantFault, DispatchFixture)
     f1.setEnabled(false);
     f2.setEnabled(false);
 
-    auto t = Topic{b.uuid(), w.uuid(), 0, "topic1"sv, zmq::Part{"hello1"sv}};
+    auto t = Topic{b.uuid(), w.uuid(), 0, "topic1"sv, zmq::Part{"hello1"sv}, Topic::State};
     w.dispatch(t.name(), t.data());
 
     testWaitForTimeout(w);
@@ -284,8 +284,8 @@ BOOST_FIXTURE_TEST_CASE(testDispatchRedundantFault, DispatchFixture)
 
 BOOST_FIXTURE_TEST_CASE(testDeliveryRedundantFull, DeliveryFixture)
 {
-    auto t1 = Topic{b.uuid(), w.uuid(), 0, "topic1"sv, zmq::Part{"hello1"sv}};
-    auto t2 = Topic{b.uuid(), w.uuid(), 0, "topic2"sv, zmq::Part{"hello2"sv}};
+    auto t1 = Topic{b.uuid(), w.uuid(), 0, "topic1"sv, zmq::Part{"hello1"sv}, Topic::State};
+    auto t2 = Topic{b.uuid(), w.uuid(), 0, "topic2"sv, zmq::Part{"hello2"sv}, Topic::State};
 
     w.dispatch(t1.name(), t1.data());
     w.dispatch(t2.name(), t2.data());
@@ -299,7 +299,7 @@ BOOST_FIXTURE_TEST_CASE(testDeliveryRedundantDegraded, DeliveryFixture)
 {
     f1.setEnabled(false);
 
-    auto t = Topic{b.uuid(), w.uuid(), 0, "topic1"sv, zmq::Part{"hello1"sv}};
+    auto t = Topic{b.uuid(), w.uuid(), 0, "topic1"sv, zmq::Part{"hello1"sv}, Topic::State};
     w.dispatch(t.name(), t.data());
 
     testWaitForTopic(w, t, 1);
@@ -311,7 +311,7 @@ BOOST_FIXTURE_TEST_CASE(testDeliveryRedundantFault, DeliveryFixture)
     f1.setEnabled(false);
     f2.setEnabled(false);
 
-    auto t = Topic{b.uuid(), w.uuid(), 0, "topic1"sv, zmq::Part{"hello1"sv}};
+    auto t = Topic{b.uuid(), w.uuid(), 0, "topic1"sv, zmq::Part{"hello1"sv}, Topic::State};
     w.dispatch(t.name(), t.data());
 
     testWaitForTimeout(w);
@@ -360,7 +360,7 @@ BOOST_AUTO_TEST_CASE(testDispatchTwoBrokers)
                                  w->endpointSnapshot()));
     }
 
-    auto t = Topic{{}, w1.uuid(), 1, "topic"sv, zmq::Part{"hello"sv}};
+    auto t = Topic{{}, w1.uuid(), 1, "topic"sv, zmq::Part{"hello"sv}, Topic::State};
 
     w1.dispatch(t.name(), t.data());
 

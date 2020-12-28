@@ -113,7 +113,8 @@ void Worker::dispatch(Topic::Name name, Topic::Data&& data)
         return;
 
     sendOperation(Operation::Type::Dispatch,
-        Topic{Uuid{}, uuid(), Topic::SeqN{}, name, data}.toPart());
+        Topic{Uuid{}, uuid(), Topic::SeqN{}, name, data, Topic::State}
+            .toPart());
 }
 
 
