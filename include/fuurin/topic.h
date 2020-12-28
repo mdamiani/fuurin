@@ -38,7 +38,7 @@ public:
     /**
      * \brief Payload name data type.
      *
-     * The name has a maximum limit of 15 characters.
+     * The name has a maximum limit of 256 characters (including null character).
      * The internal string is null terminated.
      */
     class Name final
@@ -100,8 +100,8 @@ public:
 
 
     private:
-        size_t sz_;               ///< Actual size of the name.
-        std::array<char, 16> dd_; ///< Backing array of the name.
+        size_t sz_;                ///< Actual size of the name.
+        std::array<char, 256> dd_; ///< Backing array of the name.
     };
 
 

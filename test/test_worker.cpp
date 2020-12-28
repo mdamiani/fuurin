@@ -631,7 +631,14 @@ BOOST_AUTO_TEST_CASE(testTopicSubscriptionSimple)
     Broker b(WorkerFixture::bid);
     Worker w(WorkerFixture::wid);
 
-    const std::vector<Topic::Name> names{"short topic"sv, "very long topic 12345"sv};
+    std::string longTopic;
+    for (int i = 0; i < 16; ++i)
+        longTopic += "very long topic ";
+    longTopic.resize(longTopic.size() - 1);
+
+    BOOST_TEST(longTopic.size() == 255u);
+
+    const std::vector<Topic::Name> names{"short topic"sv, longTopic + "12345"};
 
     w.setTopicsNames(names);
     BOOST_TEST(std::get<0>(w.topicsNames()) == false);
@@ -641,16 +648,16 @@ BOOST_AUTO_TEST_CASE(testTopicSubscriptionSimple)
     auto wf = w.start();
 
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Started,
-        mkCnf(w, 0, false, {"short topic"sv, "very long topic"sv}));
+        mkCnf(w, 0, false, {"short topic"sv, longTopic}));
 
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Online);
 
     w.dispatch("short topic"sv, zmq::Part{"hello1"sv});
-    w.dispatch("very long topic"sv, zmq::Part{"hello2"sv});
+    w.dispatch(longTopic, zmq::Part{"hello2"sv});
     w.dispatch("another topic"sv, zmq::Part{"hello3"sv});
 
     testWaitForTopic(w, mkT("short topic", 0, "hello1"), 1);
-    testWaitForTopic(w, mkT("very long topic", 0, "hello2"), 2);
+    testWaitForTopic(w, mkT(longTopic, 0, "hello2"), 2);
 
     testWaitForTimeout(w);
 
