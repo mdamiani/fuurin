@@ -52,12 +52,12 @@ public:
     enum struct Type : type_t
     {
         Invalid,         ///< Event is invalid.
-        Started,         ///< Event delivered when \ref Runner::start() was acknowledged, with payload \ref WorkerConfig
+        Started,         ///< Event delivered when \ref Runner::start() was acknowledged, with payload \ref WorkerConfig.
         Stopped,         ///< Event delivered when \ref Runner::stop() was acknowledged.
         Offline,         ///< Event for \ref Worker disconnection.
         Online,          ///< Event for \ref Worker connection.
         Delivery,        ///< Event for any \ref Worker::dispatch(Topic::Name, zmq::Part&&), with payload \ref Topic.
-        SyncRequest,     ///< Event for start of \ref Worker::sync().
+        SyncRequest,     ///< Event for start of \ref Worker::sync(), with payload \ref WorkerConfig.
         SyncBegin,       ///< Event for reply from broker of \ref Worker::sync().
         SyncElement,     ///< Event for Worker::sync() reply.
         SyncSuccess,     ///< Event for \ref Worker::sync() success.
