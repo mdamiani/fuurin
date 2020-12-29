@@ -192,8 +192,16 @@ public:
 
 
 private:
-    Bytes bytes_; ///< UUID bytes.
-    Srepr srepr_; ///< UUID string representation.
+    /**
+     * \brief Updates the string representation.
+     */
+    void cacheSrepr() const;
+
+
+private:
+    Bytes bytes_;         ///< UUID bytes.
+    mutable Srepr srepr_; ///< UUID string representation.
+    mutable bool cached_; ///< UUID string cached.
 };
 
 

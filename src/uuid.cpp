@@ -65,9 +65,9 @@ const Uuid Uuid::Ns::X500dn{Uuid::fromString("6ba7b814-9dad-11d1-80b4-00c04fd430
 
 
 Uuid::Uuid()
+    : cached_{false}
 {
     std::fill(bytes_.begin(), bytes_.end(), 0);
-    std::copy(NullFmt.begin(), NullFmt.end(), srepr_.begin());
 }
 
 
@@ -85,6 +85,7 @@ const Uuid::Bytes& Uuid::bytes() const noexcept
 
 std::string_view Uuid::toString() const
 {
+    cacheSrepr();
     return std::string_view(srepr_.data(), srepr_.size());
 }
 
@@ -93,6 +94,7 @@ std::string_view Uuid::toShortString() const
 {
     const size_t sz = 8;
     static_assert(sz <= NullFmt.size());
+    cacheSrepr();
     return std::string_view(srepr_.data(), sz);
 }
 
@@ -136,8 +138,17 @@ Uuid Uuid::fromBytes(const Bytes& b)
 {
     Uuid ret;
     ret.bytes_ = b;
-    ret.srepr_ = sreprFromBytes(b);
     return ret;
+}
+
+
+void Uuid::cacheSrepr() const
+{
+    if (cached_)
+        return;
+
+    srepr_ = sreprFromBytes(bytes_);
+    cached_ = true;
 }
 
 
@@ -155,7 +166,7 @@ zmq::Part Uuid::toPart() const
 
 bool Uuid::operator==(const Uuid& rhs) const
 {
-    return bytes_ == rhs.bytes_ && srepr_ == rhs.srepr_;
+    return bytes_ == rhs.bytes_;
 }
 
 
