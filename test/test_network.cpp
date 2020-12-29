@@ -314,7 +314,7 @@ BOOST_FIXTURE_TEST_CASE(testDeliveryRedundantFault, DeliveryFixture)
     auto t = Topic{b.uuid(), w.uuid(), 0, "topic1"sv, zmq::Part{"hello1"sv}, Topic::State};
     w.dispatch(t.name(), t.data());
 
-    testWaitForTimeout(w);
+    // next expected event is connection offline
 }
 
 
