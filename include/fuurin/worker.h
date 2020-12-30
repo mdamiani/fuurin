@@ -47,7 +47,7 @@ public:
      * \param[in] id Identifier.
      * \param[in] initSequence Initial sequence number.
      */
-    Worker(Uuid id = Uuid::createRandomUuid(), Topic::SeqN initSequence = 0);
+    explicit Worker(Uuid id = Uuid::createRandomUuid(), Topic::SeqN initSequence = 0);
 
     /**
      * \brief Destroys this worker.

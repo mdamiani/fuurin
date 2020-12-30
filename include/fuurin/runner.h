@@ -56,7 +56,7 @@ public:
      *
      * \param[in] id Instance identifier.
      */
-    Runner(Uuid id = Uuid::createRandomUuid());
+    explicit Runner(Uuid id = Uuid::createRandomUuid());
 
     /**
      * \brief Stops this runner.

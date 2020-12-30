@@ -39,7 +39,7 @@ public:
     /**
      * \brief Initializes this broker.
      */
-    Broker(Uuid id = Uuid::createRandomUuid());
+    explicit Broker(Uuid id = Uuid::createRandomUuid());
 
     /**
      * \brief Destroys this broker.
