@@ -303,7 +303,8 @@ void Broker::BrokerSession::replySnapshot(uint32_t rouID, uint8_t syncseq, zmq::
             ASSERT(!el.second.list().empty(), "topic entry has empty cache");
             const auto& t = el.second.list().back().second;
 
-            if (!conf.topicsAll && std::find(conf.topicsNames.begin(), conf.topicsNames.end(), t.name()) == conf.topicsNames.end())
+            if (auto& names = conf.topicsNames; t.type() == Topic::Event ||
+                (!conf.topicsAll && std::find(names.begin(), names.end(), t.name()) == names.end()))
                 continue;
 
             if (zsnapshot_->trySend(zmq::PartMulti::pack(BROKER_SYNC_ELEMN, syncseq, t.toPart())

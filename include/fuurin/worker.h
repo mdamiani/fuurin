@@ -87,12 +87,16 @@ public:
     /**
      * \brief Sends data to the broker.
      *
+     * \param[in] name Name of topic.
+     * \param[in] data Data of topic.
+     * \param[in] type Type of topic.
+     *
      * \see isRunning()
      */
     ///{@
-    void dispatch(Topic::Name name, const Topic::Data& data);
-    void dispatch(Topic::Name name, Topic::Data& data);
-    void dispatch(Topic::Name name, Topic::Data&& data);
+    void dispatch(Topic::Name name, const Topic::Data& data, Topic::Type type = Topic::State);
+    void dispatch(Topic::Name name, Topic::Data& data, Topic::Type type = Topic::State);
+    void dispatch(Topic::Name name, Topic::Data&& data, Topic::Type type = Topic::State);
     ///@}
 
     /**

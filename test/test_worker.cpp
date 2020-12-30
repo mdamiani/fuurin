@@ -615,6 +615,29 @@ BOOST_FIXTURE_TEST_CASE(testSyncTopicRecentAnotherWorker, WorkerFixture)
 }
 
 
+BOOST_FIXTURE_TEST_CASE(testSyncSkipEvents, WorkerFixture)
+{
+    auto t1 = mkT("topic1", 1, "hello1");
+    auto t2 = mkT("topic2", 2, "hello2");
+    auto t3 = mkT("topic3", 3, "hello3");
+
+    w.dispatch(t1.name(), t1.data(), Topic::State);
+    w.dispatch(t2.name(), t2.data(), Topic::Event);
+    w.dispatch(t3.name(), t3.data(), Topic::State);
+
+    testWaitForTopic(w, t1, t1.seqNum());
+    testWaitForTopic(w, t2, t2.seqNum());
+    testWaitForTopic(w, t3, t3.seqNum());
+
+    w.sync();
+
+    testWaitForSyncStart(w, b, mkCnf(w, 3));
+    testWaitForSyncTopic(w, t1, t1.seqNum());
+    testWaitForSyncTopic(w, t3, t3.seqNum());
+    testWaitForSyncStop(w, b);
+}
+
+
 BOOST_AUTO_TEST_CASE(testTopicSubscriptionInvalid)
 {
     Worker w(WorkerFixture::wid);

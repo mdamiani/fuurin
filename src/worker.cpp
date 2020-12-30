@@ -95,25 +95,25 @@ std::tuple<bool, std::vector<Topic::Name>> Worker::topicsNames() const
 }
 
 
-void Worker::dispatch(Topic::Name name, const Topic::Data& data)
+void Worker::dispatch(Topic::Name name, const Topic::Data& data, Topic::Type type)
 {
-    dispatch(name, zmq::Part{data});
+    dispatch(name, zmq::Part{data}, type);
 }
 
 
-void Worker::dispatch(Topic::Name name, Topic::Data& data)
+void Worker::dispatch(Topic::Name name, Topic::Data& data, Topic::Type type)
 {
-    dispatch(name, std::move(data));
+    dispatch(name, std::move(data), type);
 }
 
 
-void Worker::dispatch(Topic::Name name, Topic::Data&& data)
+void Worker::dispatch(Topic::Name name, Topic::Data&& data, Topic::Type type)
 {
     if (!isRunning())
         return;
 
     sendOperation(Operation::Type::Dispatch,
-        Topic{Uuid{}, uuid(), Topic::SeqN{}, name, data, Topic::State}
+        Topic{Uuid{}, uuid(), Topic::SeqN{}, name, data, type}
             .toPart());
 }
 
