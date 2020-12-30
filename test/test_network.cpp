@@ -352,7 +352,7 @@ BOOST_AUTO_TEST_CASE(testDispatchTwoBrokers)
     auto w2f = w2.start();
 
     for (auto w : {&w1, &w2}) {
-        testWaitForStart(*w, mkCnf(w->uuid(), 0,
+        testWaitForStart(*w, mkCnf(*w, 0,
                                  std::get<0>(w->topicsNames()), //
                                  std::get<1>(w->topicsNames()), //
                                  w->endpointDelivery(),         //
