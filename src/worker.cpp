@@ -24,6 +24,7 @@
 #include <utility>
 #include <chrono>
 #include <list>
+#include <set>
 #include <type_traits>
 #include <string_view>
 
@@ -380,7 +381,7 @@ void Worker::WorkerSession::connOpen()
     zdelivery_->setEndpoints({conf_.endpDelivery.begin(), conf_.endpDelivery.end()});
     zdispatch_->setEndpoints({conf_.endpDispatch.begin(), conf_.endpDispatch.end()});
 
-    std::list<std::string> groups{BROKER_HUGZ};
+    std::set<std::string> groups{BROKER_HUGZ};
 
     if (!conf_.topicsAll) {
         for (const auto& name : conf_.topicsNames) {
@@ -388,13 +389,13 @@ void Worker::WorkerSession::connOpen()
                 throw ERROR(Error, "could not set topic name",
                     log::Arg{"name"sv, std::string_view(BROKER_UPDT)});
             }
-            groups.push_back(name);
+            groups.insert(name);
         }
     } else {
-        groups.push_back(BROKER_UPDT);
+        groups.insert(BROKER_UPDT);
     }
 
-    zdelivery_->setGroups(groups);
+    zdelivery_->setGroups({groups.begin(), groups.end()});
 
     // connect
     zdelivery_->connect();

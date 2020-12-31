@@ -731,6 +731,38 @@ BOOST_AUTO_TEST_CASE(testTopicSubscriptionNone)
 }
 
 
+BOOST_AUTO_TEST_CASE(testTopicSubscriptionDuplicate)
+{
+    Broker b{WorkerFixture::bid};
+    Worker w{WorkerFixture::wid};
+
+    const std::vector<Topic::Name> names{"topic1"sv, "topic2"sv, "topic1"sv};
+
+    w.setTopicsNames(names);
+    BOOST_TEST(std::get<0>(w.topicsNames()) == false);
+    BOOST_TEST(std::get<1>(w.topicsNames()) == names);
+
+    auto bf = b.start();
+    auto wf = w.start();
+
+    testWaitForStart(w, mkCnf(w, 0, false, {"topic1"sv, "topic2"sv, "topic1"sv}));
+
+    w.dispatch("topic1"sv, zmq::Part{"hello1"sv});
+    w.dispatch("topic2"sv, zmq::Part{"hello2"sv});
+
+    testWaitForTopic(w, mkT("topic1", 0, "hello1"), 1);
+    testWaitForTopic(w, mkT("topic2", 0, "hello2"), 2);
+
+    w.stop();
+    b.stop();
+
+    testWaitForStop(w);
+
+    wf.get();
+    bf.get();
+}
+
+
 BOOST_AUTO_TEST_CASE(testTopicDeliveryGroup)
 {
     Broker b{WorkerFixture::bid};
