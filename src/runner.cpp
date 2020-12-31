@@ -32,8 +32,9 @@ namespace fuurin {
  * MAIN TASK
  */
 
-Runner::Runner(Uuid id)
-    : uuid_(id)
+Runner::Runner(Uuid id, const std::string& name)
+    : name_{name}
+    , uuid_(id)
     , zctx_(std::make_unique<zmq::Context>())
     , zops_(std::make_unique<zmq::Socket>(zctx_.get(), zmq::Socket::PAIR))
     , zopr_(std::make_unique<zmq::Socket>(zctx_.get(), zmq::Socket::PAIR))
@@ -67,6 +68,12 @@ Runner::Runner(Uuid id)
 Runner::~Runner() noexcept
 {
     stop();
+}
+
+
+std::string_view Runner::name() const
+{
+    return std::string_view(name_.data(), name_.size());
 }
 
 
@@ -267,9 +274,10 @@ Operation Runner::recvOperation(zmq::Socket* sock, token_type_t token) noexcept
  * ASYNC TASK
  */
 
-Runner::Session::Session(Uuid id, token_type_t token, CompletionFunc onComplete,
-    zmq::Context* zctx, zmq::Socket* zoper, zmq::Socket* zevent)
-    : uuid_{id}
+Runner::Session::Session(const std::string& name, Uuid id, token_type_t token,
+    CompletionFunc onComplete, zmq::Context* zctx, zmq::Socket* zoper, zmq::Socket* zevent)
+    : name_{name}
+    , uuid_{id}
     , token_{token}
     , docompl_{onComplete}
     , zctx_{zctx}

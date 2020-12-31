@@ -22,6 +22,8 @@
 #include <functional>
 #include <string>
 #include <vector>
+#include <string>
+#include <string_view>
 
 
 namespace fuurin {
@@ -56,7 +58,7 @@ public:
      *
      * \param[in] id Instance identifier.
      */
-    explicit Runner(Uuid id = Uuid::createRandomUuid());
+    explicit Runner(Uuid id = Uuid::createRandomUuid(), const std::string& name = "runner");
 
     /**
      * \brief Stops this runner.
@@ -72,6 +74,11 @@ public:
     Runner(const Runner&) = delete;
     Runner& operator=(const Runner&) = delete;
     ///@}
+
+    /**
+     * \return Worker's name.
+     */
+    std::string_view name() const;
 
     /**
      * \return Return the instance identifier.
@@ -220,7 +227,8 @@ protected:
     template<typename S, typename... Args>
     std::unique_ptr<Session> makeSession(CompletionFunc onComplete, Args&&... args) const
     {
-        return std::make_unique<S>(uuid_, token_, onComplete, zctx_.get(), zopr_.get(), zevs_.get(),
+        return std::make_unique<S>(name_, uuid_, token_, onComplete,
+            zctx_.get(), zopr_.get(), zevs_.get(),
             std::forward<Args>(args)...);
     }
 
@@ -312,14 +320,17 @@ protected:
          *
          * Passed sockets must be taken from a \ref Runner instance.
          *
+         * \param[in] name Session name.
+         * \param[in] uuid Session identifier.
          * \param[in] token Session token, it's constant as long as this session is alive.
          * \param[in] onComplete Function to call when session ends.
          * \param[in] zctx ZMQ context.
          * \param[in] zoper ZMQ socket to receive operation commands from main task.
          * \param[in] zevent ZMQ socket to send events to main task.
          */
-        Session(Uuid id, token_type_t token, CompletionFunc onComplete,
-            zmq::Context* zctx, zmq::Socket* zoper, zmq::Socket* zevent);
+        Session(const std::string& name, Uuid id, token_type_t token,
+            CompletionFunc onComplete, zmq::Context* zctx, zmq::Socket* zoper,
+            zmq::Socket* zevent);
 
         /**
          * \brief Destructor.
@@ -424,6 +435,7 @@ protected:
 
 
     protected:
+        const std::string name_;       ///< Session Name.
         const Uuid uuid_;              ///< Identifier.
         const token_type_t token_;     ///< Session token.
         const CompletionFunc docompl_; ///< Completion action.
@@ -434,6 +446,7 @@ protected:
 
 
 private:
+    const std::string name_;                   ///< Name.
     const Uuid uuid_;                          ///< Identifier.
     const std::unique_ptr<zmq::Context> zctx_; ///< ZMQ context.
     const std::unique_ptr<zmq::Socket> zops_;  ///< Inter-thread sending socket.

@@ -47,7 +47,7 @@ public:
      * \param[in] id Identifier.
      * \param[in] initSequence Initial sequence number.
      */
-    explicit Worker(Uuid id = Uuid::createRandomUuid(), Topic::SeqN initSequence = 0);
+    explicit Worker(Uuid id = Uuid::createRandomUuid(), Topic::SeqN initSequence = 0, const std::string& name = "worker");
 
     /**
      * \brief Destroys this worker.
@@ -149,7 +149,7 @@ protected:
          *
          * \see Runner::Session::Session(...)
          */
-        WorkerSession(Uuid id, token_type_t token, CompletionFunc onComplete,
+        WorkerSession(const std::string& name, Uuid id, token_type_t token, CompletionFunc onComplete,
             zmq::Context* zctx, zmq::Socket* zoper, zmq::Socket* zevent,
             zmq::Socket* zseqs);
 

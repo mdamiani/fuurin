@@ -18,6 +18,7 @@
 #include "fuurin/lrucache.h"
 
 #include <memory>
+#include <string>
 #include <list>
 
 
@@ -39,7 +40,7 @@ public:
     /**
      * \brief Initializes this broker.
      */
-    explicit Broker(Uuid id = Uuid::createRandomUuid());
+    explicit Broker(Uuid id = Uuid::createRandomUuid(), const std::string& name = "broker");
 
     /**
      * \brief Destroys this broker.
@@ -79,7 +80,7 @@ protected:
          *
          * \see Runner::Session::Session(...)
          */
-        BrokerSession(Uuid id, token_type_t token, CompletionFunc onComplete,
+        BrokerSession(const std::string& name, Uuid id, token_type_t token, CompletionFunc onComplete,
             zmq::Context* zctx, zmq::Socket* zoper, zmq::Socket* zevents);
 
         /**

@@ -120,6 +120,16 @@ BOOST_AUTO_TEST_CASE(testUuid)
 }
 
 
+BOOST_AUTO_TEST_CASE(testName)
+{
+    Broker b(WorkerFixture::bid, "my_broker");
+    Worker w(WorkerFixture::wid, 0, "my_worker");
+
+    BOOST_TEST(b.name() == "my_broker"sv);
+    BOOST_TEST(w.name() == "my_worker"sv);
+}
+
+
 BOOST_AUTO_TEST_CASE(testDeliverUuid)
 {
     Worker w(WorkerFixture::wid);
