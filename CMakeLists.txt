@@ -36,6 +36,7 @@ ExternalProject_Add(zeromq
         -D BUILD_STATIC=ON
         -D ENABLE_DRAFTS=ON
         -D WITH_TLS=OFF
+        -D WITH_LIBBSD=OFF
         -D ENABLE_CURVE=OFF
         -D CMAKE_BUILD_TYPE=Release
 )
