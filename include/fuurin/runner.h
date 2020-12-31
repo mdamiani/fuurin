@@ -328,7 +328,7 @@ protected:
          * \param[in] zoper ZMQ socket to receive operation commands from main task.
          * \param[in] zevent ZMQ socket to send events to main task.
          */
-        Session(const std::string& name, Uuid id, token_type_t token,
+        explicit Session(const std::string& name, Uuid id, token_type_t token,
             CompletionFunc onComplete, zmq::Context* zctx, zmq::Socket* zoper,
             zmq::Socket* zevent);
 

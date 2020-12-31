@@ -80,8 +80,8 @@ protected:
          *
          * \see Runner::Session::Session(...)
          */
-        BrokerSession(const std::string& name, Uuid id, token_type_t token, CompletionFunc onComplete,
-            zmq::Context* zctx, zmq::Socket* zoper, zmq::Socket* zevents);
+        explicit BrokerSession(const std::string& name, Uuid id, token_type_t token,
+            CompletionFunc onComplete, zmq::Context* zctx, zmq::Socket* zoper, zmq::Socket* zevents);
 
         /**
          * \brief Destructor.

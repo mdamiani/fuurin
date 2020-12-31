@@ -149,8 +149,8 @@ protected:
          *
          * \see Runner::Session::Session(...)
          */
-        WorkerSession(const std::string& name, Uuid id, token_type_t token, CompletionFunc onComplete,
-            zmq::Context* zctx, zmq::Socket* zoper, zmq::Socket* zevent,
+        explicit WorkerSession(const std::string& name, Uuid id, token_type_t token,
+            CompletionFunc onComplete, zmq::Context* zctx, zmq::Socket* zoper, zmq::Socket* zevent,
             zmq::Socket* zseqs);
 
         /**
