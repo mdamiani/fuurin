@@ -648,6 +648,32 @@ BOOST_FIXTURE_TEST_CASE(testSyncSkipEvents, WorkerFixture)
 }
 
 
+BOOST_FIXTURE_TEST_CASE(testStoreEvents, WorkerFixture)
+{
+    // events are not synced with, however they are still stored
+    // at broker side in order to deliver them only once.
+
+    auto t = mkT("topic", 1, "hello");
+    w.dispatch(t.name(), t.data(), Topic::Event);
+    testWaitForTopic(w, t, t.seqNum());
+    BOOST_TEST(w.seqNumber() == 1u);
+
+    // clone worker (same uuid).
+    Worker w2{w.uuid()};
+    BOOST_TEST(w2.uuid() == w.uuid());
+    BOOST_TEST(w2.seqNumber() == 0u);
+    auto w2f = w2.start();
+    testWaitForStart(w2);
+
+    // same topic will be discarded.
+    w2.dispatch(t.name(), t.data(), Topic::Event);
+    w2.stop();
+    testWaitForStop(w2);
+    BOOST_TEST(w2.seqNumber() == 1u);
+    w2f.get();
+}
+
+
 BOOST_AUTO_TEST_CASE(testTopicSubscriptionInvalid)
 {
     Worker w(WorkerFixture::wid);
