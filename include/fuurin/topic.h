@@ -36,9 +36,18 @@ public:
     using SeqN = uint64_t;
 
     /**
+     * \brief Type of topic.
+     */
+    enum Type : uint8_t
+    {
+        State, ///< Topic is delivered and synced with.
+        Event, ///< Topic is delivered once.
+    };
+
+    /**
      * \brief Payload name data type.
      *
-     * The name has a maximum limit of 15 characters.
+     * The name has a maximum limit of 256 characters (including null character).
      * The internal string is null terminated.
      */
     class Name final
@@ -100,8 +109,8 @@ public:
 
 
     private:
-        size_t sz_;               ///< Actual size of the name.
-        std::array<char, 16> dd_; ///< Backing array of the name.
+        size_t sz_;                ///< Actual size of the name.
+        std::array<char, 256> dd_; ///< Backing array of the name.
     };
 
 
@@ -121,8 +130,8 @@ public:
      * \param[in] data Topic data.
      */
     ///{@
-    Topic(const Uuid& broker, const Uuid& worker, const SeqN& seqn, const Name& name, const Data& data);
-    Topic(Uuid&& broker, Uuid&& worker, SeqN&& seqn, Name&& name, Data&& data);
+    Topic(const Uuid& broker, const Uuid& worker, const SeqN& seqn, const Name& name, const Data& data, Type type);
+    Topic(Uuid&& broker, Uuid&& worker, SeqN&& seqn, Name&& name, Data&& data, Type type);
     ///@}
 
     /**
@@ -149,10 +158,12 @@ public:
     /**
      * \return Sequence number.
      */
-    ///{@
-    const SeqN& seqNum() const noexcept;
-    SeqN& seqNum() noexcept;
-    ///@}
+    SeqN seqNum() const noexcept;
+
+    /**
+     * \return Type of topic.
+     */
+    Type type() const noexcept;
 
     /**
      * \return Topic's name.
@@ -192,10 +203,13 @@ public:
      * \brief Modifies this topic with passed value.
      * \param[in] v Sequence number.
      */
-    ///{@
-    Topic& withSeqNum(const SeqN& v);
-    Topic& withSeqNum(SeqN&& v);
-    ///@}
+    Topic& withSeqNum(SeqN v);
+
+    /**
+     * \brief Modifies this topic with passed value.
+     * \param[in] v Type of topic.
+     */
+    Topic& withType(Type v);
 
     /**
      * \brief Modifies this topic with passed value.
@@ -265,8 +279,12 @@ private:
     SeqN seqn_;   ///< Sequence number.
     Name name_;   ///< Topic name.
     Data data_;   ///< Topic data.
+    Type type_;   ///< Topic type.
 };
 
+
+///< Streams to printable form.
+std::ostream& operator<<(std::ostream& os, Topic::Type v);
 
 ///< Streams to printable form.
 std::ostream& operator<<(std::ostream& os, const Topic::Name& n);

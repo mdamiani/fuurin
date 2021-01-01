@@ -2,19 +2,34 @@
 
 Simple and fast [ZeroMQ](http://zeromq.org) communication library.
 
-**TBD**
+It provides few easy to use C++ classes in order to connect different parties together.
+There are also C++ bindings to some ZMQ sockets and features, which are used by the library
+components themselves.
 
 ## Features
 
- - **TDB**
- - ZMQ C++ bindings with RAII design and exception safe code.
- - Leverage ZMQ thread safe sockets, like RADIO/DISH, CLIENT/SERVER.
- - Multipart messages can be used with ZMQ thread safe sockets.
- - Polling of ZMQ sockets made easy: can integrate with C++ range based loops, freely open/close sockets, etc..
- - Multicore friendly, due to the usage of ZMQ and Boost::ASIO.
- - Logging aware library: levels, customization and performance.
- - Endianess management for integer types.
- - Timers can be polled like they were sockets.
+ * ZMQ Sockets:
+    - ZMQ C++ bindings with RAII design and exception safe code.
+    - Leverage of ZMQ thread safe sockets, like RADIO/DISH, CLIENT/SERVER.
+    - Multipart messages can be used with ZMQ thread safe sockets.
+    - Polling of ZMQ sockets made easy: can integrate with C++ range based loops, easy open/close sockets, etc..
+    - Multicore friendly, due to the usage of ZMQ and Boost::ASIO.
+    - Logging aware library: levels, customization and performance.
+    - Time elapsed measurement for timeouts.
+    - Endianess management for integer types.
+    - Timers can be polled like they were sockets.
+
+ * Network Classes:
+    - Microservices mini framework, based on workers and brokers.
+    - Connection management between worker and broker.
+    - Redesigned and extended [ZMQ Clone Pattern](https://zguide.zeromq.org/docs/chapter5/#Reliable-Pub-Sub-Clone-Pattern).
+    - Late joining management in publish/subscribe patterns.
+    - Retry and keep alive to check for liveness.
+    - Eventually consistent and coherent distributed system, for high availability.
+    - Universally unique identifier support (UUID).
+    - Reliability by means of supported redundant connections.
+
+(_TODO: add references to classes where possibile._)
 
 
 ## Licenses
@@ -120,8 +135,8 @@ $> make
 
 ### Vendoring
 
-External libraries used by *fuurin* are integrated through a vendoring approach.
-For example, Boost unit test framework is added in this way:
+External libraries used by *fuurin* are integrated through a git subtree approach.
+For example, Boost unit test framework may be added in this manual way:
 
  - Create an orphan branch where to store the external library
 

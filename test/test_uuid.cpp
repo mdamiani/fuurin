@@ -88,10 +88,21 @@ BOOST_AUTO_TEST_CASE(testCopy)
 {
     Uuid u1 = Uuid::createRandomUuid();
     Uuid u2 = Uuid::createRandomUuid();
+    Uuid u3 = Uuid::createRandomUuid();
+    Uuid u4 = u3;
     BOOST_TEST(u1 != u2);
+    BOOST_TEST(u1.toString() != u2.toString());
 
-    u2 = u1;
+    u1 = u2;
     BOOST_TEST(u1 == u2);
+    BOOST_TEST(u1.toString() == u2.toString());
+
+    u1 = u3;
+    BOOST_TEST(u1 == u3);
+    BOOST_TEST(u1.toString() == u3.toString());
+
+    // u4 has no cache
+    BOOST_TEST(u4 == u3);
 }
 
 

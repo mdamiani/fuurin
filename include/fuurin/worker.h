@@ -20,6 +20,7 @@
 
 #include <memory>
 #include <vector>
+#include <tuple>
 
 
 namespace fuurin {
@@ -46,7 +47,7 @@ public:
      * \param[in] id Identifier.
      * \param[in] initSequence Initial sequence number.
      */
-    Worker(Uuid id = Uuid::createRandomUuid(), Topic::SeqN initSequence = 0);
+    explicit Worker(Uuid id = Uuid::createRandomUuid(), Topic::SeqN initSequence = 0, const std::string& name = "worker");
 
     /**
      * \brief Destroys this worker.
@@ -54,23 +55,48 @@ public:
     virtual ~Worker() noexcept;
 
     /**
+     * \brief Sets every topics to sync with and receive from broker.
+     *
+     * \see setTopicsNames(std::vector<Topic::Name>)
+     */
+    void setTopicsAll();
+
+    /**
      * \brief Sets topics to sync with and receive from broker.
      *
-     * If the list of names is empty, then every topic will be received.
+     * If the list of names is empty, then none topic be received.
      *
      * \param[in] names List of topics names.
+     *
+     * \see setTopicsAll()
      */
-    void setTopicNames(const std::vector<Topic::Name>& names);
+    void setTopicsNames(const std::vector<Topic::Name>& names);
+
+    /**
+     * \brief Returns subscription topics.
+     *
+     * \return A tuple which first element is whether every topics
+     *      were subscribed and the second element (otherwise)
+     *      the specific topic names which were subscribed.
+     *
+     * \see setTopicsNames(std::vector<Topic::Name>)
+     * \see setTopicsAll()
+     */
+    std::tuple<bool, std::vector<Topic::Name>> topicsNames() const;
 
     /**
      * \brief Sends data to the broker.
      *
+     * \param[in] name Name of topic.
+     * \param[in] data Data of topic.
+     * \param[in] type Type of topic.
+     *
      * \see isRunning()
      */
     ///{@
-    void dispatch(Topic::Name name, const Topic::Data& data);
-    void dispatch(Topic::Name name, Topic::Data& data);
-    void dispatch(Topic::Name name, Topic::Data&& data);
+    void dispatch(Topic::Name name, const Topic::Data& data, Topic::Type type = Topic::State);
+    void dispatch(Topic::Name name, Topic::Data& data, Topic::Type type = Topic::State);
+    void dispatch(Topic::Name name, Topic::Data&& data, Topic::Type type = Topic::State);
     ///@}
 
     /**
@@ -123,8 +149,8 @@ protected:
          *
          * \see Runner::Session::Session(...)
          */
-        WorkerSession(Uuid id, token_type_t token, CompletionFunc onComplete,
-            zmq::Context* zctx, zmq::Socket* zoper, zmq::Socket* zevent,
+        explicit WorkerSession(const std::string& name, Uuid id, token_type_t token,
+            CompletionFunc onComplete, zmq::Context* zctx, zmq::Socket* zoper, zmq::Socket* zevent,
             zmq::Socket* zseqs);
 
         /**
@@ -274,6 +300,7 @@ protected:
 
     mutable Topic::SeqN seqNum_; ///< Worker sequence number.
 
+    bool subscrAll_;                       ///< Whether to subscribe to every topic.
     std::vector<Topic::Name> subscrNames_; ///< List of topic names.
 };
 

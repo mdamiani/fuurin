@@ -36,8 +36,11 @@ struct WorkerConfig
     ///< Initial sequence number.
     Topic::SeqN seqNum;
 
+    ///< Every topic names.
+    bool topicsAll;
+
     ///< List of topic names.
-    std::vector<Topic::Name> topicNames;
+    std::vector<Topic::Name> topicsNames;
 
     ///< List of endpoints.
     ///{@
