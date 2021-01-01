@@ -85,13 +85,28 @@ public:
     std::tuple<bool, std::vector<Topic::Name>> topicsNames() const;
 
     /**
-     * \brief Sends data to the broker.
+     * \brief Sends a message to the broker(s).
      *
-     * \param[in] name Name of topic.
+     * A message \ref Topic is first created and then dispatched to any connected broker(s).
+     * Depending on subscriptions, i.e. \ref topicsNames(), an \ref Event may be received back.
+     * If a message is marked as \ref Topic::State, then it will be retrieved back by \ref sync().
+     *
+     * The policy for messages which are sent before a worker is actually connected to broker(s),
+     * that is before the \ref Event::Type::Online event, depends on the underlying ZMQ socket type.
+     * Thus messages might be kept in socket's buffers.
+     *
+     * Sequence number is increased every time this function is called.
+     *
+     * If worker is not \ref Running(), then message is silently discarded.
+     *
+     * \param[in] name Name of topic, no more than \ref Topic::Name::capacity() chars.
      * \param[in] data Data of topic.
      * \param[in] type Type of topic.
      *
      * \see isRunning()
+     * \see waitForEvent(std::chrono::milliseconds)
+     * \see seqNumber()
+     * \see sync()
      */
     ///{@
     void dispatch(Topic::Name name, const Topic::Data& data, Topic::Type type = Topic::State);
@@ -102,7 +117,21 @@ public:
     /**
      * \brief Sends a synchronization request to the broker.
      *
+     * Every stored topic message with type \ref Topic::State will be received by
+     * a synchronization operation.
+     *
+     * Synchronization topics will be received as \ref Event::Type::SyncElement elements,
+     * after a \ref Event::Type::SyncBegin event.
+     *
+     * Received topics will match the subscribed ones.
+     *
+     * Sequence number might be also updated as part of synchronization.
+     *
+     * If worker is not \ref Running(), then synchronization request is silently discarded.
+     *
      * \see isRunning()
+     * \see waitForEvent(std::chrono::milliseconds)
+     * \see topicNames()
      */
     void sync();
 
