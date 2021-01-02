@@ -1,0 +1,56 @@
+@startuml component
+
+== Start ==
+
+actor Client
+participant Worker1
+participant Broker #LightCyan
+
+Client -> Worker1 : Start
+Worker1 -> Client : Started
+
+activate Worker1
+Worker1 -> Broker : Announce
+Broker -> Worker1 : Ping
+Worker1 -> Client : Online
+deactivate Worker1
+
+== Synchronization ==
+
+Client -> Worker1 : Sync
+Worker1 -> Client : Requested
+Worker1 -> Broker : Sync
+
+activate Broker
+Broker -> Worker1 : Ok
+Worker1 -> Client : Begin
+Broker -> Broker : Reply
+Broker -> Worker1 : .. Topics ...
+Worker1 -> Client : .. Topics ...
+Broker -> Worker1 : Complete
+deactivate Broker
+
+Worker1 -> Client : Success
+
+== Updates ==
+
+participant Worker2
+
+activate Broker
+Worker2 -> Broker : Dispatch
+Broker -> Worker1 : Delivery
+Worker1 -> Client : Topic
+Client -> Worker1 : Topic
+Worker1 -> Broker : Dispatch
+Broker -> Worker2: Delivery
+deactivate Broker
+
+== Stop ==
+
+Client -> Worker1 : Stop
+Worker1 -> Client : Offline
+activate Worker1
+Worker1 -> Client : Stopped
+deactivate Worker1
+
+@enduml

@@ -6,6 +6,12 @@ It provides few easy to use C++ classes in order to connect different parties to
 There are also C++ bindings to some ZMQ sockets and features, which are used by the library
 components themselves.
 
+## Table of Contents
+1. [Features](#Features)
+2. [Architecture](#Architecture)
+3. [Licenses](#Licenses)
+4. [Guidelines](#Guidelines)
+
 ## Features
 
  * ZMQ Sockets:
@@ -31,6 +37,72 @@ components themselves.
 
 (_TODO: add references to classes where possibile._)
 
+
+## Architecture
+
+### Components
+
+This library provides two main components which are *worker* and *broker*. The communication
+between them is based on ZMQ thread-safe sockets [Radio/Dish](https://rfc.zeromq.org/spec/48/) and
+[Client/Server](https://rfc.zeromq.org/spec/41/), as shown in the following diagram:
+
+![Worker Broker Connections](http://www.plantuml.com/plantuml/png/VP11QyCm38Nl_XMYE_iVZ5BQ74S9ow6KTGUJYCRKaOpZh9In_xuejKctGcuMrlVqtjlqqOGuT0vgxZmJKbJAc_fYpWZRm1SCyF9cpstStGp1jmA0UHLM1JhxXU5s8lXuDutbpnMO7hR5yG7x3rLaVDzo5AZ2CFA9glOBL65xRsBT2ZM-stofV6H-PlS73hFx8ph7rsV_IGfEb9DCgeVaFuFFsCxPyILWJdC7g_qYc5eIBkT91yi_d0IH4dN3Lz9hCQH4MmzUhwMeQNgzVq-pAEWW2h9Gb4fja9gXSxy0)
+
+Basic operations:
+  - **Dispatch**: A worker *dispatches* a message, i.e. a *topic*, to any connected broker.
+    Every message is marked with a *sequence number*, at worker's side.
+    Depending on the underlying ZMQ socket transport, a topic might be dispatched to more than
+    a single broker.
+
+    ZMQ sockets: [Radio/Dish](https://rfc.zeromq.org/spec/48/).
+
+  - **Delivery**: A broker *delivers* data to any connected workers, whenever it receives a *topic*.
+    A broker filters out every message marked with a sequence number that is less or equal to the
+    last seen sequence number, for every single worker. Every worker does such filtering as well.
+    Every received topic is locally stored, at broker side.
+
+    ZMQ sockets: [Radio/Dish](https://rfc.zeromq.org/spec/48/).
+
+  - **Synchronize**: A worker *synchronizes* with lastest broker's *snapshot*.
+    A broker replies with its snapshot, before serving any other dispatched topics.
+    Returned topics are the only ones marked as *state*, instead *event* ones are just delivered.
+
+    ZMQ sockets: [Client/Server](https://rfc.zeromq.org/spec/41/).
+
+
+### Usage
+
+Upon instantiation of worker and broker classes, an unique UUID is assigned in order to
+distinguish them. Every components will connect/bind to the speicified ZMQ endopoints.
+After starting both components, an asynchronous connection is set up. Data will begin to
+flow as soon as the connection gets ready. Auto reconnection to the broker is automatically
+performed by the worker, in case the former disappears. At any time, a worker can synchronize
+with its connected broker.
+
+![Usage_Diagram](http://www.plantuml.com/plantuml/png/ZLDDJm8n4BttLpJnB8aSITOWS3J1eCPpqnrWmZAjRPTa_VMsx62eZ8ctTZxUctbzdSTaGkgFdRRkw1q19QMQHh-Mi6uQfOnDBkXbXoNbSnGjUaD9VxXmWF1GnHR1vPY-UyRTFYq7GqgDdVh-yTAWPoEwudj9SH5de3tJuiaak7HTLpFBJ3yHkPuiA8vK92z8Ev5ZJHqIg1P-SuoR3sJtmH5-cOIEYWRo3hbEXD_0PmynBo6Cp6q_st5Sd7zz4E4Ni4FYXWfv0xuRHAJ9HByvZpRcqqG4hIiaZ6MsHmUfaes7bn-ojnPYF4lwxjjS7ekKWeEcjt9mebflXT6RPFVYT2ley0HXa4OPDvFUa3Dy_n_Rz8hiHWh-Eix_xPgSb4svtHPNohwlYXd5GojQU0xKvl-ilW40)
+
+### Configurations
+
+Some examples of possible configurations, by putting pieces together.
+
+#### Sharing of State among Services
+Every service can export and distribute its data to others and a central broker can manage the
+accesses to shared state.
+
+![Conf_Services](http://www.plantuml.com/plantuml/png/XT2noeCm4C3n_PuY-CqEwluXRKU7GWTnFEBLIZMHUBQKqdVlaLYqfT1C_y2Fov5yP7GyzHqCgC_Oa8eEZ4oH-YlQviJR6nfr1oMdDKpkYDeJwuJWg3Qx_Kf-ki9YFRDgpHu0slQ3DMHOff6xj9eIByjaXXLrdRr-SMbmwI-N1PUzEv07ucc8__tg86FYq23obI3x-akPB9akcK5EffPVUm80)
+
+#### Master and Replica
+Whenever a service publishes its data, it can dispatch it to both a master and a replica.
+Switchover between master and replica, or activation of services, are beyond the scope of
+this library.
+
+![Conf_Replica](http://www.plantuml.com/plantuml/png/bP3Dgi8m48NtynH3xxgBsmUGeYuhY2vAbqCwrc2QX2IrYFZkfZ-WTgNPdV1nFixaFf0BNQl0ahXGmvZio0Ts2VuLiZc7pOqqtW7Zaph-dqX4vXYCumJ9utgx_tz3bs1Xg9wvweDxmCjuOAkae1-KsPVARA44OLfhDEiG2zbTfPWgovchM2dJ0vIOTZPTZUk6K9jUJp436AUaCPQGiww7upq1)
+
+#### Redundancy for Cabling
+It's possible to configure multiple paths from worker to broker, using more than just one network.
+Messages will be filtered out by both worker and broker, using sequence numbers.
+
+![Conf_Cables](http://www.plantuml.com/plantuml/png/NT31QeGm40RW-pn5i6SFvW6Aj8LU91Hw48z3d5en9XB75LdstJVHB8Wv3JzVXfyfPqRFosW09jG3TYIoNqQcJBnLVVVFdnjQSGSHNc-P_1_gdJWV2CxYu-ld9A-kSjWcrfpP0q2xSNAMB8Tjv6-zFlRLYJLaZ5j16xUq8bF4g_D3iHDL9FFjSRi8UGXv5b2BF7yFtq0LSOgTNva49UCK8mWbBx9EMP8fWv9i6s_s1000)
 
 ## Licenses
 
@@ -205,9 +277,10 @@ $> git merge -s subtree -X subtree=vendor/boost vendor/boost
 ```
 
 
-### Contribution guidelines
+## Guidelines
 
-* Writing tests
-* Code review
-* Pull request
-* Coding standard guidelines
+* Contribution: *TBD*
+* Writing tests: *TBD*
+* Code review: *TDB*
+* Pull request: *TDB*
+* Coding standard: *TDB*

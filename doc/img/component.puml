@@ -1,0 +1,20 @@
+@startuml component
+
+package Broker #LightCyan {
+    component "Delivery\n [Radio]" as BDY #LightCyan
+    component "Snapshot\n [Server]" as BSN #LightCyan
+    component "Dispatch\n [Dish]" as BDP #LightCyan
+}
+
+package Worker #LightYellow {
+    component " [Dish] \nDelivery" as WDY #LightYellow
+    component " [Client] \nSnapshot" as WSN #LightYellow
+    component " [Radio] \nDispatch" as WDP #LightYellow
+}
+
+BDY -down-> WDY
+WSN -up-> BSN
+WSN <-down- BSN
+WDP -right-> BDP
+
+@enduml

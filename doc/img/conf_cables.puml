@@ -1,0 +1,22 @@
+@startuml
+
+package "State" #LightCyan {
+    interface "Store" as BDP #LightCyan
+    interface "Load" as BDY #LightCyan
+}
+
+component "Service" as W #LightYellow
+cloud "Network1" as N1 #LightGray
+cloud "Network2" as N2 #LightGray
+
+W --> N1
+N1 --> BDP
+W --> N2
+N2 -->BDP
+
+BDY --> N1
+N1 --> W
+BDY --> N2
+N2 --> W
+
+@enduml

@@ -1,0 +1,19 @@
+@startuml
+package "Master" #LightCyan {
+    interface "Store" as BDP1 #LightCyan
+    interface "Load" as BDY1 #LightCyan
+}
+
+package "Replica" #LightCyan {
+    interface "Store" as BDP2 #LightCyan
+    interface "Load" as BDY2 #LightCyan
+}
+
+
+component "Service" as W #LightYellow
+
+W -up-> BDP1
+W -down-> BDP2
+
+BDY1 --> W
+@enduml
