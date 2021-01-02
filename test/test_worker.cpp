@@ -816,19 +816,19 @@ BOOST_AUTO_TEST_CASE(testTopicDeliveryGroup)
     testWaitForEvent(w2, 2s, Event::Notification::Success, Event::Type::Online);
 
     auto t1 = mkT("topic1", 0, "hello1").withWorker(w1.uuid());
-    auto t2 = mkT("topic2", 0, "hello2").withWorker(w1.uuid());
+    auto t2 = mkT("topic2", 0, "hello2").withWorker(w2.uuid());
     auto t3 = mkT("topic1", 0, "hello3").withWorker(w1.uuid());
 
     w1.dispatch(t1.name(), t1.data());
-    w1.dispatch(t2.name(), t2.data());
+    w2.dispatch(t2.name(), t2.data()); // w2 dispatches topic2 which was not subscribed.
     w1.dispatch(t3.name(), t3.data());
 
     testWaitForTopic(w1, t1, 1);
-    testWaitForTopic(w1, t2, 2);
-    testWaitForTopic(w1, t3, 3);
+    testWaitForTopic(w1, t2, 1);
+    testWaitForTopic(w1, t3, 2);
 
     testWaitForTopic(w2, t1, 1);
-    testWaitForTopic(w2, t3, 3);
+    testWaitForTopic(w2, t3, 2);
 
     w1.stop();
     w2.stop();
