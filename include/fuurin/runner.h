@@ -261,7 +261,7 @@ protected:
      *
      * \see recvEvent()
      */
-    Event waitForEvent(std::chrono::milliseconds timeout = std::chrono::milliseconds(-1));
+    Event waitForEvent(std::chrono::milliseconds timeout = std::chrono::milliseconds(-1)) const;
 
 
 private:
@@ -295,7 +295,7 @@ private:
      *
      * \see waitForEvent(std::chrono::milliseconds)
      */
-    Event recvEvent();
+    Event recvEvent() const;
 
 
 protected:

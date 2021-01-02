@@ -128,7 +128,7 @@ void Worker::sync()
 }
 
 
-Event Worker::waitForEvent(std::chrono::milliseconds timeout)
+Event Worker::waitForEvent(std::chrono::milliseconds timeout) const
 {
     const auto& ev = Runner::waitForEvent(timeout);
 

@@ -174,7 +174,7 @@ bool Runner::stop() noexcept
 }
 
 
-Event Runner::waitForEvent(std::chrono::milliseconds timeout)
+Event Runner::waitForEvent(std::chrono::milliseconds timeout) const
 {
     return waitForEvent(zmq::Poller{zmq::PollerEvents::Read, 0ms, zevr_.get()},
         fuurin::StopWatch{}, std::bind(&Runner::recvEvent, this), timeout);
@@ -207,7 +207,7 @@ Event Runner::waitForEvent(zmq::PollerWaiter&& pw, Elapser&& dt,
 }
 
 
-Event Runner::recvEvent()
+Event Runner::recvEvent() const
 {
     zmq::Part r;
     const auto n = zevr_->tryRecv(&r);

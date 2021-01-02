@@ -138,7 +138,7 @@ public:
     /**
      * \see Runner::waitForEvent(std::chrono::milliseconds)
      */
-    Event waitForEvent(std::chrono::milliseconds timeout = std::chrono::milliseconds(-1));
+    Event waitForEvent(std::chrono::milliseconds timeout = std::chrono::milliseconds(-1)) const;
 
     /**
      * \return The last sequence number used for marking data.
