@@ -954,11 +954,12 @@ BOOST_AUTO_TEST_CASE(testTopicDeliveryGroup)
     auto t3 = mkT("topic1", 0, "hello3").withWorker(w1.uuid());
 
     w1.dispatch(t1.name(), t1.data());
-    w2.dispatch(t2.name(), t2.data()); // w2 dispatches topic2 which was not subscribed.
-    w1.dispatch(t3.name(), t3.data());
-
     testWaitForTopic(w1, t1, 1);
+
+    w2.dispatch(t2.name(), t2.data()); // w2 dispatches topic2 which was not subscribed.
     testWaitForTopic(w1, t2, 1);
+
+    w1.dispatch(t3.name(), t3.data());
     testWaitForTopic(w1, t3, 2);
 
     testWaitForTopic(w2, t1, 1);
