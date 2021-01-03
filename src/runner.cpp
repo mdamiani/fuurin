@@ -174,15 +174,15 @@ bool Runner::stop() noexcept
 }
 
 
-Event Runner::waitForEvent(std::chrono::milliseconds timeout) const
+Event Runner::waitForEvent(std::chrono::milliseconds timeout, EventMatchFunc match) const
 {
     return waitForEvent(zmq::Poller{zmq::PollerEvents::Read, 0ms, zevr_.get()},
-        fuurin::StopWatch{}, std::bind(&Runner::recvEvent, this), timeout);
+        fuurin::StopWatch{}, std::bind(&Runner::recvEvent, this), match, timeout);
 }
 
 
 Event Runner::waitForEvent(zmq::PollerWaiter&& pw, Elapser&& dt,
-    EventRecvFunc recv, std::chrono::milliseconds timeout)
+    EventRecvFunc recv, EventMatchFunc match, std::chrono::milliseconds timeout)
 {
     for (;;) {
         pw.setTimeout(timeout);
@@ -191,10 +191,14 @@ Event Runner::waitForEvent(zmq::PollerWaiter&& pw, Elapser&& dt,
             break;
 
         const auto& ev = recv();
-        if (ev.notification() == Event::Notification::Timeout) {
-            timeout -= dt.elapsed();
-            if (timeout <= 0ms)
-                break;
+        if (ev.notification() == Event::Notification::Timeout ||
+            (match && !match(ev.type()))) //
+        {
+            if (timeout != -1ms) {
+                timeout -= dt.elapsed();
+                if (timeout <= 0ms)
+                    break;
+            }
 
             dt.start();
             continue;
@@ -203,7 +207,7 @@ Event Runner::waitForEvent(zmq::PollerWaiter&& pw, Elapser&& dt,
         return ev;
     }
 
-    return Event{Event::Type::Invalid, Event::Notification::Timeout};
+    return {Event::Type::Invalid, Event::Notification::Timeout};
 }
 
 
@@ -212,7 +216,7 @@ Event Runner::recvEvent() const
     zmq::Part r;
     const auto n = zevr_->tryRecv(&r);
     if (n == -1) {
-        return Event{Event::Type::Invalid, Event::Notification::Timeout};
+        return {Event::Type::Invalid, Event::Notification::Timeout};
     }
 
     ASSERT(std::strncmp(r.group(), GROUP_EVENTS, sizeof(GROUP_EVENTS)) == 0, "bad event group");

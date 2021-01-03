@@ -246,8 +246,10 @@ protected:
     void sendOperation(Operation::Type oper, zmq::Part&& payload) noexcept;
     ///@}
 
-    ///< Type used for function to receive an event;
+    ///< Type used for function to receive an event.
     using EventRecvFunc = std::function<Event()>;
+    ///< Type used for function to match events type.
+    using EventMatchFunc = std::function<bool(Event::Type)>;
 
     /**
      * \brief Waits for events from the asynchronous task.
@@ -256,12 +258,14 @@ protected:
      * This method is thread-safe.
      *
      * \param[in] timeout Waiting deadline.
+     * \param[in] match Function to match events, otherwise first one will be returned.
      *
      * \return The (optionally) received event.
      *
      * \see recvEvent()
      */
-    Event waitForEvent(std::chrono::milliseconds timeout = std::chrono::milliseconds(-1)) const;
+    Event waitForEvent(std::chrono::milliseconds timeout = std::chrono::milliseconds(-1),
+        EventMatchFunc match = {}) const;
 
 
 private:
@@ -273,13 +277,15 @@ private:
      * \param[in] poll Poller interface.
      * \param[in] dt Elapser interface.
      * \param[in] recv Function used to actually receive and event.
+     * \param[in] match Function to match events, otherwise first one will be returned.
      * \param[in] timeout Waiting deadline.
      *
      * \return An \ref Event representing the (optionally) received event.
      *
      * \see waitForEvent(std::chrono::milliseconds)
      */
-    static Event waitForEvent(zmq::PollerWaiter&& pw, Elapser&& dt, EventRecvFunc recv,
+    static Event waitForEvent(zmq::PollerWaiter&& pw, Elapser&& dt,
+        EventRecvFunc recv, EventMatchFunc match,
         std::chrono::milliseconds timeout);
 
     /**

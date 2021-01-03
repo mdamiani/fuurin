@@ -130,7 +130,14 @@ void Worker::sync()
 
 Event Worker::waitForEvent(std::chrono::milliseconds timeout) const
 {
-    const auto& ev = Runner::waitForEvent(timeout);
+    return waitForEvent(timeout, {});
+}
+
+
+Event Worker::waitForEvent(std::chrono::milliseconds timeout,
+    const std::function<bool(Event::Type)>& match) const
+{
+    const auto& ev = Runner::waitForEvent(timeout, match);
 
     LOG_DEBUG(log::Arg{name(), uuid().toShortString()},
         log::Arg{"event"sv, Event::toString(ev.notification())},
@@ -138,6 +145,61 @@ Event Worker::waitForEvent(std::chrono::milliseconds timeout) const
         log::Arg{"size"sv, int(ev.payload().size())});
 
     return ev;
+}
+
+
+bool Worker::waitForStarted(std::chrono::milliseconds timeout) const
+{
+    const auto match = [](Event::Type evt) {
+        return evt == Event::Type::Started;
+    };
+
+    return match(waitForEvent(timeout, match).type());
+}
+
+
+bool Worker::waitForStopped(std::chrono::milliseconds timeout) const
+{
+    const auto match = [](Event::Type evt) {
+        return evt == Event::Type::Stopped;
+    };
+
+    return match(waitForEvent(timeout, match).type());
+}
+
+
+bool Worker::waitForOnline(std::chrono::milliseconds timeout) const
+{
+    const auto match = [](Event::Type evt) {
+        return evt == Event::Type::Online;
+    };
+
+    return match(waitForEvent(timeout, match).type());
+}
+
+
+bool Worker::waitForOffline(std::chrono::milliseconds timeout) const
+{
+    const auto match = [](Event::Type evt) {
+        return evt == Event::Type::Offline;
+    };
+
+    return match(waitForEvent(timeout, match).type());
+}
+
+
+std::optional<Topic> Worker::waitForTopic(std::chrono::milliseconds timeout) const
+{
+    const auto match = [](Event::Type evt) {
+        return evt == Event::Type::Delivery || evt == Event::Type::SyncElement;
+    };
+
+    const auto& ev = waitForEvent(timeout, match);
+
+    if (!match(ev.type()))
+        return {};
+
+    return {Topic::fromPart(ev.payload())};
 }
 
 

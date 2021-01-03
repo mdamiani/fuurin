@@ -21,6 +21,7 @@
 #include <memory>
 #include <vector>
 #include <tuple>
+#include <optional>
 
 
 namespace fuurin {
@@ -136,9 +137,44 @@ public:
     void sync();
 
     /**
-     * \see Runner::waitForEvent(std::chrono::milliseconds)
+     * \brief Waits for events from the asynchronous task.
+     *
+     * This method is thread-safe.
+     *
+     * \param[in] timeout Waiting deadline, -1ms for infinite timeout.
+     *
+     * \return The received event, or \ref Event::Type::Invalid.
      */
     Event waitForEvent(std::chrono::milliseconds timeout = std::chrono::milliseconds(-1)) const;
+
+    /**
+     * \brief Waits for an event synchronously.
+     *
+     * This method is thread-safe.
+     *
+     * The event waited for depends on the actual performed action:
+     *   - \ref start() => \ref Event::Type::Start.
+     *   - \ref start() => \ref Event::Type::Online.
+     *   - \ref stop() => \ref Event::Type::Stop.
+     *   - \ref stop() => \ref Event::Type::Offline.
+     *   - \ref dispatch() => \ref Event::Type::Delivery.
+     *   - \ref sync() => \ref Event::Type::SyncElement.
+     *
+     * Every other event, which is different from the requested one, will be discarded.
+     *
+     * \param[in] timeout Waiting deadline, -1ms for infinite timeout.
+     *
+     * \return \c false if event is not received within the specified timeout.
+     *
+     * \see waitForEvent(std::chrono::milliseconds)
+     */
+    ///{@
+    bool waitForStarted(std::chrono::milliseconds timeout = std::chrono::milliseconds(-1)) const;
+    bool waitForStopped(std::chrono::milliseconds timeout = std::chrono::milliseconds(-1)) const;
+    bool waitForOnline(std::chrono::milliseconds timeout = std::chrono::milliseconds(-1)) const;
+    bool waitForOffline(std::chrono::milliseconds timeout = std::chrono::milliseconds(-1)) const;
+    std::optional<Topic> waitForTopic(std::chrono::milliseconds timeout = std::chrono::milliseconds(-1)) const;
+    ///@}
 
     /**
      * \return The last sequence number used for marking data.
@@ -161,6 +197,14 @@ protected:
      * \see WorkerSession
      */
     virtual std::unique_ptr<Session> createSession(CompletionFunc onComplete) const override;
+
+    /**
+     * \brief Waits for specific events.
+     *
+     * \see Runner::waitForEvent(std::chrono::milliseconds, std::function<bool(Event::Type)>)
+     */
+    Event waitForEvent(std::chrono::milliseconds timeout,
+        const std::function<bool(Event::Type)>& match) const;
 
 
 protected:
