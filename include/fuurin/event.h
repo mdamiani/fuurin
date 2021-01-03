@@ -79,7 +79,10 @@ public:
      *
      * \see zmq::PartMulti::unpack(const Part&)
      */
+    ///{@
     static Event fromPart(const zmq::Part& part);
+    static Event fromPart(std::string_view part);
+    ///@}
 
     /**
      * \brief Converts this event to a \ref zmq::PartMulti packed \ref zmq::Part.

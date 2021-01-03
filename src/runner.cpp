@@ -221,7 +221,7 @@ Event Runner::recvEvent() const
 
     ASSERT(std::strncmp(r.group(), GROUP_EVENTS, sizeof(GROUP_EVENTS)) == 0, "bad event group");
 
-    auto [tok, ev] = zmq::PartMulti::unpack<token_type_t, zmq::Part>(r);
+    auto [tok, ev] = zmq::PartMulti::unpack<token_type_t, std::string_view>(r);
 
     return Event::fromPart(ev)
         .withNotification(tok == token_
