@@ -53,28 +53,36 @@ private:
      */
 
     /**
-     * \return Whether the type is integral and unsigned.
+     * \brief Static check whether the type is is integral and unsigned.
      */
+    template<typename T, typename = void>
+    struct isIntegralType : std::false_type
+    {};
     template<typename T>
-    static constexpr bool isIntegralType()
+    struct isIntegralType<T,
+        typename std::enable_if_t<                  //
+            std::is_integral_v<std::decay_t<T>> &&  //
+                !std::is_signed_v<std::decay_t<T>>, //
+            void>> : std::true_type
     {
-        using type = std::decay_t<T>;
-        return std::is_integral_v<type> && !std::is_signed_v<type>;
-    }
+    };
 
 
     /**
      * \return Whether the type is a string or a \ref Part.
      */
+    template<typename T, typename = void>
+    struct isStringType : std::false_type
+    {};
     template<typename T>
-    static constexpr bool isStringType()
+    struct isStringType<T,
+        typename std::enable_if_t<                               //
+            std::is_same_v<std::decay_t<T>, std::string_view> || //
+                std::is_same_v<std::decay_t<T>, std::string> ||  //
+                std::is_same_v<std::decay_t<T>, Part>,
+            void>> : std::true_type
     {
-        using type = std::decay_t<T>;
-        return (false ||
-            std::is_same_v<type, std::string_view> ||
-            std::is_same_v<type, std::string> ||
-            std::is_same_v<type, Part>);
-    }
+    };
 
 
     /**
