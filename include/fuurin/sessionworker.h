@@ -25,7 +25,7 @@ class SyncMachine;
 
 /**
  * \brief Worker specific asynchronous task session.
- * \see Runner::Session
+ * \see Session
  */
 class WorkerSession : public Session
 {
@@ -35,7 +35,7 @@ public:
      *
      * The sockets used for communication are created.
      *
-     * \see Runner::Session::Session(...)
+     * \see Session::Session(...)
      */
     explicit WorkerSession(const std::string& name, Uuid id, SessionEnv::token_t token,
         zmq::Context* zctx, zmq::Socket* zfin, zmq::Socket* zoper, zmq::Socket* zevent,
@@ -53,13 +53,13 @@ public:
 
 
 protected:
-    /// \see Runner::Session::createPoller()
+    /// \see Session::createPoller()
     virtual std::unique_ptr<zmq::PollerWaiter> createPoller() override;
 
-    /// \see Runner::Session::operationReady(Operation)
+    /// \see Session::operationReady(Operation)
     virtual void operationReady(Operation* oper) override;
 
-    /// \see Runner::Session::socketReady(zmq::Pollable*)
+    /// \see Session::socketReady(zmq::Pollable*)
     virtual void socketReady(zmq::Pollable* pble) override;
 
 

@@ -29,7 +29,7 @@ class Timer;
 
 /**
  * \brief Broker specific asynchronous task session.
- * \see Runner::Session
+ * \see Session
  */
 class BrokerSession : public Session
 {
@@ -39,7 +39,7 @@ public:
      *
      * The socket used to receive storage is created and bound.
      *
-     * \see Runner::Session::Session(...)
+     * \see Session::Session(...)
      */
     explicit BrokerSession(const std::string& name, Uuid id, SessionEnv::token_t token,
         zmq::Context* zctx, zmq::Socket* zfin, zmq::Socket* zoper, zmq::Socket* zevents);
@@ -51,13 +51,13 @@ public:
 
 
 protected:
-    /// \see Runner::Session::createPoller()
+    /// \see Session::createPoller()
     virtual std::unique_ptr<zmq::PollerWaiter> createPoller() override;
 
-    /// \see Runner::Session::operationReady(Operation*)
+    /// \see Session::operationReady(Operation*)
     virtual void operationReady(Operation* oper) override;
 
-    /// \see Runner::Session::socketReady(zmq::Pollable*)
+    /// \see Session::socketReady(zmq::Pollable*)
     virtual void socketReady(zmq::Pollable* pble) override;
 
 
