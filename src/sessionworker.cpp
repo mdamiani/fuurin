@@ -46,7 +46,7 @@ using namespace std::literals::chrono_literals;
 namespace fuurin {
 
 
-WorkerSession::WorkerSession(const std::string& name, Uuid id, token_type_t token,
+WorkerSession::WorkerSession(const std::string& name, Uuid id, SessionEnv::token_type_t token,
     zmq::Context* zctx, zmq::Socket* zfin, zmq::Socket* zoper, zmq::Socket* zevent,
     zmq::Socket* zseqs)
     : Session(name, id, token, zctx, zfin, zoper, zevent)

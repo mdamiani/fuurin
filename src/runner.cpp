@@ -9,6 +9,7 @@
  */
 
 #include "fuurin/runner.h"
+#include "fuurin/session.h"
 #include "fuurin/zmqcontext.h"
 #include "fuurin/zmqsocket.h"
 #include "fuurin/zmqpoller.h"
@@ -237,7 +238,7 @@ Event Runner::recvEvent() const
 
     ASSERT(std::strncmp(r.group(), GROUP_EVENTS, sizeof(GROUP_EVENTS)) == 0, "bad event group");
 
-    auto [tok, ev] = zmq::PartMulti::unpack<Session::token_type_t, std::string_view>(r);
+    auto [tok, ev] = zmq::PartMulti::unpack<SessionEnv::token_type_t, std::string_view>(r);
 
     return Event::fromPart(ev)
         .withNotification(tok == token_
@@ -258,7 +259,7 @@ void Runner::sendOperation(Operation::Type oper, zmq::Part&& payload) noexcept
 }
 
 
-void Runner::sendOperation(zmq::Socket* sock, Session::token_type_t token, Operation::Type oper, zmq::Part&& payload) noexcept
+void Runner::sendOperation(zmq::Socket* sock, SessionEnv::token_type_t token, Operation::Type oper, zmq::Part&& payload) noexcept
 {
     try {
         sock->send(zmq::Part{token},

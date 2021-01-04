@@ -96,6 +96,7 @@ set(LIB_PUBLIC_HEADERS
     include/fuurin/uuid.h
     include/fuurin/lrucache.h
     include/fuurin/session.h
+    include/fuurin/sessionenv.h
     include/fuurin/sessionworker.h
     include/fuurin/sessionbroker.h
 )

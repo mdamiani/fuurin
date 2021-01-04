@@ -41,7 +41,7 @@ public:
      *
      * \see Runner::Session::Session(...)
      */
-    explicit BrokerSession(const std::string& name, Uuid id, token_type_t token,
+    explicit BrokerSession(const std::string& name, Uuid id, SessionEnv::token_type_t token,
         zmq::Context* zctx, zmq::Socket* zfin, zmq::Socket* zoper, zmq::Socket* zevents);
 
     /**

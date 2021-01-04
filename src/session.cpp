@@ -30,7 +30,7 @@ using namespace std::literals::string_view_literals;
 
 namespace fuurin {
 
-Session::Session(const std::string& name, Uuid id, token_type_t token,
+Session::Session(const std::string& name, Uuid id, SessionEnv::token_type_t token,
     zmq::Context* zctx, zmq::Socket* zfin, zmq::Socket* zoper, zmq::Socket* zevent)
     : name_{name}
     , uuid_{id}
@@ -113,7 +113,7 @@ void Session::sendEvent(Event::Type ev, zmq::Part&& pay)
 }
 
 
-Operation Session::recvOperation(zmq::Socket* sock, token_type_t token) noexcept
+Operation Session::recvOperation(zmq::Socket* sock, SessionEnv::token_type_t token) noexcept
 {
     try {
         zmq::Part tok, oper;

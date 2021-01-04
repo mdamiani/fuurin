@@ -11,7 +11,7 @@
 #ifndef FUURIN_RUNNER_H
 #define FUURIN_RUNNER_H
 
-#include "fuurin/session.h"
+#include "fuurin/sessionenv.h"
 #include "fuurin/event.h"
 #include "fuurin/operation.h"
 #include "fuurin/uuid.h"
@@ -28,6 +28,7 @@
 
 namespace fuurin {
 class Elapser;
+class Session;
 
 namespace zmq {
 class Context;
@@ -164,7 +165,7 @@ protected:
      * \param[in] oper Type of operation.
      * \param[in] payload Payload of operation.
      */
-    static void sendOperation(zmq::Socket* sock, Session::token_type_t token, Operation::Type oper, zmq::Part&& payload) noexcept;
+    static void sendOperation(zmq::Socket* sock, SessionEnv::token_type_t token, Operation::Type oper, zmq::Part&& payload) noexcept;
 
 
 protected:
@@ -295,8 +296,8 @@ private:
     const std::unique_ptr<zmq::Socket> zfins_; ///< Inter-thread send completion message.
     const std::unique_ptr<zmq::Socket> zfinr_; ///< Inter-thread recv completion message.
 
-    mutable bool running_;        ///< Whether the task is running.
-    Session::token_type_t token_; ///< Current execution token for the task.
+    mutable bool running_;           ///< Whether the task is running.
+    SessionEnv::token_type_t token_; ///< Current execution token for the task.
 
     std::vector<std::string> endpDelivery_; ///< List of endpoints.
     std::vector<std::string> endpDispatch_; ///< List of endpoints.
