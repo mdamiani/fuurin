@@ -67,6 +67,7 @@ set(LIB_SOURCES
     src/stopwatch.cpp
     src/topic.cpp
     src/uuid.cpp
+    src/session.cpp
 )
 
 set(LIB_PUBLIC_HEADERS
@@ -92,6 +93,7 @@ set(LIB_PUBLIC_HEADERS
     include/fuurin/topic.h
     include/fuurin/uuid.h
     include/fuurin/lrucache.h
+    include/fuurin/session.h
 )
 
 set(LIB_DEPS

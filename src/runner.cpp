@@ -28,9 +28,6 @@
 
 namespace fuurin {
 
-/**
- * MAIN TASK
- */
 
 Runner::Runner(Uuid id, const std::string& name)
     : name_{name}
@@ -150,7 +147,7 @@ zmq::Part Runner::prepareConfiguration() const
 }
 
 
-std::unique_ptr<Runner::Session> Runner::createSession() const
+std::unique_ptr<Session> Runner::createSession() const
 {
     return makeSession<Session>();
 }
@@ -240,7 +237,7 @@ Event Runner::recvEvent() const
 
     ASSERT(std::strncmp(r.group(), GROUP_EVENTS, sizeof(GROUP_EVENTS)) == 0, "bad event group");
 
-    auto [tok, ev] = zmq::PartMulti::unpack<token_type_t, std::string_view>(r);
+    auto [tok, ev] = zmq::PartMulti::unpack<Session::token_type_t, std::string_view>(r);
 
     return Event::fromPart(ev)
         .withNotification(tok == token_
@@ -261,7 +258,7 @@ void Runner::sendOperation(Operation::Type oper, zmq::Part&& payload) noexcept
 }
 
 
-void Runner::sendOperation(zmq::Socket* sock, token_type_t token, Operation::Type oper, zmq::Part&& payload) noexcept
+void Runner::sendOperation(zmq::Socket* sock, Session::token_type_t token, Operation::Type oper, zmq::Part&& payload) noexcept
 {
     try {
         sock->send(zmq::Part{token},
@@ -271,112 +268,6 @@ void Runner::sendOperation(zmq::Socket* sock, token_type_t token, Operation::Typ
         LOG_FATAL(log::Arg{"runner"sv}, log::Arg{"operation send threw exception"sv},
             log::Arg{std::string_view(e.what())});
     }
-}
-
-
-Operation Runner::recvOperation(zmq::Socket* sock, token_type_t token) noexcept
-{
-    try {
-        zmq::Part tok, oper;
-        sock->recv(&tok, &oper);
-        return Operation::fromPart(oper)
-            .withNotification(tok.toUint8() == token
-                    ? Operation::Notification::Success
-                    : Operation::Notification::Discard);
-
-    } catch (const std::exception& e) {
-        LOG_FATAL(log::Arg{"runner"sv}, log::Arg{"operation recv threw exception"sv},
-            log::Arg{std::string_view(e.what())});
-
-        return Operation{};
-    }
-}
-
-
-/**
- * ASYNC TASK
- */
-
-Runner::Session::Session(const std::string& name, Uuid id, token_type_t token,
-    zmq::Context* zctx, zmq::Socket* zfin, zmq::Socket* zoper, zmq::Socket* zevent)
-    : name_{name}
-    , uuid_{id}
-    , token_{token}
-    , zctx_{zctx}
-    , zfins_{zfin}
-    , zopr_{zoper}
-    , zevs_{zevent}
-{
-}
-
-
-Runner::Session::~Session() noexcept = default;
-
-
-void Runner::Session::run()
-{
-    BOOST_SCOPE_EXIT(this)
-    {
-        try {
-            zfins_->send(zmq::Part{token_});
-        } catch (...) {
-            LOG_FATAL(log::Arg{"runner"sv},
-                log::Arg{"session on complete action threw exception"sv});
-        }
-    };
-
-    auto poll = createPoller();
-
-    for (;;) {
-        for (auto s : poll->wait()) {
-            if (s != zopr_) {
-                socketReady(s);
-                continue;
-            }
-
-            auto oper = recvOperation();
-
-            // filter out old operations
-            if (oper.notification() == Operation::Notification::Discard)
-                continue;
-
-            operationReady(&oper);
-
-            if (oper.type() == Operation::Type::Stop)
-                return;
-        }
-    }
-}
-
-
-std::unique_ptr<zmq::PollerWaiter> Runner::Session::createPoller()
-{
-    auto poll = new zmq::Poller{zmq::PollerEvents::Type::Read, zopr_};
-    return std::unique_ptr<zmq::PollerWaiter>{poll};
-}
-
-
-void Runner::Session::operationReady(Operation*)
-{
-}
-
-
-void Runner::Session::socketReady(zmq::Pollable*)
-{
-}
-
-
-Operation Runner::Session::recvOperation() noexcept
-{
-    return Runner::recvOperation(zopr_, token_);
-}
-
-
-void Runner::Session::sendEvent(Event::Type ev, zmq::Part&& pay)
-{
-    zevs_->send(zmq::PartMulti::pack(token_,
-        Event{ev, Event::Notification::Success, pay}.toPart())
-                    .withGroup(GROUP_EVENTS));
 }
 
 } // namespace fuurin

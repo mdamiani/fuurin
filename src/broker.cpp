@@ -68,7 +68,7 @@ zmq::Part Broker::prepareConfiguration() const
 }
 
 
-std::unique_ptr<Runner::Session> Broker::createSession() const
+std::unique_ptr<Session> Broker::createSession() const
 {
     return makeSession<BrokerSession>();
 }

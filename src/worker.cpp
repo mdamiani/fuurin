@@ -231,7 +231,7 @@ zmq::Part Worker::prepareConfiguration() const
 }
 
 
-std::unique_ptr<Runner::Session> Worker::createSession() const
+std::unique_ptr<Session> Worker::createSession() const
 {
     return makeSession<WorkerSession>(zseqs_.get());
 }
