@@ -196,7 +196,7 @@ protected:
      * \see Runner::makeSession()
      * \see WorkerSession
      */
-    virtual std::unique_ptr<Session> createSession(CompletionFunc onComplete) const override;
+    virtual std::unique_ptr<Session> createSession() const override;
 
     /**
      * \brief Waits for specific events.
@@ -223,7 +223,7 @@ protected:
          * \see Runner::Session::Session(...)
          */
         explicit WorkerSession(const std::string& name, Uuid id, token_type_t token,
-            CompletionFunc onComplete, zmq::Context* zctx, zmq::Socket* zoper, zmq::Socket* zevent,
+            zmq::Context* zctx, zmq::Socket* zfin, zmq::Socket* zoper, zmq::Socket* zevent,
             zmq::Socket* zseqs);
 
         /**

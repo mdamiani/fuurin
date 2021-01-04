@@ -134,9 +134,9 @@ protected:
 public:
     using Broker::Broker;
 
-    std::unique_ptr<Session> createSession(CompletionFunc onComplete) const override
+    std::unique_ptr<Session> createSession() const override
     {
-        auto ret = makeSession<TestBrokerSession>(onComplete);
+        auto ret = makeSession<TestBrokerSession>();
         const_cast<TestBroker*>(this)->setupSession(static_cast<TestBrokerSession*>(ret.get()));
         return ret;
     }

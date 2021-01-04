@@ -62,7 +62,7 @@ protected:
      * \see Runner::makeSession()
      * \see BrokerSession
      */
-    virtual std::unique_ptr<Session> createSession(CompletionFunc onComplete) const override;
+    virtual std::unique_ptr<Session> createSession() const override;
 
 
 protected:
@@ -81,7 +81,7 @@ protected:
          * \see Runner::Session::Session(...)
          */
         explicit BrokerSession(const std::string& name, Uuid id, token_type_t token,
-            CompletionFunc onComplete, zmq::Context* zctx, zmq::Socket* zoper, zmq::Socket* zevents);
+            zmq::Context* zctx, zmq::Socket* zfin, zmq::Socket* zoper, zmq::Socket* zevents);
 
         /**
          * \brief Destructor.

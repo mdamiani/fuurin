@@ -150,9 +150,9 @@ zmq::Part Runner::prepareConfiguration() const
 }
 
 
-std::unique_ptr<Runner::Session> Runner::createSession(CompletionFunc onComplete) const
+std::unique_ptr<Runner::Session> Runner::createSession() const
 {
-    return makeSession<Session>(onComplete);
+    return makeSession<Session>();
 }
 
 
@@ -172,9 +172,7 @@ std::future<void> Runner::start()
     };
 
     auto ret = std::async(std::launch::async,
-        [s = createSession([zfins = zfins_.get(), tok = token_.load()]() {
-            zfins->send(zmq::Part{tok});
-        })]() {
+        [s = createSession()]() {
             s->run();
         });
 
@@ -300,12 +298,12 @@ Operation Runner::recvOperation(zmq::Socket* sock, token_type_t token) noexcept
  */
 
 Runner::Session::Session(const std::string& name, Uuid id, token_type_t token,
-    CompletionFunc onComplete, zmq::Context* zctx, zmq::Socket* zoper, zmq::Socket* zevent)
+    zmq::Context* zctx, zmq::Socket* zfin, zmq::Socket* zoper, zmq::Socket* zevent)
     : name_{name}
     , uuid_{id}
     , token_{token}
-    , docompl_{onComplete}
     , zctx_{zctx}
+    , zfins_{zfin}
     , zopr_{zoper}
     , zevs_{zevent}
 {
@@ -320,8 +318,7 @@ void Runner::Session::run()
     BOOST_SCOPE_EXIT(this)
     {
         try {
-            if (docompl_)
-                docompl_();
+            zfins_->send(zmq::Part{token_});
         } catch (...) {
             LOG_FATAL(log::Arg{"runner"sv},
                 log::Arg{"session on complete action threw exception"sv});

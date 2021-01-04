@@ -68,9 +68,9 @@ zmq::Part Broker::prepareConfiguration() const
 }
 
 
-std::unique_ptr<Runner::Session> Broker::createSession(CompletionFunc onComplete) const
+std::unique_ptr<Runner::Session> Broker::createSession() const
 {
-    return makeSession<BrokerSession>(onComplete);
+    return makeSession<BrokerSession>();
 }
 
 
@@ -79,8 +79,8 @@ std::unique_ptr<Runner::Session> Broker::createSession(CompletionFunc onComplete
  */
 
 Broker::BrokerSession::BrokerSession(const std::string& name, Uuid id, token_type_t token,
-    CompletionFunc onComplete, zmq::Context* zctx, zmq::Socket* zoper, zmq::Socket* zevent)
-    : Session(name, id, token, onComplete, zctx, zoper, zevent)
+    zmq::Context* zctx, zmq::Socket* zfin, zmq::Socket* zoper, zmq::Socket* zevent)
+    : Session(name, id, token, zctx, zfin, zoper, zevent)
     , zsnapshot_{std::make_unique<zmq::Socket>(zctx, zmq::Socket::SERVER)}
     , zdelivery_{std::make_unique<zmq::Socket>(zctx, zmq::Socket::DISH)}
     , zdispatch_{std::make_unique<zmq::Socket>(zctx, zmq::Socket::RADIO)}

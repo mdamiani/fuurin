@@ -231,9 +231,9 @@ zmq::Part Worker::prepareConfiguration() const
 }
 
 
-std::unique_ptr<Runner::Session> Worker::createSession(CompletionFunc onComplete) const
+std::unique_ptr<Runner::Session> Worker::createSession() const
 {
-    return makeSession<WorkerSession>(onComplete, zseqs_.get());
+    return makeSession<WorkerSession>(zseqs_.get());
 }
 
 
@@ -242,9 +242,9 @@ std::unique_ptr<Runner::Session> Worker::createSession(CompletionFunc onComplete
  */
 
 Worker::WorkerSession::WorkerSession(const std::string& name, Uuid id, token_type_t token,
-    CompletionFunc onComplete, zmq::Context* zctx, zmq::Socket* zoper, zmq::Socket* zevent,
+    zmq::Context* zctx, zmq::Socket* zfin, zmq::Socket* zoper, zmq::Socket* zevent,
     zmq::Socket* zseqs)
-    : Session(name, id, token, onComplete, zctx, zoper, zevent)
+    : Session(name, id, token, zctx, zfin, zoper, zevent)
     , zsnapshot_{std::make_unique<zmq::Socket>(zctx, zmq::Socket::CLIENT)}
     , zdelivery_{std::make_unique<zmq::Socket>(zctx, zmq::Socket::DISH)}
     , zdispatch_{std::make_unique<zmq::Socket>(zctx, zmq::Socket::RADIO)}

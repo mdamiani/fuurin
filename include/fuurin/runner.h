@@ -159,9 +159,6 @@ public:
 protected:
     typedef uint8_t token_type_t; ///< Type of the execution token.
 
-    ///< Function type to call when a sessions ends.
-    using CompletionFunc = std::function<void()>;
-
     /**
      * \brief Sends an operation over a socket.
      *
@@ -209,15 +206,12 @@ protected:
      * This method shall be overridden by subclasses in order to
      * instantiate a more specific session.
      *
-     * \param[in] onComplete Function to call when session is completed.
-     *                       It shall not throw exceptions.
-     *
      * \return A pointer to a new session.
      *
      * \see Session
      * \see makeSession()
      */
-    virtual std::unique_ptr<Session> createSession(CompletionFunc onComplete) const;
+    virtual std::unique_ptr<Session> createSession() const;
 
     /**
      * \brief Wrapper to initialize any specific session.
@@ -225,10 +219,10 @@ protected:
      * \see createSession()
      */
     template<typename S, typename... Args>
-    std::unique_ptr<Session> makeSession(CompletionFunc onComplete, Args&&... args) const
+    std::unique_ptr<Session> makeSession(Args&&... args) const
     {
-        return std::make_unique<S>(name_, uuid_, token_, onComplete,
-            zctx_.get(), zopr_.get(), zevs_.get(),
+        return std::make_unique<S>(name_, uuid_, token_,
+            zctx_.get(), zfins_.get(), zopr_.get(), zevs_.get(),
             std::forward<Args>(args)...);
     }
 
@@ -329,13 +323,13 @@ protected:
          * \param[in] name Session name.
          * \param[in] uuid Session identifier.
          * \param[in] token Session token, it's constant as long as this session is alive.
-         * \param[in] onComplete Function to call when session ends.
          * \param[in] zctx ZMQ context.
+         * \param[in] zfin ZMQ socket to send completion event.
          * \param[in] zoper ZMQ socket to receive operation commands from main task.
          * \param[in] zevent ZMQ socket to send events to main task.
          */
         explicit Session(const std::string& name, Uuid id, token_type_t token,
-            CompletionFunc onComplete, zmq::Context* zctx, zmq::Socket* zoper,
+            zmq::Context* zctx, zmq::Socket* zfin, zmq::Socket* zoper,
             zmq::Socket* zevent);
 
         /**
@@ -441,13 +435,13 @@ protected:
 
 
     protected:
-        const std::string name_;       ///< Session Name.
-        const Uuid uuid_;              ///< Identifier.
-        const token_type_t token_;     ///< Session token.
-        const CompletionFunc docompl_; ///< Completion action.
-        zmq::Context* const zctx_;     ///< \see Runner::zctx_.
-        zmq::Socket* const zopr_;      ///< \see Runner::zopr_.
-        zmq::Socket* const zevs_;      ///< \see Runner::zevs_.
+        const std::string name_;   ///< Session Name.
+        const Uuid uuid_;          ///< Identifier.
+        const token_type_t token_; ///< Session token.
+        zmq::Context* const zctx_; ///< \see Runner::zctx_.
+        zmq::Socket* const zfins_; ///< \see Runner::zfins_.
+        zmq::Socket* const zopr_;  ///< \see Runner::zopr_.
+        zmq::Socket* const zevs_;  ///< \see Runner::zevs_.
     };
 
 
