@@ -15,6 +15,7 @@
 #include <benchmark/benchmark.h>
 
 #include "fuurin/broker.h"
+#include "fuurin/sessionbroker.h"
 #include "fuurin/zmqcontext.h"
 #include "fuurin/zmqsocket.h"
 #include "fuurin/zmqpart.h"

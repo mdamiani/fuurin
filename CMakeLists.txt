@@ -69,6 +69,7 @@ set(LIB_SOURCES
     src/uuid.cpp
     src/session.cpp
     src/sessionworker.cpp
+    src/sessionbroker.cpp
 )
 
 set(LIB_PUBLIC_HEADERS
@@ -96,6 +97,7 @@ set(LIB_PUBLIC_HEADERS
     include/fuurin/lrucache.h
     include/fuurin/session.h
     include/fuurin/sessionworker.h
+    include/fuurin/sessionbroker.h
 )
 
 set(LIB_DEPS
