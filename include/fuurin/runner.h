@@ -459,8 +459,10 @@ private:
     const std::unique_ptr<zmq::Socket> zopr_;  ///< Inter-thread receiving socket.
     const std::unique_ptr<zmq::Socket> zevs_;  ///< Inter-thread events notifications.
     const std::unique_ptr<zmq::Socket> zevr_;  ///< Inter-thread events reception.
+    const std::unique_ptr<zmq::Socket> zfins_; ///< Inter-thread send completion message.
+    const std::unique_ptr<zmq::Socket> zfinr_; ///< Inter-thread recv completion message.
 
-    std::atomic<bool> running_;       ///< Whether the task is running.
+    mutable bool running_;            ///< Whether the task is running.
     std::atomic<token_type_t> token_; ///< Current execution token for the task.
 
     std::vector<std::string> endpDelivery_; ///< List of endpoints.

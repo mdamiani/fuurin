@@ -40,6 +40,8 @@ Runner::Runner(Uuid id, const std::string& name)
     , zopr_(std::make_unique<zmq::Socket>(zctx_.get(), zmq::Socket::PAIR))
     , zevs_(std::make_unique<zmq::Socket>(zctx_.get(), zmq::Socket::RADIO))
     , zevr_(std::make_unique<zmq::Socket>(zctx_.get(), zmq::Socket::DISH))
+    , zfins_{std::make_unique<zmq::Socket>(zctx_.get(), zmq::Socket::PUSH)}
+    , zfinr_{std::make_unique<zmq::Socket>(zctx_.get(), zmq::Socket::PULL)}
     , running_(false)
     , token_(0)
     , endpDelivery_{{"ipc:///tmp/worker_delivery"}}
@@ -60,8 +62,18 @@ Runner::Runner(Uuid id, const std::string& name)
     zevs_->bind();
     zevr_->connect();
 
-    // TODO: check whether RADIO/DISH over inproc has the slow join behavior,
-    //       in order to avoid missing notifications.
+    // MUST be inproc in order to get instant delivery of messages.
+    zfins_->setEndpoints({"inproc://runner-terminate"});
+    zfinr_->setEndpoints({"inproc://runner-terminate"});
+
+    zfins_->setHighWaterMark(1, 1);
+    zfinr_->setHighWaterMark(1, 1);
+
+    zfins_->setConflate(true);
+    zfinr_->setConflate(true);
+
+    zfinr_->bind();
+    zfins_->connect();
 }
 
 
@@ -113,6 +125,15 @@ std::vector<std::string> Runner::endpointSnapshot() const
 
 bool Runner::isRunning() const noexcept
 {
+    // latest message is always available
+    // over the socket, because we are using
+    // inproc transport.
+    zmq::Part r;
+    if (zfinr_->tryRecv(&r) != -1) {
+        if (r.toUint8() == token_)
+            running_ = false;
+    }
+
     return running_;
 }
 
@@ -151,8 +172,8 @@ std::future<void> Runner::start()
     };
 
     auto ret = std::async(std::launch::async,
-        [s = createSession([this]() {
-            running_ = false;
+        [s = createSession([zfins = zfins_.get(), tok = token_.load()]() {
+            zfins->send(zmq::Part{tok});
         })]() {
             s->run();
         });
