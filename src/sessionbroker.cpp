@@ -27,17 +27,6 @@
 #include <algorithm>
 
 
-#define BROKER_HUGZ "HUGZ"
-#define WORKER_HUGZ "HUGZ"
-#define BROKER_UPDT "UPDT"
-#define WORKER_UPDT "UPDT"
-
-#define BROKER_SYNC_REQST "SYNC"sv
-#define BROKER_SYNC_BEGIN "BEGN"sv
-#define BROKER_SYNC_ELEMN "ELEM"sv
-#define BROKER_SYNC_COMPL "SONC"sv
-
-
 namespace fuurin {
 
 
@@ -78,7 +67,7 @@ void BrokerSession::openSockets()
     zdispatch_->setEndpoints({conf_.endpDelivery.begin(), conf_.endpDelivery.end()});
     zsnapshot_->setEndpoints({conf_.endpSnapshot.begin(), conf_.endpSnapshot.end()});
 
-    zdelivery_->setGroups({WORKER_HUGZ, WORKER_UPDT});
+    zdelivery_->setGroups({SessionEnv::WorkerHugz.data(), SessionEnv::WorkerUpdt.data()});
 
     zdelivery_->bind();
     zdispatch_->bind();
@@ -149,12 +138,12 @@ void BrokerSession::socketReady(zmq::Pollable* pble)
 
 void BrokerSession::collectWorkerMessage(zmq::Part&& payload)
 {
-    if (std::strncmp(payload.group(), WORKER_HUGZ, sizeof(WORKER_HUGZ)) == 0) {
+    if (std::strncmp(payload.group(), SessionEnv::WorkerHugz.data(), SessionEnv::WorkerHugz.size()) == 0) {
         // TODO: extract the message
         if (!zhugz_->isActive())
             zhugz_->start();
 
-    } else if (std::strncmp(payload.group(), WORKER_UPDT, sizeof(WORKER_UPDT)) == 0) {
+    } else if (std::strncmp(payload.group(), SessionEnv::WorkerUpdt.data(), SessionEnv::WorkerUpdt.size()) == 0) {
         const auto t = Topic::fromPart(payload).withBroker(uuid_);
 
         if (!storeTopic(t)) {
@@ -179,7 +168,7 @@ void BrokerSession::collectWorkerMessage(zmq::Part&& payload)
          */
         // TODO: Is it possible to avoid sending topic twice?
         zdispatch_->send(t.toPart().withGroup(std::string_view(t.name()).data()));
-        zdispatch_->send(t.toPart().withGroup(BROKER_UPDT));
+        zdispatch_->send(t.toPart().withGroup(SessionEnv::BrokerUpdt.data()));
 
     } else {
         LOG_WARN(log::Arg{name_, uuid_.toShortString()},
@@ -222,7 +211,7 @@ bool BrokerSession::storeTopic(const Topic& t)
 void BrokerSession::sendHugz()
 {
     // TODO: send network status update.
-    zdispatch_->send(zmq::Part{}.withGroup(BROKER_HUGZ));
+    zdispatch_->send(zmq::Part{}.withGroup(SessionEnv::BrokerHugz.data()));
 }
 
 
@@ -231,7 +220,7 @@ void BrokerSession::receiveWorkerCommand(zmq::Part&& payload)
     // TODO: use snapshot payload
     auto [req, syncseq, params] = zmq::PartMulti::unpack<std::string_view, SyncMachine::seqn_t, zmq::Part>(payload);
 
-    if (req != BROKER_SYNC_REQST) {
+    if (req != SessionEnv::BrokerSyncReqst) {
         LOG_WARN(log::Arg{name_, uuid_.toShortString()},
             log::Arg{"snapshot"sv, "recv"sv},
             log::Arg{"request"sv, req},
@@ -258,7 +247,7 @@ void BrokerSession::replySnapshot(uint32_t rouID, uint8_t syncseq, zmq::Part&& p
         const auto& errWouldBlock = ERROR(ZMQSocketSendFailed, "",
             log::Arg{log::ec_t{EAGAIN}});
 
-        if (zsnapshot_->trySend(zmq::PartMulti::pack(BROKER_SYNC_BEGIN, syncseq, uuid_.toPart())
+        if (zsnapshot_->trySend(zmq::PartMulti::pack(SessionEnv::BrokerSyncBegin, syncseq, uuid_.toPart())
                                     .withRoutingID(rouID)) == -1) {
             throw errWouldBlock;
         }
@@ -270,12 +259,12 @@ void BrokerSession::replySnapshot(uint32_t rouID, uint8_t syncseq, zmq::Part&& p
                 (!conf.topicsAll && std::find(names.begin(), names.end(), t.name()) == names.end()))
                 continue;
 
-            if (zsnapshot_->trySend(zmq::PartMulti::pack(BROKER_SYNC_ELEMN, syncseq, t.toPart())
+            if (zsnapshot_->trySend(zmq::PartMulti::pack(SessionEnv::BrokerSyncElemn, syncseq, t.toPart())
                                         .withRoutingID(rouID)) == -1) {
                 throw errWouldBlock;
             }
         }
-        if (zsnapshot_->trySend(zmq::PartMulti::pack(BROKER_SYNC_COMPL, syncseq, uuid_.toPart())
+        if (zsnapshot_->trySend(zmq::PartMulti::pack(SessionEnv::BrokerSyncCompl, syncseq, uuid_.toPart())
                                     .withRoutingID(rouID)) == -1) {
             throw errWouldBlock;
         }

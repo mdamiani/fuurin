@@ -12,6 +12,7 @@
 #define FUURIN_SESSIONENV_H
 
 #include <cstdint>
+#include <string_view>
 
 
 namespace fuurin {
@@ -20,6 +21,24 @@ struct SessionEnv
 {
     ///< Type of session execution token.
     using token_t = uint8_t;
+
+    ///< Broker publish group for keepalives.
+    static constexpr std::string_view BrokerHugz{"HUGZ"};
+    ///< Worker publish group for announcemets.
+    static constexpr std::string_view WorkerHugz{"HUGZ"};
+    ///< Broker publish group for delivery.
+    static constexpr std::string_view BrokerUpdt{"UPDT"};
+    ///< Worker publish group for dispatch.
+    static constexpr std::string_view WorkerUpdt{"UPDT"};
+
+    ///< Broker sync request.
+    static constexpr std::string_view BrokerSyncReqst{"SYNC"};
+    ///< Broker sync acknowledgement.
+    static constexpr std::string_view BrokerSyncBegin{"BEGN"};
+    ///< Broker sync topic.
+    static constexpr std::string_view BrokerSyncElemn{"ELEM"};
+    ///< Broker sync complete.
+    static constexpr std::string_view BrokerSyncCompl{"SONC"};
 };
 
 } // namespace fuurin

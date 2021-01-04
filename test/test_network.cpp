@@ -29,10 +29,6 @@
 #include <string_view>
 
 
-#define WORKER_HUGZ "HUGZ"
-#define WORKER_UPDT "UPDT"
-
-
 using namespace fuurin;
 namespace utf = boost::unit_test;
 namespace bdata = utf::data;
@@ -57,8 +53,8 @@ public:
         stopRcv_->bind();
         stopSnd_->connect();
 
-        // works for BROKER_HUGZ, BROKER_UPDT as well.
-        sockFrom_->setGroups({WORKER_HUGZ, WORKER_UPDT});
+        // works for SessionEnv::BrokerHugz, SessionEnv::BrokerUpdt as well.
+        sockFrom_->setGroups({SessionEnv::WorkerHugz.data(), SessionEnv::WorkerUpdt.data()});
     }
 
     enum OpenType

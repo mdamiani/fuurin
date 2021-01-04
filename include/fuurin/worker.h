@@ -62,6 +62,8 @@ public:
      *
      * If the list of names is empty, then none topic be received.
      *
+     * Any topic name shall be different than \ref SessionEnv::BrokerUpdt.
+     *
      * \param[in] names List of topics names.
      *
      * \see setTopicsAll()

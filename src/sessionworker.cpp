@@ -28,17 +28,6 @@
 #include <string_view>
 
 
-#define BROKER_HUGZ "HUGZ"
-#define WORKER_HUGZ "HUGZ"
-#define BROKER_UPDT "UPDT"
-#define WORKER_UPDT "UPDT"
-
-#define BROKER_SYNC_REQST "SYNC"sv
-#define BROKER_SYNC_BEGIN "BEGN"sv
-#define BROKER_SYNC_ELEMN "ELEM"sv
-#define BROKER_SYNC_COMPL "SONC"sv
-
-
 using namespace std::literals::string_view_literals;
 using namespace std::literals::chrono_literals;
 
@@ -181,7 +170,7 @@ void WorkerSession::operationReady(Operation* oper)
 
         zdispatch_->send(std::move(
             Topic::withSeqNum(oper->payload(), seqNum_)
-                .withGroup(WORKER_UPDT)));
+                .withGroup(SessionEnv::WorkerUpdt.data())));
         break;
 
     case Operation::Type::Sync:
@@ -248,18 +237,18 @@ void WorkerSession::connOpen()
     zdelivery_->setEndpoints({conf_.endpDelivery.begin(), conf_.endpDelivery.end()});
     zdispatch_->setEndpoints({conf_.endpDispatch.begin(), conf_.endpDispatch.end()});
 
-    std::set<std::string> groups{BROKER_HUGZ};
+    std::set<std::string> groups{{SessionEnv::BrokerHugz.data(), SessionEnv::BrokerHugz.size()}};
 
     if (!conf_.topicsAll) {
         for (const auto& name : conf_.topicsNames) {
-            if (std::string_view(name) == BROKER_UPDT) {
+            if (std::string_view(name) == SessionEnv::BrokerUpdt) {
                 throw ERROR(Error, "could not set topic name",
-                    log::Arg{"name"sv, std::string_view(BROKER_UPDT)});
+                    log::Arg{"name"sv, SessionEnv::BrokerUpdt});
             }
             groups.insert(name);
         }
     } else {
-        groups.insert(BROKER_UPDT);
+        groups.insert(SessionEnv::BrokerUpdt.data());
     }
 
     zdelivery_->setGroups({groups.begin(), groups.end()});
@@ -285,7 +274,7 @@ void WorkerSession::snapOpen()
 
 void WorkerSession::sendAnnounce()
 {
-    zdispatch_->send(zmq::Part{}.withGroup(WORKER_HUGZ));
+    zdispatch_->send(zmq::Part{}.withGroup(SessionEnv::WorkerHugz.data()));
 }
 
 
@@ -301,7 +290,7 @@ void WorkerSession::sendSync(uint8_t syncseq)
     conf.seqNum = seqNum_;
     auto params = conf.toPart();
 
-    zsnapshot_->trySend(zmq::PartMulti::pack(BROKER_SYNC_REQST, syncseq, zmq::Part{params}));
+    zsnapshot_->trySend(zmq::PartMulti::pack(SessionEnv::BrokerSyncReqst, syncseq, zmq::Part{params}));
     sendEvent(Event::Type::SyncRequest, std::move(params));
 }
 
@@ -330,11 +319,11 @@ void WorkerSession::collectBrokerMessage(zmq::Part&& payload)
 {
     const std::string_view group(payload.group());
 
-    if (group == BROKER_HUGZ) {
+    if (group == SessionEnv::BrokerHugz) {
         // TODO: extract the message
         conn_->onPing();
 
-    } else if (group == BROKER_UPDT || subscrTopic_.find(group) != subscrTopic_.list().end()) {
+    } else if (group == SessionEnv::BrokerUpdt || subscrTopic_.find(group) != subscrTopic_.list().end()) {
         if (acceptTopic(payload))
             sendEvent(Event::Type::Delivery, std::move(payload));
 
@@ -351,7 +340,7 @@ void WorkerSession::recvBrokerSnapshot(zmq::Part&& payload)
 {
     auto [reply, syncseq, params] = zmq::PartMulti::unpack<std::string_view, SyncMachine::seqn_t, zmq::Part>(payload);
 
-    if (reply == BROKER_SYNC_BEGIN) {
+    if (reply == SessionEnv::BrokerSyncBegin) {
         brokerUuid_ = Uuid::fromPart(params);
 
         LOG_DEBUG(log::Arg{name_, uuid_.toShortString()},
@@ -361,7 +350,7 @@ void WorkerSession::recvBrokerSnapshot(zmq::Part&& payload)
 
         sendEvent(Event::Type::SyncBegin, brokerUuid_.toPart());
 
-    } else if (reply == BROKER_SYNC_ELEMN) {
+    } else if (reply == SessionEnv::BrokerSyncElemn) {
         LOG_DEBUG(log::Arg{name_, uuid_.toShortString()},
             log::Arg{"snapshot"sv, "recv"sv},
             log::Arg{"broker", brokerUuid_.toShortString()},
@@ -371,7 +360,7 @@ void WorkerSession::recvBrokerSnapshot(zmq::Part&& payload)
         sendEvent(Event::Type::SyncElement, std::move(params));
         sync_->onReply(0, syncseq, SyncMachine::ReplyType::Snapshot);
 
-    } else if (reply == BROKER_SYNC_COMPL) {
+    } else if (reply == SessionEnv::BrokerSyncCompl) {
         if (const auto uuid = Uuid::fromPart(params); uuid != brokerUuid_) {
             LOG_WARN(log::Arg{name_, uuid_.toShortString()},
                 log::Arg{"snapshot"sv, "recv"sv},
