@@ -17,7 +17,6 @@
 
 #include <memory>
 #include <future>
-#include <atomic>
 #include <chrono>
 #include <functional>
 #include <string>
@@ -456,8 +455,8 @@ private:
     const std::unique_ptr<zmq::Socket> zfins_; ///< Inter-thread send completion message.
     const std::unique_ptr<zmq::Socket> zfinr_; ///< Inter-thread recv completion message.
 
-    mutable bool running_;            ///< Whether the task is running.
-    std::atomic<token_type_t> token_; ///< Current execution token for the task.
+    mutable bool running_; ///< Whether the task is running.
+    token_type_t token_;   ///< Current execution token for the task.
 
     std::vector<std::string> endpDelivery_; ///< List of endpoints.
     std::vector<std::string> endpDispatch_; ///< List of endpoints.
