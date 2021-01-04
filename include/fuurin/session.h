@@ -60,7 +60,7 @@ public:
      * \param[in] zoper ZMQ socket to receive operation commands from main task.
      * \param[in] zevent ZMQ socket to send events to main task.
      */
-    explicit Session(const std::string& name, Uuid id, SessionEnv::token_type_t token,
+    explicit Session(const std::string& name, Uuid id, SessionEnv::token_t token,
         zmq::Context* zctx, zmq::Socket* zfin, zmq::Socket* zoper,
         zmq::Socket* zevent);
 
@@ -155,7 +155,7 @@ protected:
      *
      * \return An operation object.
      */
-    static Operation recvOperation(zmq::Socket* sock, SessionEnv::token_type_t token) noexcept;
+    static Operation recvOperation(zmq::Socket* sock, SessionEnv::token_t token) noexcept;
 
 
 private:
@@ -179,13 +179,13 @@ private:
 
 
 protected:
-    const std::string name_;               ///< Session Name.
-    const Uuid uuid_;                      ///< Identifier.
-    const SessionEnv::token_type_t token_; ///< Session token.
-    zmq::Context* const zctx_;             ///< \see Runner::zctx_.
-    zmq::Socket* const zfins_;             ///< \see Runner::zfins_.
-    zmq::Socket* const zopr_;              ///< \see Runner::zopr_.
-    zmq::Socket* const zevs_;              ///< \see Runner::zevs_.
+    const std::string name_;          ///< Session Name.
+    const Uuid uuid_;                 ///< Identifier.
+    const SessionEnv::token_t token_; ///< Session token.
+    zmq::Context* const zctx_;        ///< \see Runner::zctx_.
+    zmq::Socket* const zfins_;        ///< \see Runner::zfins_.
+    zmq::Socket* const zopr_;         ///< \see Runner::zopr_.
+    zmq::Socket* const zevs_;         ///< \see Runner::zevs_.
 };
 
 } // namespace fuurin

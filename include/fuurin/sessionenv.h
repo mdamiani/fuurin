@@ -19,7 +19,7 @@ namespace fuurin {
 struct SessionEnv
 {
     ///< Type of session execution token.
-    using token_type_t = uint8_t;
+    using token_t = uint8_t;
 };
 
 } // namespace fuurin

@@ -37,7 +37,7 @@ public:
      *
      * \see Runner::Session::Session(...)
      */
-    explicit WorkerSession(const std::string& name, Uuid id, SessionEnv::token_type_t token,
+    explicit WorkerSession(const std::string& name, Uuid id, SessionEnv::token_t token,
         zmq::Context* zctx, zmq::Socket* zfin, zmq::Socket* zoper, zmq::Socket* zevent,
         zmq::Socket* zseqs);
 

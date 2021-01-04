@@ -41,7 +41,7 @@
 namespace fuurin {
 
 
-BrokerSession::BrokerSession(const std::string& name, Uuid id, SessionEnv::token_type_t token,
+BrokerSession::BrokerSession(const std::string& name, Uuid id, SessionEnv::token_t token,
     zmq::Context* zctx, zmq::Socket* zfin, zmq::Socket* zoper, zmq::Socket* zevent)
     : Session(name, id, token, zctx, zfin, zoper, zevent)
     , zsnapshot_{std::make_unique<zmq::Socket>(zctx, zmq::Socket::SERVER)}
