@@ -50,18 +50,8 @@ WorkerSession::WorkerSession(const std::string& name, Uuid id, SessionEnv::token
               std::bind(&WorkerSession::connClose, this),    //
               std::bind(&WorkerSession::connOpen, this),     //
               std::bind(&WorkerSession::sendAnnounce, this), //
-
               [this](ConnMachine::State s) {
-                  switch (s) {
-                  case ConnMachine::State::Halted:
-                  case ConnMachine::State::Trying:
-                      notifyConnectionUpdate(false);
-                      break;
-
-                  case ConnMachine::State::Stable:
-                      notifyConnectionUpdate(true);
-                      break;
-                  };
+                  onConnChanged(std::underlying_type_t<ConnMachine::State>(s));
               }),
       }
     , sync_{
@@ -73,46 +63,8 @@ WorkerSession::WorkerSession(const std::string& name, Uuid id, SessionEnv::token
               std::bind(&WorkerSession::snapClose, this),                       //
               std::bind(&WorkerSession::snapOpen, this),                        //
               std::bind(&WorkerSession::sendSync, this, std::placeholders::_2), //
-
               [this](SyncMachine::State s) {
-                  switch (s) {
-                  case SyncMachine::State::Halted:
-                      if (isSnapshot_) {
-                          LOG_DEBUG(log::Arg{name_, uuid_.toShortString()},
-                              log::Arg{"snapshot"sv, "halt"sv},
-                              log::Arg{"broker", brokerUuid_.toShortString()},
-                              log::Arg{"status"sv, Event::toString(Event::Type::SyncError)});
-
-                          sendEvent(Event::Type::SyncError, brokerUuid_.toPart());
-                      }
-                      brokerUuid_ = Uuid{};
-                      notifySnapshotDownload(false);
-                      break;
-
-                  case SyncMachine::State::Synced:
-                      LOG_DEBUG(log::Arg{name_, uuid_.toShortString()},
-                          log::Arg{"snapshot"sv, "recv"sv},
-                          log::Arg{"broker", brokerUuid_.toShortString()},
-                          log::Arg{"status"sv, Event::toString(Event::Type::SyncSuccess)});
-
-                      sendEvent(Event::Type::SyncSuccess, brokerUuid_.toPart());
-                      notifySnapshotDownload(false);
-                      break;
-
-                  case SyncMachine::State::Failed:
-                      LOG_DEBUG(log::Arg{name_, uuid_.toShortString()},
-                          log::Arg{"snapshot"sv, "timeout"sv},
-                          log::Arg{"broker", brokerUuid_.toShortString()},
-                          log::Arg{"status"sv, Event::toString(Event::Type::SyncError)});
-
-                      sendEvent(Event::Type::SyncError, brokerUuid_.toPart());
-                      notifySnapshotDownload(false);
-                      break;
-
-                  case SyncMachine::State::Download:
-                      notifySnapshotDownload(true);
-                      break;
-                  };
+                  onSyncChanged(std::underlying_type_t<SyncMachine::State>(s));
               }),
       }
     , zseqs_{zseqs}
@@ -413,6 +365,70 @@ bool WorkerSession::acceptTopic(const Uuid& worker, Topic::SeqN value)
     workerSeqNum_.put(worker, value);
 
     return true;
+}
+
+
+void WorkerSession::onConnChanged(int newState)
+{
+    static_assert(std::is_same_v<decltype(newState), std::underlying_type_t<ConnMachine::State>>,
+        "invalid type of parameter");
+
+    switch (ConnMachine::State(newState)) {
+    case ConnMachine::State::Halted:
+    case ConnMachine::State::Trying:
+        notifyConnectionUpdate(false);
+        break;
+
+    case ConnMachine::State::Stable:
+        notifyConnectionUpdate(true);
+        break;
+    };
+}
+
+
+void WorkerSession::onSyncChanged(int newState)
+{
+    static_assert(std::is_same_v<decltype(newState), std::underlying_type_t<SyncMachine::State>>,
+        "invalid type of parameter");
+
+    switch (SyncMachine::State(newState)) {
+    case SyncMachine::State::Halted:
+        if (isSnapshot_) {
+            LOG_DEBUG(log::Arg{name_, uuid_.toShortString()},
+                log::Arg{"snapshot"sv, "halt"sv},
+                log::Arg{"broker", brokerUuid_.toShortString()},
+                log::Arg{"status"sv, Event::toString(Event::Type::SyncError)});
+
+            sendEvent(Event::Type::SyncError, brokerUuid_.toPart());
+        }
+        brokerUuid_ = Uuid{};
+        notifySnapshotDownload(false);
+        break;
+
+    case SyncMachine::State::Synced:
+        LOG_DEBUG(log::Arg{name_, uuid_.toShortString()},
+            log::Arg{"snapshot"sv, "recv"sv},
+            log::Arg{"broker", brokerUuid_.toShortString()},
+            log::Arg{"status"sv, Event::toString(Event::Type::SyncSuccess)});
+
+        sendEvent(Event::Type::SyncSuccess, brokerUuid_.toPart());
+        notifySnapshotDownload(false);
+        break;
+
+    case SyncMachine::State::Failed:
+        LOG_DEBUG(log::Arg{name_, uuid_.toShortString()},
+            log::Arg{"snapshot"sv, "timeout"sv},
+            log::Arg{"broker", brokerUuid_.toShortString()},
+            log::Arg{"status"sv, Event::toString(Event::Type::SyncError)});
+
+        sendEvent(Event::Type::SyncError, brokerUuid_.toPart());
+        notifySnapshotDownload(false);
+        break;
+
+    case SyncMachine::State::Download:
+        notifySnapshotDownload(true);
+        break;
+    };
 }
 
 

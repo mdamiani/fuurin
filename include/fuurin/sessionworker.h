@@ -141,6 +141,24 @@ protected:
     bool acceptTopic(const Uuid& worker, Topic::SeqN value);
 
     /**
+     * \brief To be called whenever state of connection changes.
+     *
+     * \param[in] newState New connection state, that is \ref ConnMachine::State.
+     *
+     * \see notifyConnectionUpdate(bool)
+     */
+    void onConnChanged(int newState);
+
+    /**
+     * \brief To be called whenever state of synchronization changes.
+     *
+     * \param[in] newState New synchronization state, that is \ref SyncMachine::State.
+     *
+     * \see notifySnapshotDownload(bool)
+     */
+    void onSyncChanged(int newState);
+
+    /**
      * \brief Notifies for any change of connection state.
      *
      * \param[in] isUp Whether the connection is up or down.
