@@ -135,8 +135,15 @@ The state machine has three states:
 **TBD**: Matching between dispached vs delivered probe to be implemented.
 
 #### Synchronization
+The operation of snapshot download involves some steps. In case just one endpoint is used to connect
+to a broker, then synchronization retries to until it completely succeeds. When multiple endpoints
+are configured, then for every download failure, then next endpoint is selected, until it finally
+succeeds or the maximum number of retry count is reached. Such endpoints *might* potentially belong
+to different brokers. A detailed state machine chart is shown below:
 
-**TDB**: Handling of multiple snaphost endpoints to be implemented.
+![Sync_State](http://www.plantuml.com/plantuml/png/RP59Rzim48Nl_1LpJ0g4w78psY10WgAvIhaLFH3as1BAHI17hesY_xrSdB49-qHgtZSpZqzFYLIarLdnyyClU7XuX1_A4XeXshc1JnAURKW8AUZVI9A5pn86J4ZWyK0d5IZ0Texf0lloZgMZr_3wKf2FKho4Fzu6bO41ASwud_qEabVB57AtbEAxcctfxvUFUKYfZglMc98KF8ZD5pduaS9oTz-cP2tEkubk0MLW0TRbbYfoF8J0E_uAW5OgWyCU8sGlQ55tCKZ61jJ1-o9l-7vD5HDGetxrEg93pt5TGJds4RrfkWxEAM_Eq5jKFcqnjdKuxx66cgRGcQ9upCHvcLC7YBMgm-epAe1VM8DbxrdWUrMABG7rAD_iG01VkpgKU0TSxF7klcCiRYbppLo1tcQ7OQKEuvLeAlCSt6AHq5HAmEaNzfuBM7eoqvxL07vXfxVXlAVJ13HxNJTiMcZmzHlG535dRSqLYOQvnmlidtX2RrPd_mC0)
+
+**TDB**: Handling of multiple snapshot endpoints to be implemented.
 
 ## Licenses
 
