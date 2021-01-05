@@ -272,7 +272,8 @@ void WorkerSession::collectBrokerMessage(zmq::Part&& payload)
     const std::string_view group(payload.group());
 
     if (group == SessionEnv::BrokerHugz) {
-        // TODO: extract the message
+        // TODO: check whether payload corresponds to the dispatched probe.
+        //       in this case we are sure the full round trip works.
         conn_->onPing();
 
     } else if (group == SessionEnv::BrokerUpdt || subscrTopic_.find(group) != subscrTopic_.list().end()) {

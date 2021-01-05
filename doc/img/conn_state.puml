@@ -1,0 +1,30 @@
+@startuml
+
+[*] -left-> Halted
+
+Halted: Disconnected
+
+Trying: Connecting...
+
+Stable: Connected
+
+Trying --> Halted: onStop()
+Stable --> Halted: onStop()
+Stable -right-> Trying: onTimeout()
+
+Halted --> Trying: onStart()
+Trying -right-> Stable: onReply()
+
+state Trying {
+[*] --> Reconnect
+Reconnect --> Announce : onRetry()
+Announce --> Announce: onRetry()
+Announce -right-> Reconnect: onTimeout()
+}
+
+state Stable {
+[*] --> Keepalive
+Keepalive --> Keepalive : onReply()
+}
+
+@enduml

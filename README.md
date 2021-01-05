@@ -104,6 +104,40 @@ Messages will be filtered out by both worker and broker, using sequence numbers.
 
 ![Conf_Cables](http://www.plantuml.com/plantuml/png/NT31QeGm40RW-pn5i6SFvW6Aj8LU91Hw48z3d5en9XB75LdstJVHB8Wv3JzVXfyfPqRFosW09jG3TYIoNqQcJBnLVVVFdnjQSGSHNc-P_1_gdJWV2CxYu-ld9A-kSjWcrfpP0q2xSNAMB8Tjv6-zFlRLYJLaZ5j16xUq8bF4g_D3iHDL9FFjSRi8UGXv5b2BF7yFtq0LSOgTNva49UCK8mWbBx9EMP8fWv9i6s_s1000)
 
+### Connection Management
+Communication between workers and broker relys on a continuous flow of probes, at configurable
+specific time intervals. Every worker actively checks whether its delivery and dispatch sockets
+are connected to the broker. Conversely, snapshot socket(s) is checked on demand, that is when
+a synchronization action is performed.
+
+#### Dispatch & Delivery
+The following state machine represents how a worker checks for liveness of the dispatch and delivery
+round trip path. A worker shall send a probe to the dispatch socket, which shall be received later
+through the delivery socket. This dispatch and delivery path *might* potentially pass through
+multiple brokers, despites it requires a peer-to-peer communication among brokers.
+
+The state machine has three states:
+  - *Halted*
+      - Sockets are disconnected and connection is closed.
+
+  - *Trying*
+      - Announcements are continuously dispatched, at every retry interval.
+      - Sockets are reconnected every timeout interval, in case of timeout.
+      - A transition to *Stable* happens if a reply is delivered.
+
+  - *Stable*
+      - Keepalives are dispatched, at every delivered reply.
+      - A transition back to *Trying* happens in case of timeout.
+
+
+![Conn_State](http://www.plantuml.com/plantuml/png/VO_1IWCn48RlynHpL67t0VOW5Jq8tjhUn4FSZZMGdIpfH2ZYkvjqqeI0UChmpvUF-JSdCK7YuW1UxzvmSFGXmpq-6oTq0D1tmYTxcZqppPTq7ywMZnC-QfJcSHm1TcBU7TMuaJXKvOIUT-BNczk2_xyBzlWf2L1F1lPs8HybCUKu7Bfz-XdoLfDcK6CcjhIwS_wVgWjX0R-rVoAtLAf2dIxv0xEFF1EgH4AMNCEE-0DeNPg_h_DpFQXqRmUz4At6sI-2ElKvrbhgsH0Vuk9-0G00)
+
+**TBD**: Matching between dispached vs delivered probe to be implemented.
+
+#### Synchronization
+
+**TDB**: Handling of multiple snaphost endpoints to be implemented.
+
 ## Licenses
 
 ### MPL 2.0
