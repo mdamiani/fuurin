@@ -33,6 +33,7 @@ BOOST_AUTO_TEST_CASE(libVersion)
     std::snprintf(buf, sizeof(buf), "%d.%d.%d",
         VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH);
 
+    BOOST_TEST(VERSION_MAJOR + VERSION_MINOR + VERSION_PATCH != 0);
     BOOST_TEST(std::string(version()) == std::string(buf));
 }
 
