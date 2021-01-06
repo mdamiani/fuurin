@@ -165,6 +165,15 @@ else()
 endif()
 
 
+option(BUILD_EXAMPLES "Build fuurin examples" OFF)
+if(BUILD_EXAMPLES)
+    message(STATUS "Examples enabled")
+    add_subdirectory(${PROJECT_SOURCE_DIR}/examples)
+else()
+    message(STATUS "Examples disabled")
+endif()
+
+
 option(BUILD_DEB_PACKAGE "Build fuurin Debian package" OFF)
 if(BUILD_DEB_PACKAGE)
     message(STATUS "CPack Debian enabled")

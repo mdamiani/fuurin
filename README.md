@@ -81,6 +81,9 @@ with its connected broker.
 
 ![Usage_Diagram](http://www.plantuml.com/plantuml/png/ZLDDJm8n4BttLpJnB8aSITOWS3J1eCPpqnrWmZAjRPTa_VMsx62eZ8ctTZxUctbzdSTaGkgFdRRkw1q19QMQHh-Mi6uQfOnDBkXbXoNbSnGjUaD9VxXmWF1GnHR1vPY-UyRTFYq7GqgDdVh-yTAWPoEwudj9SH5de3tJuiaak7HTLpFBJ3yHkPuiA8vK92z8Ev5ZJHqIg1P-SuoR3sJtmH5-cOIEYWRo3hbEXD_0PmynBo6Cp6q_st5Sd7zz4E4Ni4FYXWfv0xuRHAJ9HByvZpRcqqG4hIiaZ6MsHmUfaes7bn-ojnPYF4lwxjjS7ekKWeEcjt9mebflXT6RPFVYT2ley0HXa4OPDvFUa3Dy_n_Rz8hiHWh-Eix_xPgSb4svtHPNohwlYXd5GojQU0xKvl-ilW40)
 
+Please see the [examples](examples) folder for some actual code.
+
+
 ### Configurations
 
 Some examples of possible configurations, by putting pieces together.
@@ -224,6 +227,17 @@ In order to run tests, they must be enabled first:
 $> cmake -D BUILD_TESTS=1 /path/to/fuurin/folder
 $> make
 $> ctest -v
+```
+
+
+### How to build examples
+
+In order to run examples, they must be enabled first:
+
+
+```
+$> cmake -D BUILD_EXAMPLES=1 /path/to/fuurin/folder
+$> make
 ```
 
 
