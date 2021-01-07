@@ -8,7 +8,7 @@
  # file, You can obtain one at http://mozilla.org/MPL/2.0/.
  ##
 
-cmake_minimum_required(VERSION 3.15.3)
+cmake_minimum_required(VERSION 3.19.2)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
