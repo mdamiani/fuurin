@@ -518,6 +518,7 @@ BOOST_FIXTURE_TEST_CASE(testWaitForEventThreadSafe, WorkerFixture)
             if (ev.payload().empty() || ev.notification() != Event::Notification::Success)
                 break;
             ++cnt;
+            std::this_thread::sleep_for(10ms);
         }
         return cnt;
     };
