@@ -258,7 +258,8 @@ public:
     Event waitForEvent(std::chrono::milliseconds timeout)
     {
         return r_.waitForEvent(static_cast<zmq::PollerWaiter&&>(*this),
-            static_cast<Elapser&&>(*this), std::bind(&TestRunner::recvEvent, this), timeout);
+            static_cast<Elapser&&>(*this), std::bind(&TestRunner::recvEvent, this),
+            {}, timeout);
     }
 };
 } // namespace fuurin
@@ -337,7 +338,7 @@ BOOST_AUTO_TEST_CASE_TEMPLATE(workerStart, T, runnerTypes)
 }
 
 
-BOOST_AUTO_TEST_CASE(testWaitForStarted)
+BOOST_AUTO_TEST_CASE(testWaitForEventStarted)
 {
     Worker w;
 
@@ -351,12 +352,7 @@ BOOST_AUTO_TEST_CASE(testWaitForStarted)
 }
 
 
-BOOST_FIXTURE_TEST_CASE(testWaitForOnline, WorkerFixture)
-{
-}
-
-
-BOOST_FIXTURE_TEST_CASE(testWaitForOffline, WorkerFixture)
+BOOST_FIXTURE_TEST_CASE(testWaitForEventOffline, WorkerFixture)
 {
     b.stop();
     bf.get();
@@ -364,6 +360,144 @@ BOOST_FIXTURE_TEST_CASE(testWaitForOffline, WorkerFixture)
 
     bf = b.start();
     testWaitForEvent(w, 2s, Event::Notification::Success, Event::Type::Online);
+}
+
+
+BOOST_AUTO_TEST_CASE(testWaitForStarted)
+{
+    Worker w;
+    auto f = w.start();
+
+    BOOST_TEST(true == w.waitForStarted(5s));
+
+    w.stop();
+    f.get();
+}
+
+
+BOOST_AUTO_TEST_CASE(testWaitForStopped)
+{
+    Worker w;
+    auto f = w.start();
+
+    w.stop();
+
+    BOOST_TEST(true == w.waitForStopped(5s));
+
+    f.get();
+}
+
+
+BOOST_AUTO_TEST_CASE(testWaitForOnline)
+{
+    Broker b;
+    Worker w;
+    auto bf = b.start();
+    auto wf = w.start();
+
+    BOOST_TEST(true == w.waitForOnline(5s));
+
+    b.stop();
+    w.stop();
+
+    bf.get();
+    wf.get();
+}
+
+
+BOOST_AUTO_TEST_CASE(testWaitForOffline)
+{
+    Broker b;
+    Worker w;
+    auto bf = b.start();
+    auto wf = w.start();
+
+    BOOST_TEST(true == w.waitForOnline(5s));
+
+    b.stop();
+    w.stop();
+
+    BOOST_TEST(true == w.waitForOffline(5s));
+
+    bf.get();
+    wf.get();
+}
+
+
+BOOST_AUTO_TEST_CASE(testWaitForTopicDelivery)
+{
+    Broker b;
+    Worker w;
+    auto bf = b.start();
+    auto wf = w.start();
+
+    BOOST_TEST(true == w.waitForOnline(5s));
+
+    const auto t = Topic{b.uuid(), w.uuid(), 1, "topic"sv, zmq::Part{"hello"sv}, Topic::State};
+
+    w.dispatch(t.name(), t.data(), t.type());
+
+    const auto opt = w.waitForTopic(5s);
+
+    BOOST_TEST(opt.has_value());
+    BOOST_TEST(opt.value() == t);
+
+    b.stop();
+    w.stop();
+
+    BOOST_TEST(true == w.waitForStopped());
+
+    bf.get();
+    wf.get();
+}
+
+
+BOOST_AUTO_TEST_CASE(testWaitForTopicSync)
+{
+    Broker b;
+    Worker w;
+    auto bf = b.start();
+    auto wf = w.start();
+
+    BOOST_TEST(true == w.waitForOnline(5s));
+
+    const auto t = Topic{b.uuid(), w.uuid(), 1, "topic"sv, zmq::Part{"hello"sv}, Topic::State};
+    w.dispatch(t.name(), t.data(), t.type());
+
+    const auto opt = w.waitForTopic(5s);
+    BOOST_TEST(opt.has_value());
+    BOOST_TEST(opt.value() == t);
+
+    // sync
+    w.sync();
+    const auto ops = w.waitForTopic(5s);
+    BOOST_TEST(ops.has_value());
+    BOOST_TEST(ops.value() == t);
+
+    b.stop();
+    w.stop();
+
+    BOOST_TEST(true == w.waitForStopped());
+
+    bf.get();
+    wf.get();
+}
+
+
+BOOST_AUTO_TEST_CASE(testWaitForTopicTimeout)
+{
+    Worker w;
+    auto wf = w.start();
+
+    BOOST_TEST(true == w.waitForStarted(5s));
+
+    w.stop();
+
+    const auto opt = w.waitForTopic(2s);
+
+    BOOST_TEST(!opt.has_value());
+
+    wf.get();
 }
 
 
@@ -648,6 +782,32 @@ BOOST_FIXTURE_TEST_CASE(testSyncSkipEvents, WorkerFixture)
 }
 
 
+BOOST_FIXTURE_TEST_CASE(testStoreEvents, WorkerFixture)
+{
+    // events are not synced with, however they are still stored
+    // at broker side in order to deliver them only once.
+
+    auto t = mkT("topic", 1, "hello");
+    w.dispatch(t.name(), t.data(), Topic::Event);
+    testWaitForTopic(w, t, t.seqNum());
+    BOOST_TEST(w.seqNumber() == 1u);
+
+    // clone worker (same uuid).
+    Worker w2{w.uuid()};
+    BOOST_TEST(w2.uuid() == w.uuid());
+    BOOST_TEST(w2.seqNumber() == 0u);
+    auto w2f = w2.start();
+    testWaitForStart(w2);
+
+    // same topic will be discarded.
+    w2.dispatch(t.name(), t.data(), Topic::Event);
+    w2.stop();
+    testWaitForStop(w2);
+    BOOST_TEST(w2.seqNumber() == 1u);
+    w2f.get();
+}
+
+
 BOOST_AUTO_TEST_CASE(testTopicSubscriptionInvalid)
 {
     Worker w(WorkerFixture::wid);
@@ -790,19 +950,20 @@ BOOST_AUTO_TEST_CASE(testTopicDeliveryGroup)
     testWaitForEvent(w2, 2s, Event::Notification::Success, Event::Type::Online);
 
     auto t1 = mkT("topic1", 0, "hello1").withWorker(w1.uuid());
-    auto t2 = mkT("topic2", 0, "hello2").withWorker(w1.uuid());
+    auto t2 = mkT("topic2", 0, "hello2").withWorker(w2.uuid());
     auto t3 = mkT("topic1", 0, "hello3").withWorker(w1.uuid());
 
     w1.dispatch(t1.name(), t1.data());
-    w1.dispatch(t2.name(), t2.data());
-    w1.dispatch(t3.name(), t3.data());
-
     testWaitForTopic(w1, t1, 1);
-    testWaitForTopic(w1, t2, 2);
-    testWaitForTopic(w1, t3, 3);
+
+    w2.dispatch(t2.name(), t2.data()); // w2 dispatches topic2 which was not subscribed.
+    testWaitForTopic(w1, t2, 1);
+
+    w1.dispatch(t3.name(), t3.data());
+    testWaitForTopic(w1, t3, 2);
 
     testWaitForTopic(w2, t1, 1);
-    testWaitForTopic(w2, t3, 3);
+    testWaitForTopic(w2, t3, 2);
 
     w1.stop();
     w2.stop();

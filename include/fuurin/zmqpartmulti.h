@@ -53,28 +53,36 @@ private:
      */
 
     /**
-     * \return Whether the type is integral and unsigned.
+     * \brief Static check whether the type is is integral and unsigned.
      */
+    template<typename T, typename = void>
+    struct isIntegralType : std::false_type
+    {};
     template<typename T>
-    static constexpr bool isIntegralType()
+    struct isIntegralType<T,
+        typename std::enable_if_t<                  //
+            std::is_integral_v<std::decay_t<T>> &&  //
+                !std::is_signed_v<std::decay_t<T>>, //
+            void>> : std::true_type
     {
-        using type = std::decay_t<T>;
-        return std::is_integral_v<type> && !std::is_signed_v<type>;
-    }
+    };
 
 
     /**
      * \return Whether the type is a string or a \ref Part.
      */
+    template<typename T, typename = void>
+    struct isStringType : std::false_type
+    {};
     template<typename T>
-    static constexpr bool isStringType()
+    struct isStringType<T,
+        typename std::enable_if_t<                               //
+            std::is_same_v<std::decay_t<T>, std::string_view> || //
+                std::is_same_v<std::decay_t<T>, std::string> ||  //
+                std::is_same_v<std::decay_t<T>, Part>,
+            void>> : std::true_type
     {
-        using type = std::decay_t<T>;
-        return (false ||
-            std::is_same_v<type, std::string_view> ||
-            std::is_same_v<type, std::string> ||
-            std::is_same_v<type, Part>);
-    }
+    };
 
 
     /**
@@ -202,7 +210,7 @@ public:
      *
      * It extracts the fixed amount of requested types, from the passed \ref Part.
      *
-     * \param[in] pm Part to unpack.
+     * \param[in] pm Part or string to unpack from.
      *
      * \return A tuple of the requested types.
      *
@@ -212,9 +220,11 @@ public:
      * \see pack(Args&&...)
      * \see unpack2(const Part&, size_t)
      * \see unpack1(const Part&, size_t)
+     * \see isStringType
      */
-    template<typename... Args>
-    static std::tuple<Args...> unpack(const Part& pm)
+    template<typename... Args, typename P>
+    static std::enable_if_t<isStringType<P>::value, std::tuple<Args...>>
+    unpack(P&& pm)
     {
         constexpr auto sz = sizeof...(Args);
 
@@ -297,7 +307,7 @@ public:
      *
      * See \ref unpack(const Part&, OutputIt) for description.
      *
-     * \param[in] pm Part to unpack.
+     * \param[in] pm Part or string to unpack from.
      * \param[out] visit Visit function for every item.
      *
      * \exception ZMQPartAccessFailed The multi part buffer could not be extracted.
@@ -306,10 +316,11 @@ public:
      * \see unpack(const Part&, OutputIt)
      * \see unpack2(const Part&, size_t)
      * \see unpack1(const Part&, size_t)
+     * \see isStringType
      */
-    template<typename T, typename Visitor>
-    static std::enable_if_t<std::is_invocable<Visitor, T>::value, void>
-    unpack(const Part& pm, Visitor visit)
+    template<typename T, typename Visitor, typename P>
+    static std::enable_if_t<std::is_invocable<Visitor, T>::value && isStringType<P>::value, void>
+    unpack(P&& pm, Visitor visit)
     {
         auto [size, count] = unpack2<string_length_t, iterable_length_t>(pm, 0);
         size_t pos = sizeof(size) + sizeof(count);
@@ -328,7 +339,7 @@ public:
      * Unpacks data in a \ref Part, which contains a variable number of items,
      * packed with the corresponding iterable version of pack method.
      *
-     * \param[in] pm Part to unpack.
+     * \param[in] pm Part or string to unpack from.
      * \param[out] d_first The beginning of the destination range.
      *
      * \exception ZMQPartAccessFailed The multi part buffer could not be extracted.
@@ -337,11 +348,12 @@ public:
      * \see unpack(const Part&, Visitor)
      * \see unpack2(const Part&, size_t)
      * \see unpack1(const Part&, size_t)
+     * \see isStringType
      */
     ///{@
-    template<typename T, typename OutputIt>
-    static std::enable_if_t<isIteratorType<OutputIt>::value, void>
-    unpack(const Part& pm, OutputIt d_first)
+    template<typename T, typename OutputIt, typename P>
+    static std::enable_if_t<isIteratorType<OutputIt>::value && isStringType<P>::value, void>
+    unpack(P&& pm, OutputIt d_first)
     {
         using TT = typename isIteratorType<OutputIt>::iterator_type;
         unpack<T>(pm, [&d_first](T&& v) {
@@ -349,9 +361,9 @@ public:
         });
     }
 
-    template<typename OutputIt>
-    static std::enable_if_t<isIteratorType<OutputIt>::value, void>
-    unpack(const Part& pm, OutputIt d_first)
+    template<typename OutputIt, typename P>
+    static std::enable_if_t<isIteratorType<OutputIt>::value && isStringType<P>::value, void>
+    unpack(P&& pm, OutputIt d_first)
     {
         using TT = typename isIteratorType<OutputIt>::iterator_type;
         unpack<TT>(pm, d_first);
@@ -443,8 +455,8 @@ private:
      *
      * \see unpack1
      */
-    template<typename T, typename... Args>
-    static std::tuple<T, Args...> unpack2(const Part& pm, size_t pos)
+    template<typename T, typename... Args, typename P>
+    static std::tuple<T, Args...> unpack2(P&& pm, size_t pos)
     {
         auto tuple = unpack1<T>(pm, pos);
         const size_t sz = tsize(std::forward<T>(std::get<0>(tuple)));
@@ -467,9 +479,9 @@ private:
      * \see unpack2
      * \see psize(const Part&, size_t)
      */
-    template<typename T>
+    template<typename T, typename P>
     static std::tuple<std::remove_cv_t<std::remove_reference_t<T>>>
-    unpack1(const Part& pm, size_t pos)
+    unpack1(P&& pm, size_t pos)
     {
         using TT = std::remove_cv_t<std::remove_reference_t<T>>;
         const char* const buf = &pm.data()[pos];
@@ -509,8 +521,8 @@ private:
      *      or the size of the string type, exceeds the length of the internal buffer,
      *      from the specified starting position.
      */
-    template<typename T>
-    static size_t psize(const Part& pm, size_t pos)
+    template<typename T, typename P>
+    static size_t psize(P&& pm, size_t pos)
     {
         const char* const buf = &pm.data()[pos];
 
@@ -581,7 +593,8 @@ private:
      * \param[in] sz Size to access starting from \c pos.
      * \return True in case the total requested length exceeds buffer \ref size().
      */
-    static inline bool accessOutOfBoundary(const Part& pm, size_t pos, size_t sz)
+    template<typename P>
+    static inline bool accessOutOfBoundary(P&& pm, size_t pos, size_t sz)
     {
         return !(pos <= pm.size() && pos + sz >= pos && pos + sz <= pm.size());
     }

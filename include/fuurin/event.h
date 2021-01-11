@@ -59,7 +59,7 @@ public:
         Delivery,        ///< Event for any \ref Worker::dispatch(Topic::Name, zmq::Part&&), with payload \ref Topic.
         SyncRequest,     ///< Event for start of \ref Worker::sync(), with payload \ref WorkerConfig.
         SyncBegin,       ///< Event for reply from broker of \ref Worker::sync().
-        SyncElement,     ///< Event for Worker::sync() reply.
+        SyncElement,     ///< Event for Worker::sync() reply, payload is a \ref Topic.
         SyncSuccess,     ///< Event for \ref Worker::sync() success.
         SyncError,       ///< Event for \ref Worker::sync() error.
         SyncDownloadOn,  ///< Event when download of snapshot starts.
@@ -79,7 +79,10 @@ public:
      *
      * \see zmq::PartMulti::unpack(const Part&)
      */
+    ///{@
     static Event fromPart(const zmq::Part& part);
+    static Event fromPart(std::string_view part);
+    ///@}
 
     /**
      * \brief Converts this event to a \ref zmq::PartMulti packed \ref zmq::Part.

@@ -1,0 +1,37 @@
+@startuml
+[*] --> Halted
+
+Halted: 1. Close socket.
+Halted: 2. Reset next socket to first.
+Halted: 3. Reset sync ID to 0.
+Download: Retrieving snaphost...
+Failed: Close socket.
+Synced: Success.
+
+Download --> Halted: onStop()
+Failed -right-> Halted: onStop()
+Synced -up-> Halted: onStop()
+
+state Download {
+  state Failover : Select next socket.
+  state Reconnect : Reconnect socket.
+  state Sync : 1. Increment sync ID.
+  state Sync : 2. Send sync command.
+  state Transfer : Receive snapshot.
+  state Retry : Increment max retry count.
+
+  Failover --> Reconnect
+  Reconnect --> Sync
+  Sync --> Transfer
+  Transfer --> Transfer : onReply()
+  Transfer -left-> Retry : onTimeout()
+  Transfer --> Synced : onCompleted()
+
+  Halted --> Reconnect: onSync()
+  Failed --> Failover: onSync()
+  Synced --> Sync: onSync()
+
+  Retry --> Failover : count <= threshold
+  Retry --> Failed : count > threshold
+}
+@enduml

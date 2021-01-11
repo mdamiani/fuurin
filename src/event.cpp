@@ -159,6 +159,12 @@ std::string_view Event::toString(Event::Type v) noexcept
 
 Event Event::fromPart(const zmq::Part& part)
 {
+    return fromPart(part.toString());
+}
+
+
+Event Event::fromPart(std::string_view part)
+{
     auto [type, notif, payload] = zmq::PartMulti::unpack<type_t, notif_t, zmq::Part>(part);
 
     ASSERT(type >= toIntegral(Event::Type::Invalid) &&

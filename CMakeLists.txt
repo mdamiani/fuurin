@@ -8,7 +8,7 @@
  # file, You can obtain one at http://mozilla.org/MPL/2.0/.
  ##
 
-cmake_minimum_required(VERSION 3.15.3)
+cmake_minimum_required(VERSION 3.19.2)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
@@ -67,6 +67,9 @@ set(LIB_SOURCES
     src/stopwatch.cpp
     src/topic.cpp
     src/uuid.cpp
+    src/session.cpp
+    src/sessionworker.cpp
+    src/sessionbroker.cpp
 )
 
 set(LIB_PUBLIC_HEADERS
@@ -92,6 +95,10 @@ set(LIB_PUBLIC_HEADERS
     include/fuurin/topic.h
     include/fuurin/uuid.h
     include/fuurin/lrucache.h
+    include/fuurin/session.h
+    include/fuurin/sessionenv.h
+    include/fuurin/sessionworker.h
+    include/fuurin/sessionbroker.h
 )
 
 set(LIB_DEPS
@@ -118,6 +125,10 @@ set(LIB_COMPILE_FLAGS
 set(LIB_COMPILE_DEFS
     BOOST_SCOPE_EXIT_CONFIG_USE_LAMBDAS
     ZMQ_BUILD_DRAFT_API
+
+    LIB_VERSION_MAJOR=${LIB_VERSION_MAJOR}
+    LIB_VERSION_MINOR=${LIB_VERSION_MINOR}
+    LIB_VERSION_PATCH=${LIB_VERSION_PATCH}
 )
 
 target_compile_options(fuurin_shared PUBLIC ${LIB_COMPILE_FLAGS})
@@ -155,6 +166,15 @@ if(BUILD_TESTS)
     add_subdirectory(${PROJECT_SOURCE_DIR}/test)
 else()
     message(STATUS "Tests disabled")
+endif()
+
+
+option(BUILD_EXAMPLES "Build fuurin examples" OFF)
+if(BUILD_EXAMPLES)
+    message(STATUS "Examples enabled")
+    add_subdirectory(${PROJECT_SOURCE_DIR}/examples)
+else()
+    message(STATUS "Examples disabled")
 endif()
 
 

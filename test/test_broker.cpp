@@ -15,6 +15,7 @@
 #include <benchmark/benchmark.h>
 
 #include "fuurin/broker.h"
+#include "fuurin/sessionbroker.h"
 #include "fuurin/zmqcontext.h"
 #include "fuurin/zmqsocket.h"
 #include "fuurin/zmqpart.h"
@@ -27,11 +28,6 @@
 #include <chrono>
 #include <memory>
 #include <vector>
-
-#define BROKER_SYNC_REQST "SYNC"sv
-#define BROKER_SYNC_BEGIN "BEGN"sv
-#define BROKER_SYNC_ELEMN "ELEM"sv
-#define BROKER_SYNC_COMPL "SONC"sv
 
 
 using namespace fuurin;
@@ -134,9 +130,9 @@ protected:
 public:
     using Broker::Broker;
 
-    std::unique_ptr<Session> createSession(CompletionFunc onComplete) const override
+    std::unique_ptr<Session> createSession() const override
     {
-        auto ret = makeSession<TestBrokerSession>(onComplete);
+        auto ret = makeSession<TestBrokerSession>();
         const_cast<TestBroker*>(this)->setupSession(static_cast<TestBrokerSession*>(ret.get()));
         return ret;
     }
@@ -280,8 +276,8 @@ BOOST_AUTO_TEST_CASE(testStoreTopicMultiple)
 const WorkerConfig cnfAll{{}, {}, true, {}, {}, {}, {}};
 const WorkerConfig cnfNone{{}, {}, false, {}, {}, {}, {}};
 
-const zmq::Part SREQ = zmq::PartMulti::pack(BROKER_SYNC_REQST, uint8_t(0), cnfAll.toPart()).withRoutingID(1);
-const zmq::Part SREQN = zmq::PartMulti::pack(BROKER_SYNC_REQST, uint8_t(0), cnfNone.toPart()).withRoutingID(1);
+const zmq::Part SREQ = zmq::PartMulti::pack(SessionEnv::BrokerSyncReqst, uint8_t(0), cnfAll.toPart()).withRoutingID(1);
+const zmq::Part SREQN = zmq::PartMulti::pack(SessionEnv::BrokerSyncReqst, uint8_t(0), cnfNone.toPart()).withRoutingID(1);
 
 BOOST_DATA_TEST_CASE(testReceiverWorkerSync,
     bdata::make({
@@ -367,15 +363,15 @@ BOOST_DATA_TEST_CASE(testReceiverWorkerSync,
         if (wantSize > 0) {
             BOOST_TEST(int(bpp->size()) == wantSize);
             if (bpp->size() >= 1)
-                testNotif(bpp->at(0), BROKER_SYNC_BEGIN, 0);
+                testNotif(bpp->at(0), SessionEnv::BrokerSyncBegin, 0);
             if (bpp->size() >= 2) {
                 if (payload == SREQ)
-                    testTopic(bpp->at(1), BROKER_SYNC_ELEMN, 0, t);
+                    testTopic(bpp->at(1), SessionEnv::BrokerSyncElemn, 0, t);
                 else if (payload == SREQN)
-                    testNotif(bpp->at(1), BROKER_SYNC_COMPL, 0);
+                    testNotif(bpp->at(1), SessionEnv::BrokerSyncCompl, 0);
             }
             if (bpp->size() >= 3)
-                testNotif(bpp->at(2), BROKER_SYNC_COMPL, 0);
+                testNotif(bpp->at(2), SessionEnv::BrokerSyncCompl, 0);
         } else {
             BOOST_TEST(int(bpp->empty()));
         }

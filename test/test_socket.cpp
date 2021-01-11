@@ -409,6 +409,45 @@ BOOST_AUTO_TEST_CASE(partMultiPackIter)
 }
 
 
+BOOST_AUTO_TEST_CASE(partMultiUnpackFromViewArgs)
+{
+    const auto val1 = uint16_t{200};
+    const auto val2 = "testdata"sv;
+
+    const Part a = PartMulti::pack(val1, val2);
+    const std::string s1{a.toString().data(), a.toString().size()};
+    const std::string s2{a.toString()};
+
+    const auto testUnpackView = [&](auto s) {
+        const auto [unp1, unp2] = PartMulti::unpack<uint16_t, std::string_view>(s);
+        BOOST_TEST(val1 == unp1);
+        BOOST_TEST(val2 == unp2);
+    };
+
+    testUnpackView(s1);
+    testUnpackView(s2);
+}
+
+
+BOOST_AUTO_TEST_CASE(partMultiUnpackFromViewIter)
+{
+    std::list<std::string> lst = {"rosemary", "basil", "pepper"};
+
+    const Part a = PartMulti::pack(lst.begin(), lst.end());
+    const std::string s1{a.toString().data(), a.toString().size()};
+    const std::string s2{a.toString()};
+
+    const auto testUnpackView = [&](auto s) {
+        std::list<std::string> unp;
+        PartMulti::unpack(s, std::back_inserter(unp));
+        BOOST_TEST(lst == unp);
+    };
+
+    testUnpackView(s1);
+    testUnpackView(s2);
+}
+
+
 namespace fuurin {
 namespace zmq {
 class TestPartMulti

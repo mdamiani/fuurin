@@ -11,17 +11,15 @@
 #ifndef FUURIN_H
 #define FUURIN_H
 
-#include <fuurin/logger.h>
-
 namespace fuurin {
 
 /**
  * \brief Library version as major, minor and patch components.
  */
 ///{@
-constexpr const int VERSION_MAJOR = 0;
-constexpr const int VERSION_MINOR = 1;
-constexpr const int VERSION_PATCH = 1;
+constexpr const int VERSION_MAJOR = LIB_VERSION_MAJOR;
+constexpr const int VERSION_MINOR = LIB_VERSION_MINOR;
+constexpr const int VERSION_PATCH = LIB_VERSION_PATCH;
 ///@}
 
 

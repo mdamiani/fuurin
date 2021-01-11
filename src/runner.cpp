@@ -9,6 +9,7 @@
  */
 
 #include "fuurin/runner.h"
+#include "fuurin/session.h"
 #include "fuurin/zmqcontext.h"
 #include "fuurin/zmqsocket.h"
 #include "fuurin/zmqpoller.h"
@@ -28,9 +29,6 @@
 
 namespace fuurin {
 
-/**
- * MAIN TASK
- */
 
 Runner::Runner(Uuid id, const std::string& name)
     : name_{name}
@@ -40,6 +38,8 @@ Runner::Runner(Uuid id, const std::string& name)
     , zopr_(std::make_unique<zmq::Socket>(zctx_.get(), zmq::Socket::PAIR))
     , zevs_(std::make_unique<zmq::Socket>(zctx_.get(), zmq::Socket::RADIO))
     , zevr_(std::make_unique<zmq::Socket>(zctx_.get(), zmq::Socket::DISH))
+    , zfins_{std::make_unique<zmq::Socket>(zctx_.get(), zmq::Socket::PUSH)}
+    , zfinr_{std::make_unique<zmq::Socket>(zctx_.get(), zmq::Socket::PULL)}
     , running_(false)
     , token_(0)
     , endpDelivery_{{"ipc:///tmp/worker_delivery"}}
@@ -60,8 +60,18 @@ Runner::Runner(Uuid id, const std::string& name)
     zevs_->bind();
     zevr_->connect();
 
-    // TODO: check whether RADIO/DISH over inproc has the slow join behavior,
-    //       in order to avoid missing notifications.
+    // MUST be inproc in order to get instant delivery of messages.
+    zfins_->setEndpoints({"inproc://runner-terminate"});
+    zfinr_->setEndpoints({"inproc://runner-terminate"});
+
+    zfins_->setHighWaterMark(1, 1);
+    zfinr_->setHighWaterMark(1, 1);
+
+    zfins_->setConflate(true);
+    zfinr_->setConflate(true);
+
+    zfinr_->bind();
+    zfins_->connect();
 }
 
 
@@ -113,6 +123,15 @@ std::vector<std::string> Runner::endpointSnapshot() const
 
 bool Runner::isRunning() const noexcept
 {
+    // latest message is always available
+    // over the socket, because we are using
+    // inproc transport.
+    zmq::Part r;
+    if (zfinr_->tryRecv(&r) != -1) {
+        if (r.toUint8() == token_)
+            running_ = false;
+    }
+
     return running_;
 }
 
@@ -129,9 +148,9 @@ zmq::Part Runner::prepareConfiguration() const
 }
 
 
-std::unique_ptr<Runner::Session> Runner::createSession(CompletionFunc onComplete) const
+std::unique_ptr<Session> Runner::createSession() const
 {
-    return makeSession<Session>(onComplete);
+    return makeSession<Session>();
 }
 
 
@@ -151,9 +170,7 @@ std::future<void> Runner::start()
     };
 
     auto ret = std::async(std::launch::async,
-        [s = createSession([this]() {
-            running_ = false;
-        })]() {
+        [s = createSession()]() {
             s->run();
         });
 
@@ -174,15 +191,15 @@ bool Runner::stop() noexcept
 }
 
 
-Event Runner::waitForEvent(std::chrono::milliseconds timeout)
+Event Runner::waitForEvent(std::chrono::milliseconds timeout, EventMatchFunc match) const
 {
     return waitForEvent(zmq::Poller{zmq::PollerEvents::Read, 0ms, zevr_.get()},
-        fuurin::StopWatch{}, std::bind(&Runner::recvEvent, this), timeout);
+        fuurin::StopWatch{}, std::bind(&Runner::recvEvent, this), match, timeout);
 }
 
 
 Event Runner::waitForEvent(zmq::PollerWaiter&& pw, Elapser&& dt,
-    EventRecvFunc recv, std::chrono::milliseconds timeout)
+    EventRecvFunc recv, EventMatchFunc match, std::chrono::milliseconds timeout)
 {
     for (;;) {
         pw.setTimeout(timeout);
@@ -191,10 +208,14 @@ Event Runner::waitForEvent(zmq::PollerWaiter&& pw, Elapser&& dt,
             break;
 
         const auto& ev = recv();
-        if (ev.notification() == Event::Notification::Timeout) {
-            timeout -= dt.elapsed();
-            if (timeout <= 0ms)
-                break;
+        if (ev.notification() == Event::Notification::Timeout ||
+            (match && !match(ev.type()))) //
+        {
+            if (timeout != -1ms) {
+                timeout -= dt.elapsed();
+                if (timeout <= 0ms)
+                    break;
+            }
 
             dt.start();
             continue;
@@ -203,21 +224,21 @@ Event Runner::waitForEvent(zmq::PollerWaiter&& pw, Elapser&& dt,
         return ev;
     }
 
-    return Event{Event::Type::Invalid, Event::Notification::Timeout};
+    return {Event::Type::Invalid, Event::Notification::Timeout};
 }
 
 
-Event Runner::recvEvent()
+Event Runner::recvEvent() const
 {
     zmq::Part r;
     const auto n = zevr_->tryRecv(&r);
     if (n == -1) {
-        return Event{Event::Type::Invalid, Event::Notification::Timeout};
+        return {Event::Type::Invalid, Event::Notification::Timeout};
     }
 
     ASSERT(std::strncmp(r.group(), GROUP_EVENTS, sizeof(GROUP_EVENTS)) == 0, "bad event group");
 
-    auto [tok, ev] = zmq::PartMulti::unpack<token_type_t, zmq::Part>(r);
+    auto [tok, ev] = zmq::PartMulti::unpack<SessionEnv::token_t, std::string_view>(r);
 
     return Event::fromPart(ev)
         .withNotification(tok == token_
@@ -238,7 +259,7 @@ void Runner::sendOperation(Operation::Type oper, zmq::Part&& payload) noexcept
 }
 
 
-void Runner::sendOperation(zmq::Socket* sock, token_type_t token, Operation::Type oper, zmq::Part&& payload) noexcept
+void Runner::sendOperation(zmq::Socket* sock, SessionEnv::token_t token, Operation::Type oper, zmq::Part&& payload) noexcept
 {
     try {
         sock->send(zmq::Part{token},
@@ -248,113 +269,6 @@ void Runner::sendOperation(zmq::Socket* sock, token_type_t token, Operation::Typ
         LOG_FATAL(log::Arg{"runner"sv}, log::Arg{"operation send threw exception"sv},
             log::Arg{std::string_view(e.what())});
     }
-}
-
-
-Operation Runner::recvOperation(zmq::Socket* sock, token_type_t token) noexcept
-{
-    try {
-        zmq::Part tok, oper;
-        sock->recv(&tok, &oper);
-        return Operation::fromPart(oper)
-            .withNotification(tok.toUint8() == token
-                    ? Operation::Notification::Success
-                    : Operation::Notification::Discard);
-
-    } catch (const std::exception& e) {
-        LOG_FATAL(log::Arg{"runner"sv}, log::Arg{"operation recv threw exception"sv},
-            log::Arg{std::string_view(e.what())});
-
-        return Operation{};
-    }
-}
-
-
-/**
- * ASYNC TASK
- */
-
-Runner::Session::Session(const std::string& name, Uuid id, token_type_t token,
-    CompletionFunc onComplete, zmq::Context* zctx, zmq::Socket* zoper, zmq::Socket* zevent)
-    : name_{name}
-    , uuid_{id}
-    , token_{token}
-    , docompl_{onComplete}
-    , zctx_{zctx}
-    , zopr_{zoper}
-    , zevs_{zevent}
-{
-}
-
-
-Runner::Session::~Session() noexcept = default;
-
-
-void Runner::Session::run()
-{
-    BOOST_SCOPE_EXIT(this)
-    {
-        try {
-            if (docompl_)
-                docompl_();
-        } catch (...) {
-            LOG_FATAL(log::Arg{"runner"sv},
-                log::Arg{"session on complete action threw exception"sv});
-        }
-    };
-
-    auto poll = createPoller();
-
-    for (;;) {
-        for (auto s : poll->wait()) {
-            if (s != zopr_) {
-                socketReady(s);
-                continue;
-            }
-
-            auto oper = recvOperation();
-
-            // filter out old operations
-            if (oper.notification() == Operation::Notification::Discard)
-                continue;
-
-            operationReady(&oper);
-
-            if (oper.type() == Operation::Type::Stop)
-                return;
-        }
-    }
-}
-
-
-std::unique_ptr<zmq::PollerWaiter> Runner::Session::createPoller()
-{
-    auto poll = new zmq::Poller{zmq::PollerEvents::Type::Read, zopr_};
-    return std::unique_ptr<zmq::PollerWaiter>{poll};
-}
-
-
-void Runner::Session::operationReady(Operation*)
-{
-}
-
-
-void Runner::Session::socketReady(zmq::Pollable*)
-{
-}
-
-
-Operation Runner::Session::recvOperation() noexcept
-{
-    return Runner::recvOperation(zopr_, token_);
-}
-
-
-void Runner::Session::sendEvent(Event::Type ev, zmq::Part&& pay)
-{
-    zevs_->send(zmq::PartMulti::pack(token_,
-        Event{ev, Event::Notification::Success, pay}.toPart())
-                    .withGroup(GROUP_EVENTS));
 }
 
 } // namespace fuurin
