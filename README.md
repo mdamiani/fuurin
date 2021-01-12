@@ -1,5 +1,9 @@
 # Fuurin
 
+[![GitHub license](https://img.shields.io/github/license/mdamiani/fuurin)](https://github.com/mdamiani/fuurin/blob/master/LICENSE)
+[![GitHub build](https://github.com/mdamiani/fuurin/workflows/build/badge.svg)](https://github.com/mdamiani/fuurin/actions?query=workflow%3ACMake)
+
+
 Simple and fast [ZeroMQ](http://zeromq.org) communication library.
 
 It provides few easy to use C++ classes in order to connect different parties together.
