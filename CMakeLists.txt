@@ -131,6 +131,8 @@ set(LIB_COMPILE_DEFS
     LIB_VERSION_PATCH=${LIB_VERSION_PATCH}
 )
 
+include(Coverage)
+
 target_compile_options(fuurin_shared PUBLIC ${LIB_COMPILE_FLAGS})
 target_compile_options(fuurin_static PUBLIC ${LIB_COMPILE_FLAGS})
 
@@ -156,8 +158,8 @@ include_directories(
     "${3RDPARTY_DIR}/include"
 )
 
-target_link_libraries(fuurin_static zmq ${CMAKE_THREAD_LIBS_INIT})
-target_link_libraries(fuurin_shared zmq ${CMAKE_THREAD_LIBS_INIT})
+target_link_libraries(fuurin_static PUBLIC zmq ${CMAKE_THREAD_LIBS_INIT} ${LIB_LINK_FLAGS})
+target_link_libraries(fuurin_shared PUBLIC zmq ${CMAKE_THREAD_LIBS_INIT} ${LIB_LINK_FLAGS})
 
 option(BUILD_TESTS "Build fuurin tests" OFF)
 if(BUILD_TESTS)

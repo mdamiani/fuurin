@@ -255,8 +255,19 @@ Sanitizers can enabled with some cmake options:
   - Undefined Behavior Sanitizer: cmake -D ENABLE_UBSAN=ON ...
 
 
-### How to compile with clang
+### How to check coverage
+Coverage can be enable by specifying CMake option `ENABLE_COVERAGE`.
 
+```
+$> cmake -D BUILD_TESTS=1 -D ENABLE_COVERAGE=1 /path/to/fuurin/folder
+$> make
+$> ctest -v
+$> lcov --directory . --capture --output-file coverage.info
+$> genhtml coverage.info --output-directory coverage
+```
+
+
+### How to compile with clang
 
 ```
 $> cmake -D CMAKE_C_COMPILER=/usr/bin/clang -D CMAKE_CXX_COMPILER=/usr/bin/clang++ /path/to/fuurin/folder
