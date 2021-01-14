@@ -4,7 +4,7 @@ on: [push]
 
 env:
   # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
-  BUILD_TYPE: RelWithDebInfo
+  BUILD_TYPE: Debug
 
 jobs:
   build:
@@ -19,7 +19,7 @@ jobs:
     - name: Configure CMake
       shell: bash
       working-directory: ${{github.workspace}}/build
-      run: cmake $GITHUB_WORKSPACE -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DBUILD_TESTS=1 -DBUILD_EXAMPLES=1 -DENABLE_ASAN=1
+      run: cmake $GITHUB_WORKSPACE -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DBUILD_TESTS=1 -DBUILD_EXAMPLES=1 -DENABLE_ASAN=1 -DENABLE_COVERAGE=1
 
     - name: Build
       working-directory: ${{github.workspace}}/build
@@ -30,3 +30,8 @@ jobs:
       working-directory: ${{github.workspace}}/build
       shell: bash
       run: CTEST_OUTPUT_ON_FAILURE=1 ctest -v
+
+    - name: Coverage
+      working-directory: ${{github.workspace}}/build
+      shell: bash
+      run: bash <(curl -s https://codecov.io/bash)

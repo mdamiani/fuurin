@@ -2,6 +2,7 @@
 
 [![GitHub license](https://img.shields.io/github/license/mdamiani/fuurin)](https://github.com/mdamiani/fuurin/blob/master/LICENSE)
 [![GitHub build](https://github.com/mdamiani/fuurin/workflows/build/badge.svg)](https://github.com/mdamiani/fuurin/actions?query=workflow%3ACMake)
+[![codecov](https://codecov.io/gh/mdamiani/fuurin/branch/master/graph/badge.svg?token=hQ0rGhtCcr)](https://codecov.io/gh/mdamiani/fuurin)
 
 
 Simple and fast [ZeroMQ](http://zeromq.org) communication library.
