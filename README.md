@@ -1,5 +1,10 @@
 # Fuurin
 
+[![GitHub license](https://img.shields.io/github/license/mdamiani/fuurin)](https://github.com/mdamiani/fuurin/blob/master/LICENSE)
+[![GitHub build](https://github.com/mdamiani/fuurin/workflows/build/badge.svg)](https://github.com/mdamiani/fuurin/actions?query=workflow%3ACMake)
+[![codecov](https://codecov.io/gh/mdamiani/fuurin/branch/master/graph/badge.svg?token=hQ0rGhtCcr)](https://codecov.io/gh/mdamiani/fuurin)
+
+
 Simple and fast [ZeroMQ](http://zeromq.org) communication library.
 
 It provides few easy to use C++ classes in order to connect different parties together.
@@ -251,8 +256,19 @@ Sanitizers can enabled with some cmake options:
   - Undefined Behavior Sanitizer: cmake -D ENABLE_UBSAN=ON ...
 
 
-### How to compile with clang
+### How to check coverage
+Coverage can be obtained by specifying CMake option `ENABLE_COVERAGE`.
 
+```
+$> cmake -D BUILD_TESTS=1 -D ENABLE_COVERAGE=1 /path/to/fuurin/folder
+$> make
+$> ctest -v
+$> lcov --directory . --capture --output-file coverage.info
+$> genhtml coverage.info --output-directory coverage
+```
+
+
+### How to compile with clang
 
 ```
 $> cmake -D CMAKE_C_COMPILER=/usr/bin/clang -D CMAKE_CXX_COMPILER=/usr/bin/clang++ /path/to/fuurin/folder
