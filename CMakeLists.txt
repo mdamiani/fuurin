@@ -20,6 +20,7 @@ set(CMAKE_CXX_STANDARD 17)
 
 include(BuildType)
 include(Sanitizer)
+include(Doxygen)
 include(ExternalProject)
 
 find_package(Threads REQUIRED)
