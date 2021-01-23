@@ -37,7 +37,6 @@ public:
      * \brief Initializes this error with string description and arguments.
      * \param[in] loc Location of the error.
      * \param[in] what Error description.
-     * \param[in] reason Error specific reason.
      * \param[in] arg Error arguments.
      */
     explicit Error(const log::Loc& loc, const char* what, const log::Arg& arg = log::Arg{}) noexcept;

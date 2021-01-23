@@ -66,14 +66,14 @@ public:
      *
      * \exception ZMQPartCreateFailed The part could not be created.
      */
-    ///{@
+    ///@{
     explicit Part(uint8_t val);
     explicit Part(uint16_t val);
     explicit Part(uint32_t val);
     explicit Part(uint64_t val);
     explicit Part(std::string_view val);
     explicit Part(const std::string& val);
-    ///{@
+    ///@{
 
     /**
      * \brief Initializes with raw data.
@@ -145,7 +145,7 @@ public:
      *
      * \exception ZMQPartMoveFailed The part could not be moved.
      */
-    ///{@
+    ///@{
     Part& move(Part& other);
     Part& move(Part&& other);
     ///@}
@@ -176,7 +176,7 @@ public:
      * \param[in] other Another part to compare.
      * \return Whether messages are equal.
      */
-    ///{@
+    ///@{
     bool operator==(const Part& other) const noexcept;
     bool operator!=(const Part& other) const noexcept;
     ///@}
@@ -201,7 +201,7 @@ public:
      * \see size()
      * \see empty()
      */
-    ///{@
+    ///@{
     const char* data() const noexcept;
     char* data() noexcept;
     ///@}
@@ -309,7 +309,7 @@ public:
      * \see data()
      * \see size()
      */
-    ///{@
+    ///@{
     uint8_t toUint8() const noexcept;
     uint16_t toUint16() const noexcept;
     uint32_t toUint32() const noexcept;
@@ -397,6 +397,7 @@ private:
 
 /**
  * \brief Outputs a part.
+ * \param[in] os Output stream.
  * \param[in] msg Part to print.
  */
 std::ostream& operator<<(std::ostream& os, const Part& msg);

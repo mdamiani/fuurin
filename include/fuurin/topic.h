@@ -66,7 +66,7 @@ public:
          *
          * \param[in] str Value to initialize.
          */
-        ///{@
+        ///@{
         Name(std::string_view str);
         Name(const std::string& str);
         ///@}
@@ -93,7 +93,7 @@ public:
          * not included in data size, at position
          * just past the end of the string.
          */
-        ///{@
+        ///@{
         operator std::string_view() const;
         operator std::string() const;
         ///@}
@@ -102,7 +102,7 @@ public:
          * \brief Comparison operator.
          * \param[in] rhs Another name.
          */
-        ///{@
+        ///@{
         bool operator==(const Name& rhs) const;
         bool operator!=(const Name& rhs) const;
         ///@}
@@ -125,11 +125,12 @@ public:
      *
      * \param[in] broker Broker uuid.
      * \param[in] worker Worker uuid.
-     * \param[in] seqnum Sequence number.
+     * \param[in] seqn Sequence number.
      * \param[in] name Topic name.
      * \param[in] data Topic data.
+     * \param[in] type Topic type.
      */
-    ///{@
+    ///@{
     Topic(const Uuid& broker, const Uuid& worker, const SeqN& seqn, const Name& name, const Data& data, Type type);
     Topic(Uuid&& broker, Uuid&& worker, SeqN&& seqn, Name&& name, Data&& data, Type type);
     ///@}
@@ -142,7 +143,7 @@ public:
     /**
      * \return Broker uuid.
      */
-    ///{@
+    ///@{
     const Uuid& broker() const noexcept;
     Uuid& broker() noexcept;
     ///@}
@@ -150,7 +151,7 @@ public:
     /**
      * \return Worker uuid.
      */
-    ///{@
+    ///@{
     const Uuid& worker() const noexcept;
     Uuid& worker() noexcept;
     ///@}
@@ -168,7 +169,7 @@ public:
     /**
      * \return Topic's name.
      */
-    ///{@
+    ///@{
     const Name& name() const noexcept;
     Name& name() noexcept;
     ///@}
@@ -176,7 +177,7 @@ public:
     /**
      * \return Topic's data.
      */
-    ///{@
+    ///@{
     const Data& data() const noexcept;
     Data& data() noexcept;
     ///@}
@@ -185,7 +186,7 @@ public:
      * \brief Modifies this topic with passed value.
      * \param[in] v Broker uuid.
      */
-    ///{@
+    ///@{
     Topic& withBroker(const Uuid& v);
     Topic& withBroker(Uuid&& v);
     ///@}
@@ -194,7 +195,7 @@ public:
      * \brief Modifies this topic with passed value.
      * \param[in] v Worker uuid.
      */
-    ///{@
+    ///@{
     Topic& withWorker(const Uuid& v);
     Topic& withWorker(Uuid&& v);
     ///@}
@@ -215,7 +216,7 @@ public:
      * \brief Modifies this topic with passed value.
      * \param[in] v Topic name.
      */
-    ///{@
+    ///@{
     Topic& withName(const Name& v);
     Topic& withName(Name&& v);
     ///@}
@@ -224,7 +225,7 @@ public:
      * \brief Modifies this topic with passed value.
      * \param[in] v Topic data.
      */
-    ///{@
+    ///@{
     Topic& withData(const Data& v);
     Topic& withData(Data&& v);
     ///@}
@@ -233,7 +234,7 @@ public:
      * \brief Comparison operator.
      * \param[in] rhs Another topic.
      */
-    ///{@
+    ///@{
     bool operator==(const Topic& rhs) const;
     bool operator!=(const Topic& rhs) const;
     ///@}
@@ -298,11 +299,12 @@ std::ostream& operator<<(std::ostream& os, const Topic& t);
 namespace std {
 
 /**
- * \brief Makes \ref Topic::Name hashable.
+ * \brief Makes \ref fuurin::Topic::Name hashable.
  */
 template<>
 struct hash<fuurin::Topic::Name>
 {
+    /// Hashing operator.
     size_t operator()(const fuurin::Topic::Name& n) const;
 };
 

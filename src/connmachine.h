@@ -32,19 +32,19 @@ class Timer;
  *
  * The state machine has three states:
  *
- *   - \ref State::Halted:
+ *   - \ref State::Halted.
  *      The sockets are disconnected and the state machine is halted.
  *
- *   - \ref State::Trying:
+ *   - \ref State::Trying.
  *      Announcements are sent through the \ref doPong_ function, every
- *      \ref timerTry_ interval. A transition forward to \ref Stable is
- *      performed if \ref ping() is called and \ref timerTry_ is
+ *      \ref timerTry_ interval. A transition forward to \ref State::Stable is
+ *      performed if \ref onPing() is called and \ref timerTry_ is
  *      stopped.
  *
- *   - \ref State::Stable:
+ *   - \ref State::Stable.
  *      Replies are sent through \ref doPong_ function, upon request
- *      only, using \ref ping() method and \ref timerTmo_ is restarted.
- *      A transition back to \ref Trying is performed if \ref timerTmo_
+ *      only, using \ref onPing() method and \ref timerTmo_ is restarted.
+ *      A transition back to \ref State::Trying is performed if \ref timerTmo_
  *      expires.
  */
 class ConnMachine
@@ -100,7 +100,7 @@ public:
     /**
      * Disable copy.
      */
-    ///{@
+    ///@{
     ConnMachine(const ConnMachine&) = delete;
     ConnMachine& operator=(const ConnMachine&) = delete;
     ///@}
@@ -164,7 +164,7 @@ public:
      * \brief Notifies \ref timerRetry() has fired.
      *
      * When in \ref State::Trying, it causes:
-     *  - if the timer has expired, then it calls \ref Timer::consume().
+     *  - if the timer has expired, then it calls \ref zmq::Timer::consume().
      *  - \ref doPong_ is called.
      */
     void onTimerRetryFired();
@@ -173,9 +173,10 @@ public:
      * \brief Notifies \ref timerTimeout() has fired.
      *
      * When in any state, it causes:
-     *  - if the timer has expired, then it calls \ref Timer::consume().
+     *  - if the timer has expired, then it calls \ref zmq::Timer::consume().
      *  - \ref change(State) is called with \ref State::Trying.
-     *  - \ref reconnect() is called.
+     *  - \ref doClose_ and \ref doOpen_ are called.
+     *  - \ref doPong_ is called.
      */
     void onTimerTimeoutFired();
 

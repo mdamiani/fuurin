@@ -218,7 +218,7 @@ public:
 
     /**
      * \brief Post increment operator.
-     * \retern Reference to this incremented iterator.
+     * \return Reference to this incremented iterator.
      */
     PollerIterator& operator++() noexcept;
 
@@ -233,7 +233,7 @@ public:
      * \param[in] other Another iterator.
      * \return \c true when the iterators are pointing to the same ZMQ poller event.
      */
-    ///{@
+    ///@{
     bool operator==(PollerIterator other) const noexcept;
     bool operator!=(PollerIterator other) const noexcept;
     ///@}
@@ -267,7 +267,7 @@ public:
     /**
      * Disable copy.
      */
-    ///{@
+    ///@{
     PollerWaiter(const PollerWaiter&) = delete;
     PollerWaiter& operator=(const PollerWaiter&) = delete;
     ///@}
@@ -329,7 +329,7 @@ public:
     /**
      * Disable copy.
      */
-    ///{@
+    ///@{
     PollerObserver(const PollerObserver&) = delete;
     PollerObserver& operator=(const PollerObserver&) = delete;
     ///@}
@@ -355,7 +355,7 @@ public:
      *
      * \see Socket::isOpen()
      */
-    ///{@
+    ///@{
     virtual void updateOnOpen(Pollable* sock) = 0;
     virtual void updateOnClose(Pollable* sock) = 0;
     ///@}
@@ -413,8 +413,13 @@ protected:
     }
 
     /**
-     * \brief Creates a the poller with timeout.
+     * \brief Creates a poller with timeout.
+     *
+     * \param[in] ev Type of event to poll.
      * \param[in] tmeo Timeout value.
+     * \param[in] obs Observer interface.
+     * \param[in] args Sockets to poll for events.
+     *
      * \see Poller(PollerEvents::Type, PollerObserver*, Args*...)
      * \see setTimeout(std::chrono::milliseconds)
      */
@@ -446,7 +451,11 @@ public:
 
     /**
      * \brief Creates the poller with timeout.
+     *
+     * \param[in] ev Type of event to poll.
      * \param[in] tmeo Timeout value.
+     * \param[in] args Sockets to poll for events.
+     *
      * \see Poller(PollerEvents::Type, Args*...)
      */
     Poller(PollerEvents::Type ev, std::chrono::milliseconds tmeo, Args*... args)
@@ -467,7 +476,7 @@ public:
     /**
      * Disable copy.
      */
-    ///{@
+    ///@{
     Poller(const Poller&) = delete;
     Poller& operator=(const Poller&) = delete;
     ///@}
@@ -528,7 +537,7 @@ public:
     }
 
     /**
-     * \brief Waits for an event on multiple \ref Pollable sockets.
+     * \brief Waits for an event on multiple \ref fuurin::zmq::Pollable sockets.
      *
      * \exception ZMQPollerWaitFailed Polling could not be performed.
      * \return An iterable \ref PollerEvents object over the subset of ready sockets.
@@ -606,7 +615,7 @@ public:
     /**
      * Disable copy.
      */
-    ///{@
+    ///@{
     PollerAuto(const PollerAuto&) = delete;
     PollerAuto& operator=(const PollerAuto&) = delete;
     ///@}

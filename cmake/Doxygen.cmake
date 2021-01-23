@@ -21,6 +21,8 @@ find_package(Doxygen REQUIRED dot OPTIONAL_COMPONENTS mscgen dia)
 # Doxygen settings can be set here, prefixed with "DOXYGEN_"
 set(DOXYGEN_SOURCE_BROWSER YES)
 set(DOXYGEN_EXTRACT_PRIVATE YES)
+set(DOXYGEN_WARN_AS_ERROR NO)
+set(DOXYGEN_EXTRACT_ALL YES)
 set(DOXYGEN_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/doxygen")
 
 # this target will only be built if specifically asked to.

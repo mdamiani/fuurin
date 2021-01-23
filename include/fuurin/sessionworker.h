@@ -67,7 +67,7 @@ protected:
     /**
      * \brief Closes/Opens the sockets connection.
      */
-    ///{@
+    ///@{
     void connClose();
     void connOpen();
     ///@}
@@ -75,7 +75,7 @@ protected:
     /**
      * \brief Closes/Opens the sockets for synchronization.
      */
-    ///{@
+    ///@{
     void snapClose();
     void snapOpen();
     ///@}

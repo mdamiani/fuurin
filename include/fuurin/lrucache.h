@@ -166,7 +166,7 @@ public:
      * If the passed key is contained in the cache,
      * then it is removed and returned.
      *
-     * \param[in] Item's key.
+     * \param[in] k Item's key.
      *
      * \return Optionally the removed item.
      */
@@ -192,11 +192,11 @@ public:
      *
      * The cache list is not modified.
      *
-     * \param[in] Item's key.
+     * \param[in] k Item's key.
      *
      * \return An iterator to the cache list.
      */
-    ///{@
+    ///@{
     typename List::iterator find(const K& k)
     {
         const auto it = map_.find(k);
@@ -220,7 +220,7 @@ public:
     /**
      * \return The cache list.
      */
-    ///{@
+    ///@{
     List& list()
     {
         return list_;
@@ -240,7 +240,7 @@ public:
      *
      * \return \c true in case the cache list has the same items and the same ordering.
      */
-    ///{@
+    ///@{
     bool operator==(const LRUCache<K, V>& rhs) const
     {
         return list_ == rhs.list_;

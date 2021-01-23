@@ -42,7 +42,7 @@ public:
     /**
      * Disable copy.
      */
-    ///{@
+    ///@{
     Pollable(const Pollable&) = delete;
     Pollable& operator=(const Pollable&) = delete;
     ///@}
@@ -73,7 +73,7 @@ public:
      *
      * \param[in] poller Poller of this socket.
      */
-    ///{@
+    ///@{
     void registerPoller(PollerObserver* poller);
     void unregisterPoller(PollerObserver* poller);
     ///@}

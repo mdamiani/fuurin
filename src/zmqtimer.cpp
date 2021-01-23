@@ -113,6 +113,7 @@ public:
 
 
 private:
+    /// Constructor.
     IOSteadyTimer(Context* const ctx, std::chrono::milliseconds interval, bool singleshot, Socket* trigger)
         : interval{interval}
         , singleshot{singleshot}
@@ -124,12 +125,12 @@ private:
 
 
 private:
-    const std::chrono::milliseconds interval;
-    const bool singleshot;
-    Socket* const trigger;
+    const std::chrono::milliseconds interval; ///< \see Timer::interval_.
+    const bool singleshot;                    ///< \see Timer::singleshot_.
+    Socket* const trigger;                    ///< Socket to trigger.
 
-    boost::asio::steady_timer t;
-    std::promise<bool> cancelPromise;
+    boost::asio::steady_timer t;      ///< ASIO timer.
+    std::promise<bool> cancelPromise; ///< Promise set when timer is canceled.
 };
 
 

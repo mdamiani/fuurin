@@ -33,7 +33,7 @@ struct BrokerConfig
     Uuid uuid;
 
     ///< List of endpoints.
-    ///{@
+    ///@{
     std::vector<std::string> endpDelivery;
     std::vector<std::string> endpDispatch;
     std::vector<std::string> endpSnapshot;
@@ -43,7 +43,7 @@ struct BrokerConfig
      * \brief Comparison operator.
      * \param[in] rhs Another config.
      */
-    ///{@
+    ///@{
     bool operator==(const BrokerConfig& rhs) const;
     bool operator!=(const BrokerConfig& rhs) const;
     ///@}

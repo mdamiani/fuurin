@@ -40,16 +40,16 @@ class Timer;
  *
  * The state machine has three states:
  *
- *   - \ref State::Halted:
+ *   - \ref State::Halted.
  *     The sockets are disconnected and the state machiene is halted.
  *
- *   - \ref State::Download:
+ *   - \ref State::Download.
  *     Replies are being received from a synchronization request.
  *
- *   - \ref State::Synced:
+ *   - \ref State::Synced.
  *     Synchronization is completed.
  *
- *   - \ref State::Failed:
+ *   - \ref State::Failed.
  *     Synchronization is failed.
  */
 class SyncMachine
@@ -125,7 +125,7 @@ public:
     /**
      * Disable copy.
      */
-    ///{@
+    ///@{
     SyncMachine(const SyncMachine&) = delete;
     SyncMachine& operator=(const SyncMachine&) = delete;
     ///@}
@@ -218,7 +218,7 @@ public:
      *
      * When either in \ref State::Halted, \ref State::Synced or \ref State::Failed,
      * it causes:
-     *   - A transition to \ref State:Download.
+     *   - A transition to \ref State::Download.
      *   - Synchronization starts.
      *
      * The index \ref nextIndex() is used to perform synchronization,
@@ -256,7 +256,7 @@ public:
      * \brief Notifies that \ref timerTimeout() has fired.
      *
      * When in \ref State::Download, it causes:
-     *   - If the timer has expired, then it calls \ref Timer::consume().
+     *   - If the timer has expired, then it calls \ref zmq::Timer::consume().
      *   - A transition to \ref State::Halted happens,
      *     if \ref maxRetry() exceeded.
      *   - the \ref currentIndex() is moved to

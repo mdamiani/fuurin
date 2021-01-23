@@ -49,7 +49,7 @@ public:
     /**
      * Disable copy.
      */
-    ///{@
+    ///@{
     Context(const Context&) = delete;
     Context& operator=(const Context&) = delete;
     ///@}
@@ -78,9 +78,6 @@ private:
 private:
     void* const ptr_; ///< ZMQ context.
 
-    /**
-     * \brief ASIO context which runs asynchrous I/O, e.g. ASIO timers.
-     */
     struct IOWork;
     std::unique_ptr<IOWork> iowork_; ///< ASIO context for asynchronous I/O.
     std::future<void> iocompl_;      ///< Future to wait for ASIO context completion.
