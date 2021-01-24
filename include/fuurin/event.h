@@ -56,7 +56,7 @@ public:
         Stopped,         ///< Event delivered when \ref Runner::stop() was acknowledged.
         Offline,         ///< Event for \ref Worker disconnection.
         Online,          ///< Event for \ref Worker connection.
-        Delivery,        ///< Event for any \ref Worker::dispatch(Topic::Name, zmq::Part&&), with payload \ref Topic.
+        Delivery,        ///< Event for any \ref Worker::dispatch(Topic::Name, zmq::Part&&, Topic::Type), with payload \ref Topic.
         SyncRequest,     ///< Event for start of \ref Worker::sync(), with payload \ref WorkerConfig.
         SyncBegin,       ///< Event for reply from broker of \ref Worker::sync().
         SyncElement,     ///< Event for Worker::sync() reply, payload is a \ref Topic.
@@ -79,7 +79,7 @@ public:
      *
      * \see zmq::PartMulti::unpack(const Part&)
      */
-    ///{@
+    ///@{
     static Event fromPart(const zmq::Part& part);
     static Event fromPart(std::string_view part);
     ///@}
@@ -102,7 +102,7 @@ public:
      *
      * \return A representable string.
      */
-    ///{@
+    ///@{
     static std::string_view toString(Event::Notification v) noexcept;
     static std::string_view toString(Event::Type v) noexcept;
     ///@}
@@ -121,7 +121,7 @@ public:
      * \param[in] notif Event notification type.
      * \param[in] data Event payload.
      */
-    ///{@
+    ///@{
     Event(Type type, Notification notif, const zmq::Part& data) noexcept;
     Event(Type type, Notification notif, zmq::Part&& data = zmq::Part{}) noexcept;
     ///@}
@@ -144,7 +144,7 @@ public:
     /**
      * \return The payload of this event.
      */
-    ///{@
+    ///@{
     zmq::Part& payload() noexcept;
     const zmq::Part& payload() const noexcept;
     ///@}
@@ -165,7 +165,7 @@ public:
      * \brief Modifies passed value.
      * \param[in] v Event payload.
      */
-    ///{@
+    ///@{
     Event& withPayload(const zmq::Part& v);
     Event& withPayload(zmq::Part&& v);
     ///@}

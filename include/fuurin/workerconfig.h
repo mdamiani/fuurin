@@ -43,7 +43,7 @@ struct WorkerConfig
     std::vector<Topic::Name> topicsNames;
 
     ///< List of endpoints.
-    ///{@
+    ///@{
     std::vector<std::string> endpDelivery;
     std::vector<std::string> endpDispatch;
     std::vector<std::string> endpSnapshot;
@@ -53,7 +53,7 @@ struct WorkerConfig
      * \brief Comparison operator.
      * \param[in] rhs Another config.
      */
-    ///{@
+    ///@{
     bool operator==(const WorkerConfig& rhs) const;
     bool operator!=(const WorkerConfig& rhs) const;
     ///@}

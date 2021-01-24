@@ -24,6 +24,9 @@ namespace fuurin {
 namespace zmq {
 
 
+/**
+ * \brief ASIO context which runs asynchrous I/O, e.g. ASIO timers.
+ */
 struct Context::IOWork
 {
     boost::asio::io_context io_;

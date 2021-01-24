@@ -53,7 +53,7 @@ private:
      */
 
     /**
-     * \brief Static check whether the type is is integral and unsigned.
+     * \brief Static check whether the type is integral and unsigned.
      */
     template<typename T, typename = void>
     struct isIntegralType : std::false_type
@@ -69,7 +69,7 @@ private:
 
 
     /**
-     * \return Whether the type is a string or a \ref Part.
+     * \brief Whether the type is a string or a \ref Part.
      */
     template<typename T, typename = void>
     struct isStringType : std::false_type
@@ -88,14 +88,16 @@ private:
     /**
      * \brief Static check whether the type is char array.
      */
-    ///{@
     template<typename T>
     struct isCharArrayType : std::false_type
     {};
+    /// Type trait utility to match a signed or unsigned char array.
     template<typename I>
-    struct mustCharArrayItem : std::enable_if<std::is_same_v<I, char> ||
-                                       std::is_same_v<I, unsigned char>,
-                                   std::size_t>
+    struct mustCharArrayItem
+        : std::enable_if<
+              std::is_same_v<I, char> ||
+                  std::is_same_v<I, unsigned char>,
+              std::size_t>
     {};
     template<typename I, typename mustCharArrayItem<I>::type N>
     struct isCharArrayType<std::array<I, N> const&> : std::true_type
@@ -112,20 +114,19 @@ private:
     template<typename I, typename mustCharArrayItem<I>::type N>
     struct isCharArrayType<std::array<I, N>&&> : std::true_type
     {};
-    ///@}
 
 
     /**
      * \brief Static check whether the type is an iterator type.
      */
-    ///{@
     template<typename T, typename = void>
     struct isIteratorType : std::false_type
     {};
     template<typename T>
-    struct isIteratorType<T, typename std::enable_if_t<!std::is_same_v<             //
-                                 typename std::iterator_traits<T>::value_type, void //
-                                 >>> : std::true_type                               //
+    struct isIteratorType<T,
+        typename std::enable_if_t<!std::is_same_v<             //
+            typename std::iterator_traits<T>::value_type, void //
+            >>> : std::true_type                               //
     {
         using iterator_type = typename std::iterator_traits<T>::value_type;
     };
@@ -144,7 +145,6 @@ private:
     {
         using iterator_type = typename T::value_type;
     };
-    ///@}
 
 
     /// Helper type for assertions.
@@ -240,12 +240,12 @@ public:
     /**
      * \brief Creates and pack a multi part message, iterating over a container.
      *
-     * Packs data to a \ref Part which will contain a variable number of items,
+     * Packs data to a \ref zmq::Part which will contain a variable number of items,
      * to be subsequently accessed with the corresponding iterable version of
      * unpack method.
      *
      * \param[in] first The beginning of the input iterator to the first element.
-     * \param[in] list Input iterator to the end.
+     * \param[in] last Input iterator to the end.
      *
      * \return A \ref Part with packed parameters.
      *
@@ -255,7 +255,7 @@ public:
      * \see pack(Args&&...)
      * \see pack2(Part&, size_t, T&&)
      */
-    ///{@
+    ///@{
     template<typename T, typename InputIt>
     static std::enable_if_t<isIteratorType<InputIt>::value, Part>
     pack(InputIt first, InputIt last)
@@ -305,7 +305,7 @@ public:
     /**
      * \brief Extract a multi parts message to a tuple, from an iterable data.
      *
-     * See \ref unpack(const Part&, OutputIt) for description.
+     * See \ref unpack(P&&, OutputIt) for description.
      *
      * \param[in] pm Part or string to unpack from.
      * \param[out] visit Visit function for every item.
@@ -350,7 +350,7 @@ public:
      * \see unpack1(const Part&, size_t)
      * \see isStringType
      */
-    ///{@
+    ///@{
     template<typename T, typename OutputIt, typename P>
     static std::enable_if_t<isIteratorType<OutputIt>::value && isStringType<P>::value, void>
     unpack(P&& pm, OutputIt d_first)
@@ -383,6 +383,7 @@ private:
     /**
      * \brief Packs arguments into the part's internal buffer.
      *
+     * \param[out] pm Part to pack to.
      * \param[in] pos Starting position in the internal buffer.
      * \param[in] part Part to pack at the passed position.
      * \param[in] args Other arguments to pack.
@@ -392,7 +393,7 @@ private:
      * \exception ZMQPartCreateFailed Either \c position exceeds the buffer size or
      *     \c part size exceeds 4 GiB.
      */
-    ///{@
+    ///@{
     template<typename T, typename... Args>
     static size_t pack2(Part& pm, size_t pos, T&& part, Args&&... args)
     {
@@ -444,6 +445,7 @@ private:
     /**
      * \brief Unpacks a tuple of multiple types, from the internal buffer.
      *
+     * \param[in] pm Part to unpack from.
      * \param[in] pos Position within the internal buffer, where to unpack the tuple.
      *
      * \return The tuple with objects of the requested types,
@@ -471,6 +473,7 @@ private:
     /**
      * \brief Unpacks a tuple of a single type, from the internal buffer.
      *
+     * \param[in] pm Part to unpack from.
      * \param[in] pos Position within the internal buffer, where to unpack the tuple.
      *
      * \return The tuple with the object of the requested type,
@@ -589,6 +592,7 @@ private:
 
     /**
      * \brief Checks whether there is an out of bound access.
+     * \param[in] pm Part to check.
      * \param[in] pos Starting position whithin the internal buffer.
      * \param[in] sz Size to access starting from \c pos.
      * \return True in case the total requested length exceeds buffer \ref size().

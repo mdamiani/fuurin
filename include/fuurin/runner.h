@@ -57,6 +57,7 @@ public:
      * ends are created and connected/bound.
      *
      * \param[in] id Instance identifier.
+     * \param[in] name Description of this runner.
      */
     explicit Runner(Uuid id = Uuid::createRandomUuid(), const std::string& name = "runner");
 
@@ -70,7 +71,7 @@ public:
     /**
      * Disable copy.
      */
-    ///{@
+    ///@{
     Runner(const Runner&) = delete;
     Runner& operator=(const Runner&) = delete;
     ///@}
@@ -107,7 +108,7 @@ public:
      *
      * \see setEndpoints(std::vector<std::string>, std::vector<std::string>, std::vector<std::string>)
      */
-    ///{@
+    ///@{
     std::vector<std::string> endpointDelivery() const;
     std::vector<std::string> endpointDispatch() const;
     std::vector<std::string> endpointSnapshot() const;
@@ -180,7 +181,7 @@ protected:
      * This method shall be overridden by subclasses in order to
      * return a specific configuration data.
      *
-     * \return An empty \ref Part.
+     * \return An empty \ref zmq::Part.
      *
      * \see start()
      */
@@ -221,7 +222,7 @@ protected:
      * Send of operation shall not fail, i.e. no exceptions must be thrown
      * by the inter-thread socket, otherwise a fatal error is raised.
      */
-    ///{@
+    ///@{
     void sendOperation(Operation::Type oper) noexcept;
     void sendOperation(Operation::Type oper, zmq::Part&& payload) noexcept;
     ///@}
@@ -254,7 +255,7 @@ private:
     /**
      * \brief Waits for events from the asynchronous task.
      *
-     * \param[in] poll Poller interface.
+     * \param[in] pw Poller interface.
      * \param[in] dt Elapser interface.
      * \param[in] recv Function used to actually receive and event.
      * \param[in] match Function to match events, otherwise first one will be returned.

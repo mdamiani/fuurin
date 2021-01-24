@@ -13,18 +13,28 @@ jobs:
     steps:
     - uses: actions/checkout@v2
 
+    - name: Install Packages
+      shell: bash
+      run: sudo apt install -y doxygen graphviz
+
     - name: Create Build Environment
       run: cmake -E make_directory ${{github.workspace}}/build
 
     - name: Configure CMake
-      shell: bash
       working-directory: ${{github.workspace}}/build
-      run: cmake $GITHUB_WORKSPACE -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DBUILD_TESTS=1 -DBUILD_EXAMPLES=1 -DENABLE_ASAN=1 -DENABLE_COVERAGE=1
+      shell: bash
+      run: cmake $GITHUB_WORKSPACE
+        -DCMAKE_BUILD_TYPE=$BUILD_TYPE
+        -DBUILD_TESTS=1
+        -DBUILD_EXAMPLES=1
+        -DENABLE_ASAN=1
+        -DENABLE_COVERAGE=1
+        -DENABLE_DOXYGEN=1
 
     - name: Build
       working-directory: ${{github.workspace}}/build
       shell: bash
-      run: cmake --build . --config $BUILD_TYPE
+      run: cmake --build . --config $BUILD_TYPE -j$(nproc)
 
     - name: Test
       working-directory: ${{github.workspace}}/build
@@ -35,3 +45,17 @@ jobs:
       working-directory: ${{github.workspace}}/build
       shell: bash
       run: bash <(curl -s https://codecov.io/bash)
+
+    - name: Doxygen
+      working-directory: ${{github.workspace}}/build
+      shell: bash
+      run: cmake --build . --target doxygen
+
+#    - name: Artifacts
+#      uses: actions/upload-artifact@v2
+#      with:
+#        name: artifacts
+#        path: |
+#          build/doxygen
+#        retention-days: 5
+

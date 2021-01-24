@@ -53,7 +53,7 @@ public:
      * Passed sockets must be taken from a \ref Runner instance.
      *
      * \param[in] name Session name.
-     * \param[in] uuid Session identifier.
+     * \param[in] id Session identifier.
      * \param[in] token Session token, it's constant as long as this session is alive.
      * \param[in] zctx ZMQ context.
      * \param[in] zfin ZMQ socket to send completion event.
@@ -72,7 +72,7 @@ public:
     /**
      * Disable copy.
      */
-    ///{@
+    ///@{
     Session(const Session&) = delete;
     Session& operator=(const Session&) = delete;
     ///@}
@@ -98,7 +98,7 @@ protected:
      * \brief Creates the poller to be used in the main asynchronous task.
      *
      * Concrete classes shall override this virtual method to create a poller in order to
-     * wait on the passed inter-thread \c sock and any other additional \ref Socket.
+     * wait on the passed inter-thread \c sock and any other additional \ref zmq::Socket.
      *
      * This notification shall be executed in the asynchronous task thread.
      *
@@ -116,7 +116,7 @@ protected:
      * This notification shall be executed in the asynchronous task thread.
      *
      * Concrete classes shall override this virtual method in order to
-     * handle and define any other specific tasks than \ref Operation::Stop.
+     * handle and define any other specific tasks than \ref Operation::Type::Stop.
      */
     virtual void operationReady(Operation* oper);
 

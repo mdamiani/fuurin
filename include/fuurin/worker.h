@@ -42,6 +42,7 @@ public:
      *
      * \param[in] id Identifier.
      * \param[in] initSequence Initial sequence number.
+     * \param[in] name Description of this worker.
      */
     explicit Worker(Uuid id = Uuid::createRandomUuid(), Topic::SeqN initSequence = 0, const std::string& name = "worker");
 
@@ -95,7 +96,7 @@ public:
      *
      * Sequence number is increased every time this function is called.
      *
-     * If worker is not \ref Running(), then message is silently discarded.
+     * If worker is not \ref isRunning(), then message is silently discarded.
      *
      * \param[in] name Name of topic, no more than \ref Topic::Name::capacity() chars.
      * \param[in] data Data of topic.
@@ -106,7 +107,7 @@ public:
      * \see seqNumber()
      * \see sync()
      */
-    ///{@
+    ///@{
     void dispatch(Topic::Name name, const Topic::Data& data, Topic::Type type = Topic::State);
     void dispatch(Topic::Name name, Topic::Data& data, Topic::Type type = Topic::State);
     void dispatch(Topic::Name name, Topic::Data&& data, Topic::Type type = Topic::State);
@@ -125,7 +126,7 @@ public:
      *
      * Sequence number might be also updated as part of synchronization.
      *
-     * If worker is not \ref Running(), then synchronization request is silently discarded.
+     * If worker is not \ref isRunning(), then synchronization request is silently discarded.
      *
      * \see isRunning()
      * \see waitForEvent(std::chrono::milliseconds)
@@ -150,9 +151,9 @@ public:
      * This method is thread-safe.
      *
      * The event waited for depends on the actual performed action:
-     *   - \ref start() => \ref Event::Type::Start.
+     *   - \ref start() => \ref Event::Type::Started.
      *   - \ref start() => \ref Event::Type::Online.
-     *   - \ref stop() => \ref Event::Type::Stop.
+     *   - \ref stop() => \ref Event::Type::Stopped.
      *   - \ref stop() => \ref Event::Type::Offline.
      *   - \ref dispatch() => \ref Event::Type::Delivery.
      *   - \ref sync() => \ref Event::Type::SyncElement.
@@ -165,7 +166,7 @@ public:
      *
      * \see waitForEvent(std::chrono::milliseconds)
      */
-    ///{@
+    ///@{
     bool waitForStarted(std::chrono::milliseconds timeout = std::chrono::milliseconds(-1)) const;
     bool waitForStopped(std::chrono::milliseconds timeout = std::chrono::milliseconds(-1)) const;
     bool waitForOnline(std::chrono::milliseconds timeout = std::chrono::milliseconds(-1)) const;

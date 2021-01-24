@@ -17,6 +17,9 @@
 
 namespace fuurin {
 
+/**
+ * \brief Session constants.
+ */
 struct SessionEnv
 {
     ///< Type of session execution token.

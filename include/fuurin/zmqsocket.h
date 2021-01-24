@@ -75,7 +75,7 @@ public:
     /**
      * Disable copy.
      */
-    ///{@
+    ///@{
     Socket(const Socket&) = delete;
     Socket& operator=(const Socket&) = delete;
     ///@}
@@ -166,7 +166,7 @@ public:
     /**
      * \brief Sets the list of groups to join.
      * Groups are joined at connect/bind time.
-     * It shall be set to a \ref Type::DISH socket.
+     * It shall be set to a #DISH socket.
      *
      * \param[in] groups List of groups to join.
      * \see groups()
@@ -223,7 +223,7 @@ public:
      * \see join()
      * \see isOpen()
      */
-    ///{@
+    ///@{
     void connect();
     void bind();
     ///@}
@@ -279,7 +279,7 @@ public:
      * \see sendMessageMore(Part *)
      * \see sendMessageLast(Part *)
      */
-    ///{@
+    ///@{
     template<typename T, typename... Args>
     std::enable_if_t<std::is_same_v<std::decay_t<T>, Part>, int>
     send(T&& part, Args&&... args)
@@ -310,7 +310,7 @@ public:
      * \see sendMessageTryMore(Part *)
      * \see sendMessageTryLast(Part *)
      */
-    ///{@
+    ///@{
     template<typename T, typename... Args>
     std::enable_if_t<std::is_same_v<std::decay_t<T>, Part>, int>
     trySend(T&& part, Args&&... args)
@@ -350,7 +350,7 @@ public:
      * \see recvMessageMore(Part *)
      * \see recvMessageLast(Part *)
      */
-    ///{@
+    ///@{
     template<typename... Args>
     int recv(Part* part, Args&&... args)
     {
@@ -378,7 +378,7 @@ public:
      * \see recvMessageTryMore(Part *)
      * \see recvMessageTryLast(Part *)
      */
-    ///{@
+    ///@{
     template<typename... Args>
     int tryRecv(Part* part, Args&&... args)
     {
@@ -415,7 +415,7 @@ protected:
      *
      * \exception ZMQSocketSendFailed The part could not be sent.
      */
-    ///{@
+    ///@{
     virtual int sendMessageMore(Part* part);
     virtual int sendMessageLast(Part* part);
     ///@}
@@ -435,7 +435,7 @@ protected:
      * \see sendMessageMore
      * \see sendMessageLast
      */
-    ///{@
+    ///@{
     virtual int sendMessageTryMore(Part* part);
     virtual int sendMessageTryLast(Part* part);
     ///@}
@@ -453,7 +453,7 @@ protected:
      *
      * \exception ZMQSocketRecvFailed The part could not be received.
      */
-    ///{@
+    ///@{
     virtual int recvMessageMore(Part* part);
     virtual int recvMessageLast(Part* part);
     ///@}
@@ -470,7 +470,7 @@ protected:
      *
      * \exception ZMQSocketRecvFailed The part could not be received.
      */
-    ///{@
+    ///@{
     virtual int recvMessageTryMore(Part* part);
     virtual int recvMessageTryLast(Part* part);
     ///@}
@@ -546,7 +546,7 @@ private:
     /**
      * \brief Joins a RADIO/DISH group.
      *
-     * It shall be called on a \ref Type::DISH socket.
+     * It shall be called on a #DISH socket.
      * This method calls \c zmq_join.
      *
      * \param[in] group Group to join.

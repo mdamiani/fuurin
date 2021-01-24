@@ -5,7 +5,7 @@
 [![codecov](https://codecov.io/gh/mdamiani/fuurin/branch/master/graph/badge.svg?token=hQ0rGhtCcr)](https://codecov.io/gh/mdamiani/fuurin)
 
 
-Simple and fast [ZeroMQ](http://zeromq.org) communication library.
+Simple and fast communication library based on [ZeroMQ](http://zeromq.org).
 
 It provides few easy to use C++ classes in order to connect different parties together.
 There are also C++ bindings to some ZMQ sockets and features, which are used by the library

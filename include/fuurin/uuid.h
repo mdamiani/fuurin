@@ -74,7 +74,7 @@ public:
     }
 
     /**
-     * \brief Check whether this UUID equals to \ref Null.
+     * \brief Check whether this UUID equals to \ref NullFmt.
      */
     bool isNull() const noexcept;
 
@@ -107,9 +107,9 @@ public:
     /**
      * \brief Comparing operator.
      * \param[in] rhs Uuid to compare with.
-     * \retrun \c true if both UUID are the same.
+     * \return \c true if both UUID are the same.
      */
-    ///{@
+    ///@{
     bool operator==(const Uuid& rhs) const;
     bool operator!=(const Uuid& rhs) const;
     ///@}
@@ -130,7 +130,7 @@ public:
      *
      * \exception std::runtime_error When input is invalid.
      */
-    ///{@
+    ///@{
     static Uuid fromString(std::string_view str);
     static Uuid fromString(const std::string& str);
     ///@}
@@ -163,7 +163,7 @@ public:
      *
      * \exception std::runtime_error When either namespace or name are invalid.
      */
-    ///{@
+    ///@{
     static Uuid createNamespaceUuid(const Uuid& ns, std::string_view name);
     static Uuid createNamespaceUuid(const Uuid& ns, const std::string& name);
     ///@}
@@ -214,11 +214,12 @@ std::ostream& operator<<(std::ostream& os, const Uuid& v);
 namespace std {
 
 /**
- * \brief Makes \ref Uuid hashable.
+ * \brief Makes \ref fuurin::Uuid hashable.
  */
 template<>
 struct hash<fuurin::Uuid>
 {
+    /// Hashing operator.
     size_t operator()(const fuurin::Uuid& n) const;
 };
 

@@ -55,7 +55,7 @@ public:
         Invalid,  ///< Invalid command.
         Start,    ///< Operation for \ref Runner::start().
         Stop,     ///< Operation for \ref Runner::stop().
-        Dispatch, ///< Operation for \ref Worker::dispatch(zmq::Part&&).
+        Dispatch, ///< Operation for \ref Worker::dispatch().
         Sync,     ///< Operation for \ref Worker::sync().
 
         COUNT, ///< Number of operations.
@@ -70,7 +70,7 @@ public:
      *
      * \return A representable string.
      */
-    ///{@
+    ///@{
     static std::string_view toString(Operation::Notification v) noexcept;
     static std::string_view toString(Operation::Type v) noexcept;
     ///@}
@@ -89,7 +89,7 @@ public:
      * \param[in] notif Event notification type.
      * \param[in] data Operation payload.
      */
-    ///{@
+    ///@{
     Operation(Type type, Notification notif, const zmq::Part& data) noexcept;
     Operation(Type type, Notification notif, zmq::Part&& data = zmq::Part{}) noexcept;
     ///@}
@@ -112,7 +112,7 @@ public:
     /**
      * \return The payload of this operation.
      */
-    ///{@
+    ///@{
     zmq::Part& payload() noexcept;
     const zmq::Part& payload() const noexcept;
     ///@}
@@ -133,7 +133,7 @@ public:
      * \brief Modifies passed value.
      * \param[in] v Operation payload.
      */
-    ///{@
+    ///@{
     Operation& withPayload(const zmq::Part& v);
     Operation& withPayload(zmq::Part&& v);
     ///@}

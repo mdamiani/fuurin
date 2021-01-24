@@ -45,7 +45,7 @@ public:
      * \param[in] args Arguments of the log message.
      * \param[in] num Number of arguments.
      */
-    ///{@
+    ///@{
     virtual void debug(const Loc& loc, const Arg args[], size_t num) const = 0;
     virtual void info(const Loc& loc, const Arg args[], size_t num) const = 0;
     virtual void warn(const Loc& loc, const Arg args[], size_t num) const = 0;
@@ -70,7 +70,7 @@ class StandardHandler : public Handler
      *
      * This method is thread-safe.
      */
-    ///{@
+    ///@{
     void debug(const Loc&, const Arg[], size_t) const override;
     void info(const Loc&, const Arg[], size_t) const override;
     void warn(const Loc&, const Arg[], size_t) const override;
@@ -92,7 +92,7 @@ class SilentHandler : public Handler
      *
      * This method is thread-safe.
      */
-    ///{@
+    ///@{
     void debug(const Loc&, const Arg[], size_t) const override;
     void info(const Loc&, const Arg[], size_t) const override;
     void warn(const Loc&, const Arg[], size_t) const override;
@@ -130,7 +130,7 @@ public:
      * \param[in] args Arguments of the log message.
      * \param[in] num Number of arguments of the log message.
      */
-    ///{@
+    ///@{
     static void debug(const Loc& loc, const Arg args[], size_t num) noexcept;
     static void info(const Loc& loc, const Arg args[], size_t num) noexcept;
     static void warn(const Loc& loc, const Arg args[], size_t num) noexcept;

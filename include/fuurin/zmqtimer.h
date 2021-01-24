@@ -30,9 +30,9 @@ class Socket;
  * \brief Timer object which is \ref Pollable by a \ref Poller.
  *
  * The actual implemention of this object is made of two socket ends of type
- * \ref Socket::Type::PAIR using "inproc://" transport.
+ * \ref Socket::PAIR, using \c inproc:// transport.
  *
- * When the timer is \ref trigger() 'ed by sending data to the writable end,
+ * When the timer is triggered by sending data to the writable end,
  * then the pollable end becomes ready for read and any waiting poller
  * will be waken up.
  */
@@ -56,7 +56,7 @@ public:
     /**
      * Disable copy.
      */
-    ///{@
+    ///@{
     Timer(const Timer&) = delete;
     Timer& operator=(const Timer&) = delete;
     ///@}
@@ -158,7 +158,7 @@ private:
     std::unique_ptr<IOSteadyTimer> timer_; ///< ASIO timer.
     std::future<bool> cancelFuture_;       ///< Future to wait for the ASIO timer to cancel.
 
-    std::chrono::milliseconds interval_; ///< Timer expiration interval;
+    std::chrono::milliseconds interval_; ///< Timer expiration interval.
     bool singleshot_;                    ///< Whether this time is single shot or not.
 };
 

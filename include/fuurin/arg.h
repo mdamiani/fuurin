@@ -80,7 +80,7 @@ public:
      *
      * \see Arg(const char*, int)
      */
-    ///{@
+    ///@{
     explicit Arg(int val) noexcept;
     explicit Arg(ec_t val) noexcept;
     explicit Arg(double val) noexcept;
@@ -103,7 +103,7 @@ public:
      * \see count()
      * \see refCount()
      */
-    ///{@
+    ///@{
     explicit Arg(std::string_view key, int val) noexcept;
     explicit Arg(std::string_view key, ec_t val) noexcept;
     explicit Arg(std::string_view key, double val) noexcept;
@@ -149,7 +149,7 @@ public:
      * \return The value of this argument if the type matches the requested value,
      *         or 0 otherwise.
      */
-    ///{@
+    ///@{
     int toInt() const noexcept;
     double toDouble() const noexcept;
     std::string_view toString() const noexcept;
@@ -212,7 +212,7 @@ private:
     union Val
     {
         /// Sets the value.
-        ///{@
+        ///@{
         explicit Val(int) noexcept;
         explicit Val(double) noexcept;
         explicit Val(std::string_view) noexcept;
@@ -221,10 +221,11 @@ private:
         ///@}
 
         /// Underlying type of value.
-        ///{@
+        ///@{
         int int_;
         double dbl_;
         std::string_view chr_;
+        /// Underlying buffer type of value.
         struct Buf
         {
             uint8_t siz_;
