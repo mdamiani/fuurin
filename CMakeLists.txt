@@ -182,6 +182,8 @@ else()
     message(STATUS "Examples disabled")
 endif()
 
+add_subdirectory(${PROJECT_SOURCE_DIR}/grpc)
+
 
 option(BUILD_DEB_PACKAGE "Build fuurin Debian package" OFF)
 if(BUILD_DEB_PACKAGE)
