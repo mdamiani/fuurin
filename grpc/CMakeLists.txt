@@ -21,12 +21,28 @@ find_package(Protobuf REQUIRED)
 message(STATUS "Using protobuf ${Protobuf_VERSION}")
 
 # gRPC
-find_package(gRPC CONFIG REQUIRED)
+find_package(gRPC CONFIG)
+# First attempt to set up gRPC via cmake; but if cmake config files aren't
+# available, fallback to pkg-config.
+if (gRPC_FOUND)
+    # gRPC C++ plugin
+    get_target_property(gRPC_CPP_PLUGIN_EXECUTABLE gRPC::grpc_cpp_plugin IMPORTED_LOCATION_RELEASE)
+    set(gRPC_INC $<TARGET_PROPERTY:gRPC::grpc++_unsecure,INTERFACE_INCLUDE_DIRECTORIES>)
+    set(gRPC_LIB gRPC::grpc++_unsecure)
+else()
+    message(STATUS "Falling back to finding gRPC with pkg-config")
+    # gRPC C++ plugin
+    find_program(gRPC_CPP_PLUGIN_EXECUTABLE grpc_cpp_plugin)
+    if (NOT gRPC_CPP_PLUGIN_EXECUTABLE)
+        message(FATAL_ERROR "grpc_cpp_plugin not found!")
+    endif()
+    find_package(PkgConfig REQUIRED)
+    pkg_search_module(gRPC REQUIRED grpc)
+    pkg_search_module(gRPCPP REQUIRED grpc++)
+    set(gRPC_INC ${gRPC_INCLUDE_DIRS} ${gRPCPP_INCLUDE_DIRS})
+    set(gRPC_LIB ${gRPCPP_LDFLAGS} ${gRPC_LDFLAGS})
+endif()
 message(STATUS "Using gRPC ${gRPC_VERSION}")
-
-# gRPC C++ plugin
-get_target_property(gRPC_CPP_PLUGIN_EXECUTABLE gRPC::grpc_cpp_plugin
-    IMPORTED_LOCATION_RELEASE)
 
 # Generated sources
 set(wrk_proto ${PROJECT_SOURCE_DIR}/grpc/worker.proto)
@@ -47,6 +63,6 @@ foreach(_target
     fuurin_worker
     fuurin_cli)
     add_executable(${_target} "${_target}.cpp" ${wrk_proto_srcs} ${wrk_grpc_srcs})
-    target_include_directories(${_target} PUBLIC "${CMAKE_CURRENT_BINARY_DIR}")
-    target_link_libraries(${_target} protobuf::libprotobuf gRPC::grpc++_unsecure)
+    target_include_directories(${_target} PUBLIC "${CMAKE_CURRENT_BINARY_DIR}" ${gRPC_INC})
+    target_link_libraries(${_target} protobuf::libprotobuf ${gRPC_LIB})
 endforeach()
