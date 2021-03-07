@@ -10,18 +10,20 @@
 
 #include "fuurin_cli_impl.h"
 
-#include <grpcpp/create_channel.h>
 
-#include <iostream>
-
-
-int main(int argc, char** argv)
+WorkerCli::WorkerCli(std::shared_ptr<grpc::Channel> channel)
+    : stub_(WorkerService::NewStub(channel))
 {
-    WorkerCli cli{grpc::CreateChannel("localhost:50051",
-        grpc::InsecureChannelCredentials())};
+}
 
-    const auto seqNum = cli.GetSeqNum();
-    std::cout << "SeqNum: " << (seqNum ? std::to_string(seqNum->value()) : "n/a") << std::endl;
+std::optional<SeqNum> WorkerCli::GetSeqNum()
+{
+    grpc::ClientContext context;
+    SeqNum ret;
 
-    return 0;
+    const grpc::Status status = stub_->GetSeqNum(&context, google::protobuf::Empty{}, &ret);
+    if (!status.ok())
+        return {};
+
+    return {ret};
 }
