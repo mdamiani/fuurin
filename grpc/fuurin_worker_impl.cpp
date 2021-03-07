@@ -10,14 +10,33 @@
 
 #include "fuurin_worker_impl.h"
 
+#include "fuurin/worker.h"
+#include "fuurin/uuid.h"
+
 
 WorkerServiceImpl::WorkerServiceImpl()
+    : worker_{new fuurin::Worker}
 {
 }
 
-grpc::Status WorkerServiceImpl::GetSeqNum(grpc::ServerContext* context,
-    const google::protobuf::Empty* request, SeqNum* response)
+
+WorkerServiceImpl::~WorkerServiceImpl()
 {
-    response->set_value(1);
+}
+
+
+grpc::Status WorkerServiceImpl::GetUuid(grpc::ServerContext*,
+    const google::protobuf::Empty*, Uuid* resp)
+{
+    const auto bytes = worker_->uuid().bytes();
+    resp->set_data(bytes.data(), bytes.size());
+    return grpc::Status::OK;
+}
+
+
+grpc::Status WorkerServiceImpl::GetSeqNum(grpc::ServerContext*,
+    const google::protobuf::Empty*, SeqNum* resp)
+{
+    resp->set_value(worker_->seqNumber());
     return grpc::Status::OK;
 }

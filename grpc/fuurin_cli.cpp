@@ -10,18 +10,44 @@
 
 #include "fuurin_cli_impl.h"
 
+#include "fuurin/uuid.h"
+
 #include <grpcpp/create_channel.h>
 
+#include <algorithm>
 #include <iostream>
 
 
-int main(int argc, char** argv)
+fuurin::Uuid fromGrpcUuid(Uuid& uuid)
+{
+    fuurin::Uuid::Bytes bytes;
+    std::fill(bytes.begin(), bytes.end(), 0);
+
+    std::copy_n(uuid.mutable_data()->data(),
+        std::min(uuid.mutable_data()->size(), std::tuple_size<fuurin::Uuid::Bytes>::value),
+        bytes.data());
+
+    return fuurin::Uuid::fromBytes(bytes);
+}
+
+
+int main(int, char**)
 {
     WorkerCli cli{grpc::CreateChannel("localhost:50051",
         grpc::InsecureChannelCredentials())};
 
-    const auto seqNum = cli.GetSeqNum();
-    std::cout << "SeqNum: " << (seqNum ? std::to_string(seqNum->value()) : "n/a") << std::endl;
+    auto uuid = cli.GetUuid();
+    auto seqNum = cli.GetSeqNum();
+
+    std::cout
+        << "Uuid: "
+        << (uuid ? fromGrpcUuid(*uuid).toShortString() : "n/a")
+        << std::endl;
+
+    std::cout
+        << "SeqNum: "
+        << (seqNum ? std::to_string(seqNum->value()) : "n/a")
+        << std::endl;
 
     return 0;
 }
