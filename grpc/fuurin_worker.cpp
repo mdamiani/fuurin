@@ -8,31 +8,14 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-#include "worker.grpc.pb.h"
+#include "fuurin_worker_impl.h"
 
-#include <grpc/grpc.h>
 #include <grpcpp/server.h>
 #include <grpcpp/server_builder.h>
-#include <grpcpp/server_context.h>
 
 #include <iostream>
 #include <string>
 #include <memory>
-
-
-class WorkerServiceImpl final : public WorkerService::Service
-{
-public:
-    explicit WorkerServiceImpl()
-    {
-    }
-
-    grpc::Status GetSeqNum(grpc::ServerContext* context, const google::protobuf::Empty* request, SeqNum* response) override
-    {
-        response->set_value(1);
-        return grpc::Status::OK;
-    }
-};
 
 
 void runService(const std::string srv_addr)

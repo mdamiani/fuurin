@@ -62,7 +62,11 @@ add_custom_command(
 foreach(_target
     fuurin_worker
     fuurin_cli)
-    add_executable(${_target} "${_target}.cpp" ${wrk_proto_srcs} ${wrk_grpc_srcs})
+    add_executable(${_target}
+        "${_target}.cpp"
+        "${_target}_impl.cpp"
+        ${wrk_proto_srcs}
+        ${wrk_grpc_srcs})
     target_include_directories(${_target} PUBLIC "${CMAKE_CURRENT_BINARY_DIR}" ${gRPC_INC})
     target_link_libraries(${_target} protobuf::libprotobuf ${gRPC_LIB})
 endforeach()
