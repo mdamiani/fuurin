@@ -16,9 +16,11 @@ else()
     return()
 endif()
 
+
 # Protobuf
 find_package(Protobuf REQUIRED)
 message(STATUS "Using protobuf ${Protobuf_VERSION}")
+
 
 # gRPC
 find_package(gRPC CONFIG)
@@ -44,6 +46,7 @@ else()
 endif()
 message(STATUS "Using gRPC ${gRPC_VERSION}")
 
+
 # Generated sources
 set(wrk_proto ${PROJECT_SOURCE_DIR}/grpc/worker.proto)
 set(wrk_grpc_srcs "${CMAKE_CURRENT_BINARY_DIR}/worker.grpc.pb.cc")
@@ -58,15 +61,19 @@ add_custom_command(
         "${wrk_proto}"
     DEPENDS "${wrk_proto}")
 
+
 # Targets
 foreach(_target
     fuurin_worker
     fuurin_cli)
+
     add_executable(${_target}
         "${_target}.cpp"
         "${_target}_impl.cpp"
         ${wrk_proto_srcs}
         ${wrk_grpc_srcs})
+
+    add_dependencies(${_target} fuurin_static)
     target_include_directories(${_target} PUBLIC "${CMAKE_CURRENT_BINARY_DIR}" ${gRPC_INC})
-    target_link_libraries(${_target} protobuf::libprotobuf ${gRPC_LIB})
+    target_link_libraries(${_target} fuurin_static protobuf::libprotobuf ${gRPC_LIB})
 endforeach()

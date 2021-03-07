@@ -16,6 +16,20 @@ WorkerCli::WorkerCli(std::shared_ptr<grpc::Channel> channel)
 {
 }
 
+
+std::optional<Uuid> WorkerCli::GetUuid()
+{
+    grpc::ClientContext context;
+    Uuid ret;
+
+    const grpc::Status status = stub_->GetUuid(&context, google::protobuf::Empty{}, &ret);
+    if (!status.ok())
+        return {};
+
+    return {ret};
+}
+
+
 std::optional<SeqNum> WorkerCli::GetSeqNum()
 {
     grpc::ClientContext context;

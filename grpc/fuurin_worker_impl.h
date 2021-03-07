@@ -16,15 +16,31 @@
 #include <grpc/grpc.h>
 #include <grpcpp/server_context.h>
 
+#include <memory>
+
+
+namespace fuurin {
+class Worker;
+}
+
 
 class WorkerServiceImpl final : public WorkerService::Service
 {
 public:
     explicit WorkerServiceImpl();
+    ~WorkerServiceImpl();
 
-    grpc::Status GetSeqNum(grpc::ServerContext* context,
-        const google::protobuf::Empty* request,
+    grpc::Status GetUuid(grpc::ServerContext*,
+        const google::protobuf::Empty*,
+        Uuid* response) override;
+
+    grpc::Status GetSeqNum(grpc::ServerContext*,
+        const google::protobuf::Empty*,
         SeqNum* response) override;
+
+
+private:
+    std::unique_ptr<fuurin::Worker> worker_;
 };
 
 #endif // FUURIN_WORKER_IMPL_H

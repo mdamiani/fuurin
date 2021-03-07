@@ -27,6 +27,7 @@ class WorkerCli final
 public:
     WorkerCli(std::shared_ptr<grpc::Channel> channel);
 
+    std::optional<Uuid> GetUuid();
     std::optional<SeqNum> GetSeqNum();
 
 private:
