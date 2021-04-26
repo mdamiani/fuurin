@@ -196,127 +196,6 @@ BOOST_AUTO_TEST_CASE(testTopicPatchSeqNum)
 }
 
 
-namespace fuurin {
-class TestRunner : public zmq::PollerWaiter, public Elapser
-{
-public:
-    virtual ~TestRunner() = default;
-
-    Runner r_;
-    std::list<std::chrono::milliseconds> timeout_;
-    std::list<std::chrono::milliseconds> elapsed_;
-    std::list<bool> empty_;
-    std::list<Event::Notification> recv_;
-
-    /**
-     * PollerWaiter
-     */
-    void setTimeout(std::chrono::milliseconds tmeo) noexcept override
-    {
-        timeout_.push_back(tmeo);
-    };
-
-    std::chrono::milliseconds timeout() const noexcept override
-    {
-        return 0ms;
-    };
-
-    zmq::PollerEvents wait() override
-    {
-        BOOST_TEST(!empty_.empty());
-        auto v = empty_.front();
-        empty_.pop_front();
-        return zmq::PollerEvents(zmq::PollerEvents::Read, nullptr, v ? 0 : 1);
-    };
-
-    /**
-     * PollerWaiter
-     */
-    void start() noexcept override
-    {
-    }
-
-    std::chrono::milliseconds elapsed() const noexcept override
-    {
-        BOOST_TEST(!elapsed_.empty());
-        auto v = elapsed_.front();
-        const_cast<TestRunner*>(this)->elapsed_.pop_front();
-        return v;
-    }
-
-    /**
-     * Runner
-     */
-    Event recvEvent()
-    {
-        BOOST_TEST(!recv_.empty());
-        auto v = recv_.front();
-        recv_.pop_front();
-        return Event{Event::Type::Invalid, v, zmq::Part{}};
-    }
-
-    Event waitForEvent(std::chrono::milliseconds timeout)
-    {
-        return r_.waitForEvent(static_cast<zmq::PollerWaiter&&>(*this),
-            static_cast<Elapser&&>(*this), std::bind(&TestRunner::recvEvent, this),
-            {}, timeout);
-    }
-};
-} // namespace fuurin
-
-using EM = std::list<bool>;
-using ER = std::list<Event::Notification>;
-using EL = std::list<std::chrono::milliseconds>;
-using TO = std::list<std::chrono::milliseconds>;
-using EV = Event::Notification;
-
-BOOST_DATA_TEST_CASE(testWaitForEventTimeout,
-    bdata::make({
-        std::make_tuple("read success",
-            EM{false},
-            ER{EV::Success},
-            EL{},
-            TO{1000ms},
-            EV::Success),
-        std::make_tuple("read timeout, simple",
-            EM{true},
-            ER{},
-            EL{},
-            TO{1000ms},
-            EV::Timeout),
-        std::make_tuple("read timeout, sequence to zero",
-            EM{false, false, false},
-            ER{EV::Timeout, EV::Timeout, EV::Timeout},
-            EL{500ms, 300ms, 200ms},
-            TO{1000ms, 500ms, 200ms},
-            EV::Timeout),
-        std::make_tuple("read timeout, sequence to below zero",
-            EM{false, false, false},
-            ER{EV::Timeout, EV::Timeout, EV::Timeout},
-            EL{500ms, 300ms, 300ms},
-            TO{1000ms, 500ms, 200ms},
-            EV::Timeout),
-        std::make_tuple("read timeout, sequence to success",
-            EM{false, false, false},
-            ER{EV::Timeout, EV::Timeout, EV::Success},
-            EL{500ms, 300ms},
-            TO{1000ms, 500ms, 200ms},
-            EV::Success),
-    }),
-    name, empty, recv, elapsed, wantTimeout, wantEvent)
-{
-    BOOST_TEST_MESSAGE(name);
-
-    TestRunner r;
-    r.empty_ = empty;
-    r.recv_ = recv;
-    r.elapsed_ = elapsed;
-    auto ev = r.waitForEvent(1000ms);
-    BOOST_TEST(r.timeout_ == wantTimeout);
-    BOOST_TEST(ev.notification() == wantEvent);
-}
-
-
 typedef boost::mpl::list<Broker, Worker> runnerTypes;
 BOOST_AUTO_TEST_CASE_TEMPLATE(workerStart, T, runnerTypes)
 {
@@ -577,6 +456,13 @@ BOOST_FIXTURE_TEST_CASE(testWaitForEventDiscard, WorkerFixture)
 
     // receive new events
     testWaitForTopic(w, mkT("t2", 0, "hello2"), 4);
+}
+
+
+BOOST_FIXTURE_TEST_CASE(testWaitForEventTimeout, WorkerFixture)
+{
+    const auto ev = w.waitForEvent(500ms);
+    BOOST_TEST(ev.notification() == Event::Notification::Timeout);
 }
 
 

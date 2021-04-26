@@ -57,6 +57,7 @@ set(LIB_SOURCES
     src/zmqpoller.cpp
     src/zmqpart.cpp
     src/zmqtimer.cpp
+    src/zmqcancelable.cpp
     src/failure.cpp
     src/log.cpp
     src/arg.cpp
@@ -90,6 +91,7 @@ set(LIB_PUBLIC_HEADERS
     include/fuurin/zmqpoller.h
     include/fuurin/zmqpart.h
     include/fuurin/zmqtimer.h
+    include/fuurin/zmqcancelable.h
     include/fuurin/runner.h
     include/fuurin/broker.h
     include/fuurin/worker.h

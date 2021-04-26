@@ -27,7 +27,6 @@
 
 
 namespace fuurin {
-class Elapser;
 class Session;
 
 namespace zmq {
@@ -251,23 +250,6 @@ protected:
 
 private:
     friend class TestRunner;
-
-    /**
-     * \brief Waits for events from the asynchronous task.
-     *
-     * \param[in] pw Poller interface.
-     * \param[in] dt Elapser interface.
-     * \param[in] recv Function used to actually receive and event.
-     * \param[in] match Function to match events, otherwise first one will be returned.
-     * \param[in] timeout Waiting deadline.
-     *
-     * \return An \ref Event representing the (optionally) received event.
-     *
-     * \see waitForEvent(std::chrono::milliseconds)
-     */
-    static Event waitForEvent(zmq::PollerWaiter&& pw, Elapser&& dt,
-        EventRecvFunc recv, EventMatchFunc match,
-        std::chrono::milliseconds timeout);
 
     /**
      * \brief Receives an event notification from the asynchronous task.
