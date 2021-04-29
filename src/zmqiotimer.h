@@ -11,6 +11,8 @@
 #ifndef ZMQIOTIMER_H
 #define ZMQIOTIMER_H
 
+#include "fuurin/zmqpart.h"
+
 #include <boost/asio/steady_timer.hpp>
 
 #include <tuple>
@@ -35,7 +37,7 @@ public:
      * \brief Creates a new timer along with its completion future.
      */
     static std::tuple<std::future<bool>, IOSteadyTimer*> makeIOSteadyTimer(Context* const ctx,
-        std::chrono::milliseconds interval, bool singleshot, Socket* trigger);
+        std::chrono::milliseconds interval, bool singleshot, const Part& notif, Socket* trigger);
 
     /**
      * \brief Timer expiration management.
@@ -78,12 +80,13 @@ public:
 
 private:
     /// Constructor.
-    IOSteadyTimer(Context* const ctx, std::chrono::milliseconds interval, bool singleshot, Socket* trigger);
+    IOSteadyTimer(Context* const ctx, std::chrono::milliseconds interval, bool singleshot, const Part& notif, Socket* trigger);
 
 
 private:
     const std::chrono::milliseconds interval; ///< \see Timer::interval_.
     const bool singleshot;                    ///< \see Timer::singleshot_.
+    const Part notif_;                        ///< Notification payload.
     Socket* const trigger;                    ///< Socket to trigger.
 
     boost::asio::steady_timer t;      ///< ASIO timer.

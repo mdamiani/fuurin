@@ -11,7 +11,6 @@
 #include "zmqiotimer.h"
 #include "fuurin/zmqcontext.h"
 #include "fuurin/zmqsocket.h"
-#include "fuurin/zmqpart.h"
 #include "log.h"
 
 #include <boost/scope_exit.hpp>
@@ -26,9 +25,11 @@ namespace fuurin {
 namespace zmq {
 
 
-IOSteadyTimer::IOSteadyTimer(Context* const ctx, std::chrono::milliseconds interval, bool singleshot, Socket* trigger)
+IOSteadyTimer::IOSteadyTimer(Context* const ctx, std::chrono::milliseconds interval, bool singleshot,
+    const Part& notif, Socket* trigger)
     : interval{interval}
     , singleshot{singleshot}
+    , notif_{notif}
     , trigger{trigger}
     , t{boost::asio::steady_timer{ctx->ioContext()}}
     , cancelPromise{std::promise<bool>()}
@@ -37,9 +38,9 @@ IOSteadyTimer::IOSteadyTimer(Context* const ctx, std::chrono::milliseconds inter
 
 
 std::tuple<std::future<bool>, IOSteadyTimer*> IOSteadyTimer::makeIOSteadyTimer(Context* const ctx,
-    std::chrono::milliseconds interval, bool singleshot, Socket* trigger)
+    std::chrono::milliseconds interval, bool singleshot, const Part& notif, Socket* trigger)
 {
-    auto timer = new IOSteadyTimer(ctx, interval, singleshot, trigger);
+    auto timer = new IOSteadyTimer(ctx, interval, singleshot, notif, trigger);
     return std::make_tuple(timer->cancelPromise.get_future(), timer);
 }
 
@@ -71,7 +72,7 @@ void IOSteadyTimer::timerFired(IOSteadyTimer* timer, const boost::system::error_
         return;
 
     // send notification
-    timer->trigger->send(Part{uint8_t(1)});
+    timer->trigger->send(Part{timer->notif_});
 
     if (timer->singleshot)
         return;

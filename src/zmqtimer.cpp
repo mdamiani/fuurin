@@ -100,7 +100,8 @@ void Timer::start()
 {
     stop();
 
-    auto tup = IOSteadyTimer::makeIOSteadyTimer(ctx_, interval_, singleshot_, trigger_.get());
+    auto tup = IOSteadyTimer::makeIOSteadyTimer(ctx_, interval_, singleshot_,
+        Part{uint8_t(1)}, trigger_.get());
     cancelFuture_ = std::move(std::get<0>(tup));
     timer_.reset(std::get<1>(tup));
 

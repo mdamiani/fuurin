@@ -14,24 +14,32 @@
 #include "fuurin/zmqpollable.h"
 
 #include <memory>
+#include <string>
 #include <chrono>
+#include <future>
 
 
 namespace fuurin {
 namespace zmq {
 
 class Context;
-class Timer;
+class Socket;
+class IOSteadyTimer;
 
 
 /**
  * \brief Cancelable is an interface used to stop a blocking API.
  *
- * This object is \ref Pollable by a \ref Poller. It acts like a
+ * This object is \ref Pollable by a \ref PollerWaiter. It acts like a
  * \ref Timer which expires when the canceling action is performed.
  *
  * Once the object is canceled/expired, there is no way to reset it,
  * so it is continuously readable by a poller.
+ *
+ * Internally it uses an "inproc" ZMQ transport.
+ *
+ * This object is not thread-safe, but polling from multiple \ref PollerWaiter
+ * objects is thread-safe.
  */
 class Cancelable : public Pollable
 {
@@ -52,20 +60,21 @@ public:
     ///@}
 
     /**
+     * This method is thread-safe.
+     *
+     * It can be used by multiple \ref PollerWaiter objects.
+     *
      * \return Pollable ZMQ socket.
-     * \see Timer::zmqPointer()
      */
     virtual void* zmqPointer() const noexcept override;
 
     /**
      * \return Always \c true.
-     * \see Timer::isOpen()
      */
     virtual bool isOpen() const noexcept override;
 
     /**
-     * \return The passed endpoint.
-     * \see Timer::description()
+     * \return Fixed description.
      */
     virtual std::string description() const override;
 
@@ -93,6 +102,11 @@ public:
     void setDeadline(std::chrono::milliseconds timeout);
 
     /**
+     * \return Cancelation programmed deadline.
+     */
+    std::chrono::milliseconds deadline() const noexcept;
+
+    /**
      * \brief Triggers the cancellation.
      *
      * Once this object is canceled, then it becomes
@@ -107,11 +121,38 @@ public:
      *
      * \see cancel()
      */
-    bool isCanceled();
+    bool isCanceled() const;
+
+
+protected:
+    /**
+     * \brief Starts or restarts the cancellation.
+     *
+     * \param[in] timeout Expiration timeout.
+     *
+     * \see stop()
+     */
+    void start(std::chrono::milliseconds timeout);
+
+    /**
+     * \brief Stops the cancellation.
+     *
+     * \see start()
+     */
+    void stop();
 
 
 private:
-    std::unique_ptr<Timer> timer_;
+    Context* const ctx_;     ///< ZMQ context of this object.
+    const std::string name_; ///< Cancelation description.
+
+    const std::unique_ptr<Socket> trigger_;  ///< Writable end of this object.
+    const std::unique_ptr<Socket> receiver_; ///< Pollable end of this object.
+
+    std::unique_ptr<IOSteadyTimer> timer_; ///< ASIO timer.
+    std::future<bool> cancelFuture_;       ///< Future to wait for the ASIO timer to cancel.
+
+    std::chrono::milliseconds deadline_; ///< Expiration deadline.
 };
 
 } // namespace zmq
