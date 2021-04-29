@@ -58,6 +58,7 @@ set(LIB_SOURCES
     src/zmqpart.cpp
     src/zmqtimer.cpp
     src/zmqcancelable.cpp
+    src/zmqiotimer.cpp
     src/failure.cpp
     src/log.cpp
     src/arg.cpp
