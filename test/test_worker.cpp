@@ -481,7 +481,7 @@ BOOST_FIXTURE_TEST_CASE(testWaitForEventCanc, WorkerFixture)
         canc.setDeadline(1s);
 
         t.start();
-        const auto ev = w.waitForEvent(canc);
+        const auto ev = w.waitForEvent(&canc);
         BOOST_TEST(ev.notification() == Event::Notification::Timeout);
         BOOST_TEST((t.elapsed() >= 1s));
     }
