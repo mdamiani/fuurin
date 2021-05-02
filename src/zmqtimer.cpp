@@ -13,125 +13,15 @@
 #include "fuurin/zmqsocket.h"
 #include "fuurin/zmqpoller.h"
 #include "fuurin/zmqpart.h"
-#include "log.h"
-
-#include <boost/asio/steady_timer.hpp>
-#include <boost/scope_exit.hpp>
-
-#include <tuple>
-#include <functional>
+#include "zmqiotimer.h"
 
 
 using namespace std::literals::string_literals;
+using namespace std::literals::chrono_literals;
 
 
 namespace fuurin {
 namespace zmq {
-
-
-/**
- * \brief ASIO timer implementation.
- */
-class Timer::IOSteadyTimer
-{
-public:
-    /**
-     * \brief Creates a new timer along with its completion future.
-     */
-    static std::tuple<std::future<bool>, IOSteadyTimer*> makeIOSteadyTimer(Context* const ctx,
-        std::chrono::milliseconds interval, bool singleshot, Socket* trigger)
-    {
-        auto timer = new IOSteadyTimer(ctx, interval, singleshot, trigger);
-        return std::make_tuple(timer->cancelPromise.get_future(), timer);
-    }
-
-    /**
-     * \brief Timer expiration management.
-     * \param[in] timer Timer to work on.
-     * \param[in] ec Error code.
-     */
-    static void timerFired(IOSteadyTimer* timer, const boost::system::error_code& ec)
-    {
-        bool done = true;
-        BOOST_SCOPE_EXIT(timer, &done)
-        {
-            if (done) {
-                try {
-                    timer->cancelPromise.set_value(true);
-                } catch (const std::exception& e) {
-                    LOG_FATAL(log::Arg{"fuurin::Timer"sv, "timer already canceled"sv},
-                        log::Arg{"reason"sv, std::string(e.what())});
-                }
-            }
-        };
-
-        if (ec) {
-            if (ec != boost::asio::error::operation_aborted) {
-                LOG_DEBUG(log::Arg{"fuurin::Timer"sv, "timer fired error"sv},
-                    log::Arg{"reason"sv, ec.message()});
-            }
-            return;
-        }
-
-        if (timer->t.expires_at() == boost::asio::steady_timer::clock_type::time_point::min())
-            return;
-
-        // send notification
-        timer->trigger->send(Part{uint8_t(1)});
-
-        if (timer->singleshot)
-            return;
-
-        // rearm timer
-        timer->t.expires_at(timer->t.expiry() + timer->interval);
-        timer->t.async_wait(std::bind(&IOSteadyTimer::timerFired, timer, std::placeholders::_1));
-        done = false;
-    }
-
-    /**
-     * \brief Starts the timer after \c interval from now.
-     * \param[in] timer Timer to work on.
-     */
-    static void timerStart(IOSteadyTimer* timer)
-    {
-        timer->t.expires_after(timer->interval);
-        timer->t.async_wait(std::bind(&IOSteadyTimer::timerFired, timer, std::placeholders::_1));
-    }
-
-    /**
-     * \brief Sets the expiry time to a well known invalid time.
-     * In case the handler is still pending, then it will be called with operation_aborted error code.
-     * In case the handler is already expired, the special value will be caught anyway.
-     * \param[in] timer Timer to work on.
-     * \param[in] ackPromise Promise to set to nofity command completion.
-     */
-    static void timerCancel(IOSteadyTimer* timer, std::promise<void>* ackPromise)
-    {
-        timer->t.expires_at(boost::asio::steady_timer::clock_type::time_point::min());
-        ackPromise->set_value();
-    }
-
-
-private:
-    /// Constructor.
-    IOSteadyTimer(Context* const ctx, std::chrono::milliseconds interval, bool singleshot, Socket* trigger)
-        : interval{interval}
-        , singleshot{singleshot}
-        , trigger{trigger}
-        , t{boost::asio::steady_timer{ctx->ioContext()}}
-        , cancelPromise{std::promise<bool>()}
-    {
-    }
-
-
-private:
-    const std::chrono::milliseconds interval; ///< \see Timer::interval_.
-    const bool singleshot;                    ///< \see Timer::singleshot_.
-    Socket* const trigger;                    ///< Socket to trigger.
-
-    boost::asio::steady_timer t;      ///< ASIO timer.
-    std::promise<bool> cancelPromise; ///< Promise set when timer is canceled.
-};
 
 
 Timer::Timer(Context* ctx, const std::string& name)
@@ -210,11 +100,12 @@ void Timer::start()
 {
     stop();
 
-    auto tup = IOSteadyTimer::makeIOSteadyTimer(ctx_, interval_, singleshot_, trigger_.get());
+    auto tup = IOSteadyTimer::makeIOSteadyTimer(ctx_, interval_, singleshot_,
+        Part{uint8_t(1)}, trigger_.get());
     cancelFuture_ = std::move(std::get<0>(tup));
     timer_.reset(std::get<1>(tup));
 
-    ctx_->ioContext().post(std::bind(&IOSteadyTimer::timerStart, timer_.get()));
+    IOSteadyTimer::postTimerStart(ctx_, timer_.get());
 }
 
 
@@ -223,11 +114,7 @@ void Timer::stop()
     if (!timer_)
         return;
 
-    // send cancel command synchronously.
-    std::promise<void> ackPromise;
-    std::future<void> ackFuture = ackPromise.get_future();
-    ctx_->ioContext().post(std::bind(&IOSteadyTimer::timerCancel, timer_.get(), &ackPromise));
-    ackFuture.get();
+    IOSteadyTimer::postTimerCancel(ctx_, timer_.get());
 
     // wait for timer completion.
     cancelFuture_.get();

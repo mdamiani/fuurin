@@ -24,10 +24,11 @@ namespace zmq {
 
 class Context;
 class Socket;
+class IOSteadyTimer;
 
 
 /**
- * \brief Timer object which is \ref Pollable by a \ref Poller.
+ * \brief Timer object which is \ref Pollable by a \ref PollerWaiter.
  *
  * The actual implemention of this object is made of two socket ends of type
  * \ref Socket::PAIR, using \c inproc:// transport.
@@ -154,7 +155,6 @@ private:
     const std::unique_ptr<Socket> trigger_;  ///< Writable end of this timer.
     const std::unique_ptr<Socket> receiver_; ///< Pollable end of this timer.
 
-    class IOSteadyTimer;                   ///< Wrapper for ASIO steady timer.
     std::unique_ptr<IOSteadyTimer> timer_; ///< ASIO timer.
     std::future<bool> cancelFuture_;       ///< Future to wait for the ASIO timer to cancel.
 

@@ -27,8 +27,8 @@ namespace fuurin {
 
 Worker::Worker(Uuid id, Topic::SeqN initSequence, const std::string& name)
     : Runner{id, name}
-    , zseqs_(std::make_unique<zmq::Socket>(zmqCtx(), zmq::Socket::PUSH))
-    , zseqr_(std::make_unique<zmq::Socket>(zmqCtx(), zmq::Socket::PULL))
+    , zseqs_(std::make_unique<zmq::Socket>(context(), zmq::Socket::PUSH))
+    , zseqr_(std::make_unique<zmq::Socket>(context(), zmq::Socket::PULL))
     , seqNum_{initSequence}
     , subscrAll_{true}
 {
@@ -107,6 +107,32 @@ void Worker::sync()
 Event Worker::waitForEvent(std::chrono::milliseconds timeout) const
 {
     return waitForEvent(timeout, {});
+}
+
+
+Event Worker::waitForEvent(zmq::Pollable& timeout) const
+{
+    const auto& ev = Runner::waitForEvent(timeout);
+
+    LOG_DEBUG(log::Arg{name(), uuid().toShortString()},
+        log::Arg{"event"sv, Event::toString(ev.notification())},
+        log::Arg{"type"sv, Event::toString(ev.type())},
+        log::Arg{"size"sv, int(ev.payload().size())});
+
+    return ev;
+}
+
+
+Event Worker::waitForEvent(zmq::Pollable* timeout) const
+{
+    const auto& ev = Runner::waitForEvent(timeout);
+
+    LOG_DEBUG(log::Arg{name(), uuid().toShortString()},
+        log::Arg{"event"sv, Event::toString(ev.notification())},
+        log::Arg{"type"sv, Event::toString(ev.type())},
+        log::Arg{"size"sv, int(ev.payload().size())});
+
+    return ev;
 }
 
 

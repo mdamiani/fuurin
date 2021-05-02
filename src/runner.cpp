@@ -15,7 +15,7 @@
 #include "fuurin/zmqpoller.h"
 #include "fuurin/zmqpart.h"
 #include "fuurin/zmqpartmulti.h"
-#include "fuurin/stopwatch.h"
+#include "fuurin/zmqcancel.h"
 #include "failure.h"
 #include "log.h"
 
@@ -136,7 +136,7 @@ bool Runner::isRunning() const noexcept
 }
 
 
-zmq::Context* Runner::zmqCtx() const noexcept
+zmq::Context* Runner::context() const noexcept
 {
     return zctx_.get();
 }
@@ -193,38 +193,39 @@ bool Runner::stop() noexcept
 
 Event Runner::waitForEvent(std::chrono::milliseconds timeout, EventMatchFunc match) const
 {
-    return waitForEvent(zmq::Poller{zmq::PollerEvents::Read, 0ms, zevr_.get()},
-        fuurin::StopWatch{}, std::bind(&Runner::recvEvent, this), match, timeout);
+    return waitForEvent(
+        zmq::Cancellation{zctx_.get(), "waitForEvent_canc_deadline"}
+            .withDeadline(timeout),
+        match);
 }
 
 
-Event Runner::waitForEvent(zmq::PollerWaiter&& pw, Elapser&& dt,
-    EventRecvFunc recv, EventMatchFunc match, std::chrono::milliseconds timeout)
+Event Runner::waitForEvent(zmq::Pollable& canc, EventMatchFunc match) const
 {
+    return waitForEvent(&canc, match);
+}
+
+
+Event Runner::waitForEvent(zmq::Pollable* canc, EventMatchFunc match) const
+{
+    zmq::Poller pw{zmq::PollerEvents::Read, 0ms, zevr_.get(), canc};
+
     for (;;) {
-        pw.setTimeout(timeout);
+        for (auto s : pw.wait()) {
+            if (s == canc)
+                return {Event::Type::Invalid, Event::Notification::Timeout};
 
-        if (pw.wait().empty())
-            break;
+            const auto& ev = recvEvent();
 
-        const auto& ev = recv();
-        if (ev.notification() == Event::Notification::Timeout ||
-            (match && !match(ev.type()))) //
-        {
-            if (timeout != -1ms) {
-                timeout -= dt.elapsed();
-                if (timeout <= 0ms)
-                    break;
+            if (ev.notification() == Event::Notification::Timeout ||
+                (match && !match(ev.type()))) //
+            {
+                continue;
             }
 
-            dt.start();
-            continue;
+            return ev;
         }
-
-        return ev;
     }
-
-    return {Event::Type::Invalid, Event::Notification::Timeout};
 }
 
 

@@ -27,7 +27,6 @@
 
 
 namespace fuurin {
-class Elapser;
 class Session;
 
 namespace zmq {
@@ -35,6 +34,7 @@ class Context;
 class Socket;
 class Part;
 class PollerWaiter;
+class Pollable;
 } // namespace zmq
 
 
@@ -67,6 +67,11 @@ public:
      * \see stop()
      */
     virtual ~Runner() noexcept;
+
+    /**
+     * \return Runner's ZMQ Context.
+     */
+    zmq::Context* context() const noexcept;
 
     /**
      * Disable copy.
@@ -171,11 +176,6 @@ protected:
 
 protected:
     /**
-     * \return Runner's ZMQ Context.
-     */
-    zmq::Context* zmqCtx() const noexcept;
-
-    /**
      * \brief Prepares configuration to send to the asynchronous task upon start.
      *
      * This method shall be overridden by subclasses in order to
@@ -245,29 +245,16 @@ protected:
      *
      * \see recvEvent()
      */
+    ///@{
     Event waitForEvent(std::chrono::milliseconds timeout = std::chrono::milliseconds(-1),
         EventMatchFunc match = {}) const;
+    Event waitForEvent(zmq::Pollable& timeout, EventMatchFunc match = {}) const;
+    Event waitForEvent(zmq::Pollable* timeout, EventMatchFunc match = {}) const;
+    ///@}
 
 
 private:
     friend class TestRunner;
-
-    /**
-     * \brief Waits for events from the asynchronous task.
-     *
-     * \param[in] pw Poller interface.
-     * \param[in] dt Elapser interface.
-     * \param[in] recv Function used to actually receive and event.
-     * \param[in] match Function to match events, otherwise first one will be returned.
-     * \param[in] timeout Waiting deadline.
-     *
-     * \return An \ref Event representing the (optionally) received event.
-     *
-     * \see waitForEvent(std::chrono::milliseconds)
-     */
-    static Event waitForEvent(zmq::PollerWaiter&& pw, Elapser&& dt,
-        EventRecvFunc recv, EventMatchFunc match,
-        std::chrono::milliseconds timeout);
 
     /**
      * \brief Receives an event notification from the asynchronous task.

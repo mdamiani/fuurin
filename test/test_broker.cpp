@@ -141,7 +141,7 @@ public:
     void setupSession(TestBrokerSession* s)
     {
         testSession = s;
-        testSocket = new TestSocket(zmqCtx(), zmq::Socket::Type{});
+        testSocket = new TestSocket(context(), zmq::Socket::Type{});
         testSession->setSnapshotSocket(testSocket);
     }
 
