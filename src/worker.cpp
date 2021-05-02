@@ -27,8 +27,8 @@ namespace fuurin {
 
 Worker::Worker(Uuid id, Topic::SeqN initSequence, const std::string& name)
     : Runner{id, name}
-    , zseqs_(std::make_unique<zmq::Socket>(zmqCtx(), zmq::Socket::PUSH))
-    , zseqr_(std::make_unique<zmq::Socket>(zmqCtx(), zmq::Socket::PULL))
+    , zseqs_(std::make_unique<zmq::Socket>(context(), zmq::Socket::PUSH))
+    , zseqr_(std::make_unique<zmq::Socket>(context(), zmq::Socket::PULL))
     , seqNum_{initSequence}
     , subscrAll_{true}
 {

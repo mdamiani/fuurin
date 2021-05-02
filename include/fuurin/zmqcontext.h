@@ -59,6 +59,7 @@ public:
      */
     void* zmqPointer() const noexcept;
 
+    // TODO: ioContext shall not be public.
     /**
      * \return The ASIO context.
      */

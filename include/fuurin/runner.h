@@ -68,6 +68,11 @@ public:
     virtual ~Runner() noexcept;
 
     /**
+     * \return Runner's ZMQ Context.
+     */
+    zmq::Context* context() const noexcept;
+
+    /**
      * Disable copy.
      */
     ///@{
@@ -169,11 +174,6 @@ protected:
 
 
 protected:
-    /**
-     * \return Runner's ZMQ Context.
-     */
-    zmq::Context* zmqCtx() const noexcept;
-
     /**
      * \brief Prepares configuration to send to the asynchronous task upon start.
      *

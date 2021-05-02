@@ -136,7 +136,7 @@ bool Runner::isRunning() const noexcept
 }
 
 
-zmq::Context* Runner::zmqCtx() const noexcept
+zmq::Context* Runner::context() const noexcept
 {
     return zctx_.get();
 }
