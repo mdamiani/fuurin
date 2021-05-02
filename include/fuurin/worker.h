@@ -143,7 +143,11 @@ public:
      *
      * \return The received event, or \ref Event::Type::Invalid.
      */
+    ///@{
     Event waitForEvent(std::chrono::milliseconds timeout = std::chrono::milliseconds(-1)) const;
+    Event waitForEvent(zmq::Pollable& timeout) const;
+    Event waitForEvent(zmq::Pollable* timeout) const;
+    ///@}
 
     /**
      * \brief Waits for an event synchronously.

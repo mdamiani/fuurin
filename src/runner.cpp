@@ -193,14 +193,26 @@ bool Runner::stop() noexcept
 
 Event Runner::waitForEvent(std::chrono::milliseconds timeout, EventMatchFunc match) const
 {
-    zmq::Cancellation canc{zctx_.get(), "waitForEvent_canc"};
-    canc.setDeadline(timeout);
+    return waitForEvent(
+        zmq::Cancellation{zctx_.get(), "waitForEvent_canc_deadline"}
+            .withDeadline(timeout),
+        match);
+}
 
-    zmq::Poller pw{zmq::PollerEvents::Read, 0ms, zevr_.get(), &canc};
+
+Event Runner::waitForEvent(zmq::Pollable& canc, EventMatchFunc match) const
+{
+    return waitForEvent(&canc, match);
+}
+
+
+Event Runner::waitForEvent(zmq::Pollable* canc, EventMatchFunc match) const
+{
+    zmq::Poller pw{zmq::PollerEvents::Read, 0ms, zevr_.get(), canc};
 
     for (;;) {
         for (auto s : pw.wait()) {
-            if (s == &canc)
+            if (s == canc)
                 return {Event::Type::Invalid, Event::Notification::Timeout};
 
             const auto& ev = recvEvent();

@@ -21,7 +21,8 @@
 #include "fuurin/workerconfig.h"
 #include "fuurin/zmqpart.h"
 #include "fuurin/zmqpoller.h"
-#include "fuurin/elapser.h"
+#include "fuurin/zmqcancel.h"
+#include "fuurin/stopwatch.h"
 #include "fuurin/errors.h"
 
 #include <string_view>
@@ -463,6 +464,37 @@ BOOST_FIXTURE_TEST_CASE(testWaitForEventTimeout, WorkerFixture)
 {
     const auto ev = w.waitForEvent(500ms);
     BOOST_TEST(ev.notification() == Event::Notification::Timeout);
+}
+
+
+BOOST_FIXTURE_TEST_CASE(testWaitForEventCanc, WorkerFixture)
+{
+    StopWatch t;
+
+    // use the same "canc" name in order to test correct
+    // release of resources, since the same name cannot
+    // be used twice.
+
+    // pointer version
+    {
+        fuurin::zmq::Cancellation canc{w.context(), "canc"};
+        canc.setDeadline(1s);
+
+        t.start();
+        const auto ev = w.waitForEvent(canc);
+        BOOST_TEST(ev.notification() == Event::Notification::Timeout);
+        BOOST_TEST((t.elapsed() >= 1s));
+    }
+
+    // reference version
+    {
+        t.start();
+        const auto ev = w.waitForEvent(
+            fuurin::zmq::Cancellation{w.context(), "canc"}
+                .withDeadline(1s));
+        BOOST_TEST(ev.notification() == Event::Notification::Timeout);
+        BOOST_TEST((t.elapsed() >= 1s));
+    }
 }
 
 

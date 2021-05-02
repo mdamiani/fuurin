@@ -110,6 +110,32 @@ Event Worker::waitForEvent(std::chrono::milliseconds timeout) const
 }
 
 
+Event Worker::waitForEvent(zmq::Pollable& timeout) const
+{
+    const auto& ev = Runner::waitForEvent(timeout);
+
+    LOG_DEBUG(log::Arg{name(), uuid().toShortString()},
+        log::Arg{"event"sv, Event::toString(ev.notification())},
+        log::Arg{"type"sv, Event::toString(ev.type())},
+        log::Arg{"size"sv, int(ev.payload().size())});
+
+    return ev;
+}
+
+
+Event Worker::waitForEvent(zmq::Pollable* timeout) const
+{
+    const auto& ev = Runner::waitForEvent(timeout);
+
+    LOG_DEBUG(log::Arg{name(), uuid().toShortString()},
+        log::Arg{"event"sv, Event::toString(ev.notification())},
+        log::Arg{"type"sv, Event::toString(ev.type())},
+        log::Arg{"size"sv, int(ev.payload().size())});
+
+    return ev;
+}
+
+
 Event Worker::waitForEvent(std::chrono::milliseconds timeout, EventMatchFunc match) const
 {
     const auto& ev = Runner::waitForEvent(timeout, match);

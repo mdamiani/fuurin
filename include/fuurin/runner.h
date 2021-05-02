@@ -34,6 +34,7 @@ class Context;
 class Socket;
 class Part;
 class PollerWaiter;
+class Pollable;
 } // namespace zmq
 
 
@@ -244,8 +245,12 @@ protected:
      *
      * \see recvEvent()
      */
+    ///@{
     Event waitForEvent(std::chrono::milliseconds timeout = std::chrono::milliseconds(-1),
         EventMatchFunc match = {}) const;
+    Event waitForEvent(zmq::Pollable& timeout, EventMatchFunc match = {}) const;
+    Event waitForEvent(zmq::Pollable* timeout, EventMatchFunc match = {}) const;
+    ///@}
 
 
 private:
