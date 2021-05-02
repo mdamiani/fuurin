@@ -8,7 +8,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-#define BOOST_TEST_MODULE cancels
+#define BOOST_TEST_MODULE cancel
 #include <boost/test/unit_test.hpp>
 #include <boost/test/data/test_case.hpp>
 #include <boost/mpl/list.hpp>
@@ -16,7 +16,7 @@
 
 #include "fuurin/zmqcontext.h"
 #include "fuurin/zmqpoller.h"
-#include "fuurin/zmqcancelable.h"
+#include "fuurin/zmqcancel.h"
 #include "fuurin/stopwatch.h"
 #include "fuurin/errors.h"
 
@@ -46,10 +46,10 @@ BOOST_AUTO_TEST_CASE(cancelableInit)
 {
     Context ctx;
 
-    BOOST_REQUIRE_THROW(Cancelable c(&ctx, ""),
+    BOOST_REQUIRE_THROW(Cancellation c(&ctx, ""),
         fuurin::err::ZMQSocketBindFailed);
 
-    Cancelable c{&ctx, "canc1"};
+    Cancellation c{&ctx, "canc1"};
 
     BOOST_TEST(c.zmqPointer() != nullptr);
     BOOST_TEST(c.description() == "canc1");
@@ -62,7 +62,7 @@ BOOST_AUTO_TEST_CASE(cancelableInit)
 BOOST_AUTO_TEST_CASE(cancelableCancel)
 {
     Context ctx;
-    Cancelable c{&ctx, "canc1"};
+    Cancellation c{&ctx, "canc1"};
 
     Poller poll{PollerEvents::Type::Read, 1s, &c};
 
@@ -83,7 +83,7 @@ BOOST_AUTO_TEST_CASE(cancelableCancel)
 BOOST_AUTO_TEST_CASE(cancelableDeadline)
 {
     Context ctx;
-    Cancelable c{&ctx, "canc1"};
+    Cancellation c{&ctx, "canc1"};
 
     fuurin::StopWatch t;
     t.start();
@@ -122,7 +122,7 @@ BOOST_AUTO_TEST_CASE(cancelableDeadline)
 BOOST_AUTO_TEST_CASE(cancelableThreads)
 {
     Context ctx;
-    Cancelable c{&ctx, "canc1"};
+    Cancellation c{&ctx, "canc1"};
 
     const auto pollFn = [&c] {
         Poller poll{PollerEvents::Type::Read, 5s, &c};

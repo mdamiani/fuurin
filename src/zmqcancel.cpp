@@ -8,7 +8,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-#include "fuurin/zmqcancelable.h"
+#include "fuurin/zmqcancel.h"
 #include "fuurin/zmqcontext.h"
 #include "fuurin/zmqsocket.h"
 #include "fuurin/zmqpoller.h"
@@ -22,7 +22,7 @@ namespace fuurin {
 namespace zmq {
 
 
-Cancelable::Cancelable(Context* ctx, const std::string& name)
+Cancellation::Cancellation(Context* ctx, const std::string& name)
     : ctx_{ctx}
     , name_{name}
     , trigger_{std::make_unique<zmq::Socket>(ctx, zmq::Socket::RADIO)}
@@ -41,38 +41,38 @@ Cancelable::Cancelable(Context* ctx, const std::string& name)
 }
 
 
-Cancelable::~Cancelable() noexcept
+Cancellation::~Cancellation() noexcept
 {
     stop();
 }
 
 
-void* Cancelable::zmqPointer() const noexcept
+void* Cancellation::zmqPointer() const noexcept
 {
     return receiver_->zmqPointer();
 }
 
 
-bool Cancelable::isOpen() const noexcept
+bool Cancellation::isOpen() const noexcept
 {
     return true;
 }
 
 
-std::string Cancelable::description() const
+std::string Cancellation::description() const
 {
     return name_;
 }
 
 
-Cancelable& Cancelable::withDeadline(std::chrono::milliseconds timeout)
+Cancellation& Cancellation::withDeadline(std::chrono::milliseconds timeout)
 {
     setDeadline(timeout);
     return *this;
 }
 
 
-void Cancelable::setDeadline(std::chrono::milliseconds timeout)
+void Cancellation::setDeadline(std::chrono::milliseconds timeout)
 {
     if (timeout < 0ms)
         return;
@@ -81,26 +81,26 @@ void Cancelable::setDeadline(std::chrono::milliseconds timeout)
 }
 
 
-std::chrono::milliseconds Cancelable::deadline() const noexcept
+std::chrono::milliseconds Cancellation::deadline() const noexcept
 {
     return deadline_;
 }
 
 
-void Cancelable::cancel()
+void Cancellation::cancel()
 {
     start(0ms);
 }
 
 
-bool Cancelable::isCanceled() const
+bool Cancellation::isCanceled() const
 {
-    Poller poll{PollerEvents::Type::Read, 0ms, const_cast<Cancelable*>(this)};
+    Poller poll{PollerEvents::Type::Read, 0ms, const_cast<Cancellation*>(this)};
     return !poll.wait().empty();
 }
 
 
-void Cancelable::start(std::chrono::milliseconds timeout)
+void Cancellation::start(std::chrono::milliseconds timeout)
 {
     if (isCanceled())
         return;
@@ -116,7 +116,7 @@ void Cancelable::start(std::chrono::milliseconds timeout)
 }
 
 
-void Cancelable::stop()
+void Cancellation::stop()
 {
     if (!timer_)
         return;

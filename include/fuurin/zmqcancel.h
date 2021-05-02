@@ -8,8 +8,8 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-#ifndef ZMQCANCELABLE
-#define ZMQCANCELABLE
+#ifndef ZMQCANCEL_H
+#define ZMQCANCEL_H
 
 #include "fuurin/zmqpollable.h"
 
@@ -28,7 +28,7 @@ class IOSteadyTimer;
 
 
 /**
- * \brief Cancelable is an interface used to stop a blocking API.
+ * \brief Cancellation is an interface used to stop a blocking API.
  *
  * This object is \ref Pollable by a \ref PollerWaiter. It acts like a
  * \ref Timer which expires when the canceling action is performed.
@@ -41,22 +41,22 @@ class IOSteadyTimer;
  * This object is not thread-safe, but polling from multiple \ref PollerWaiter
  * objects is thread-safe.
  */
-class Cancelable : public Pollable
+class Cancellation : public Pollable
 {
 public:
-    explicit Cancelable(Context* ctx, const std::string& name);
+    explicit Cancellation(Context* ctx, const std::string& name);
 
     /**
      * \brief Destroys this cancelable.
      */
-    virtual ~Cancelable() noexcept;
+    virtual ~Cancellation() noexcept;
 
     /**
      * Disable copy.
      */
     ///@{
-    Cancelable(const Cancelable&) = delete;
-    Cancelable& operator=(const Cancelable&) = delete;
+    Cancellation(const Cancellation&) = delete;
+    Cancellation& operator=(const Cancellation&) = delete;
     ///@}
 
     /**
@@ -87,7 +87,7 @@ public:
      *
      * \see setDeadline(std::chrono::milliseconds)
      */
-    Cancelable& withDeadline(std::chrono::milliseconds timeout);
+    Cancellation& withDeadline(std::chrono::milliseconds timeout);
 
     /**
      * \brief Set a cancellation deadline.
@@ -102,7 +102,7 @@ public:
     void setDeadline(std::chrono::milliseconds timeout);
 
     /**
-     * \return Cancelation programmed deadline.
+     * \return Cancellation programmed deadline.
      */
     std::chrono::milliseconds deadline() const noexcept;
 
@@ -144,7 +144,7 @@ protected:
 
 private:
     Context* const ctx_;     ///< ZMQ context of this object.
-    const std::string name_; ///< Cancelation description.
+    const std::string name_; ///< Cancellation description.
 
     const std::unique_ptr<Socket> trigger_;  ///< Writable end of this object.
     const std::unique_ptr<Socket> receiver_; ///< Pollable end of this object.
@@ -159,4 +159,4 @@ private:
 } // namespace fuurin
 
 
-#endif // ZMQCANCELABLE
+#endif // ZMQCANCEL_H

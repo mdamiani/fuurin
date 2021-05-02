@@ -15,7 +15,7 @@
 #include "fuurin/zmqpoller.h"
 #include "fuurin/zmqpart.h"
 #include "fuurin/zmqpartmulti.h"
-#include "fuurin/zmqcancelable.h"
+#include "fuurin/zmqcancel.h"
 #include "failure.h"
 #include "log.h"
 
@@ -193,7 +193,7 @@ bool Runner::stop() noexcept
 
 Event Runner::waitForEvent(std::chrono::milliseconds timeout, EventMatchFunc match) const
 {
-    zmq::Cancelable canc{zctx_.get(), "waitForEvent_canc"};
+    zmq::Cancellation canc{zctx_.get(), "waitForEvent_canc"};
     canc.setDeadline(timeout);
 
     zmq::Poller pw{zmq::PollerEvents::Read, 0ms, zevr_.get(), &canc};
