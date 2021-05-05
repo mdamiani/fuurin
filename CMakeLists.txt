@@ -75,6 +75,7 @@ set(LIB_SOURCES
     src/session.cpp
     src/sessionworker.cpp
     src/sessionbroker.cpp
+    src/tokenpool.cpp
 )
 
 set(LIB_PUBLIC_HEADERS
@@ -105,6 +106,7 @@ set(LIB_PUBLIC_HEADERS
     include/fuurin/sessionenv.h
     include/fuurin/sessionworker.h
     include/fuurin/sessionbroker.h
+    include/fuurin/tokenpool.h
 )
 
 set(LIB_DEPS
