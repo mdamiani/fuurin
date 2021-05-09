@@ -67,6 +67,8 @@ foreach(_target
     fuurin_worker
     fuurin_cli)
 
+    message("-- Adding gRPC ${_target}")
+
     add_executable(${_target}
         "${_target}.cpp"
         "${_target}_impl.cpp"
@@ -77,3 +79,12 @@ foreach(_target
     target_include_directories(${_target} PUBLIC "${CMAKE_CURRENT_BINARY_DIR}" ${gRPC_INC})
     target_link_libraries(${_target} fuurin_static protobuf::libprotobuf ${gRPC_LIB})
 endforeach()
+
+
+set(_gRPC_broker fuurin_broker)
+
+message("-- Adding gRPC ${_gRPC_broker}")
+add_executable(${_gRPC_broker} fuurin_broker.cpp)
+add_dependencies(${_gRPC_broker} fuurin_static)
+target_include_directories(${_gRPC_broker} PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
+target_link_libraries(${_gRPC_broker} fuurin_static)

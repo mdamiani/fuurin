@@ -20,6 +20,9 @@
 
 #include <memory>
 #include <optional>
+#include <vector>
+#include <utility>
+#include <chrono>
 
 
 class WorkerCli final
@@ -29,6 +32,16 @@ public:
 
     std::optional<Uuid> GetUuid();
     std::optional<SeqNum> GetSeqNum();
+
+    bool SetSubscriptions(bool wildcard, std::vector<std::string> names);
+
+    bool Start();
+    bool Stop();
+    bool Sync();
+
+    bool Dispatch(const std::vector<std::pair<std::string, std::string>>& stream);
+
+    bool WaitForEvent(std::chrono::milliseconds timeout, std::function<void(Event)> callback);
 
 private:
     std::unique_ptr<WorkerService::Stub> stub_;

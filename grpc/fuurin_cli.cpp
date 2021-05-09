@@ -16,6 +16,10 @@
 
 #include <algorithm>
 #include <iostream>
+#include <future>
+#include <functional>
+
+using namespace std::literals::chrono_literals;
 
 
 fuurin::Uuid fromGrpcUuid(Uuid& uuid)
@@ -39,6 +43,15 @@ int main(int, char**)
     auto uuid = cli.GetUuid();
     auto seqNum = cli.GetSeqNum();
 
+    auto callback = std::bind(&WorkerCli::WaitForEvent, &cli, 3s, [](const Event& ev) {
+        std::cout
+            << "Event:\n"
+            << ev.DebugString()
+            << std::endl;
+    });
+
+    auto evf = std::async(std::launch::async, callback);
+
     std::cout
         << "Uuid: "
         << (uuid ? fromGrpcUuid(*uuid).toShortString() : "n/a")
@@ -48,6 +61,28 @@ int main(int, char**)
         << "SeqNum: "
         << (seqNum ? std::to_string(seqNum->value()) : "n/a")
         << std::endl;
+
+    std::cout
+        << "Subscribe: topicA, topicB: "
+        << (cli.SetSubscriptions(false, {"topicA", "topicB"}) ? "ok" : "err")
+        << std::endl;
+
+    std::cout
+        << "Start: "
+        << (cli.Start() ? "ok" : "err")
+        << std::endl;
+
+    std::cout
+        << "Sync: "
+        << (cli.Sync() ? "ok" : "err")
+        << std::endl;
+
+    std::cout
+        << "Dispatch: "
+        << (cli.Dispatch({{"topicA", "Hello"}, {"topicB", "World"}}) ? "ok" : "err")
+        << std::endl;
+
+    evf.get();
 
     return 0;
 }

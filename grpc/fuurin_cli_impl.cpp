@@ -41,3 +41,96 @@ std::optional<SeqNum> WorkerCli::GetSeqNum()
 
     return {ret};
 }
+
+
+bool WorkerCli::SetSubscriptions(bool wildcard, std::vector<std::string> names)
+{
+    grpc::ClientContext context;
+    Config conf;
+
+    conf.mutable_subscriptions()->set_wildcard(wildcard);
+    for (const auto& name : names)
+        conf.mutable_subscriptions()->add_name(name);
+
+    google::protobuf::Empty ret;
+    const grpc::Status status = stub_->SetConfig(&context, conf, &ret);
+
+    return status.ok();
+}
+
+
+bool WorkerCli::Start()
+{
+    grpc::ClientContext context;
+
+    google::protobuf::Empty ret;
+    const grpc::Status status = stub_->Start(&context, google::protobuf::Empty{}, &ret);
+
+    return status.ok();
+}
+
+
+bool WorkerCli::Stop()
+{
+    grpc::ClientContext context;
+
+    google::protobuf::Empty ret;
+    const grpc::Status status = stub_->Stop(&context, google::protobuf::Empty{}, &ret);
+
+    return status.ok();
+}
+
+
+bool WorkerCli::Sync()
+{
+    grpc::ClientContext context;
+
+    google::protobuf::Empty ret;
+    const grpc::Status status = stub_->Sync(&context, google::protobuf::Empty{}, &ret);
+
+    return status.ok();
+}
+
+
+bool WorkerCli::Dispatch(const std::vector<std::pair<std::string, std::string>>& stream)
+{
+    grpc::ClientContext context;
+
+    google::protobuf::Empty ret;
+    std::unique_ptr<grpc::ClientWriter<Topic>> writer(stub_->Dispatch(&context, &ret));
+
+    for (const auto& el : stream) {
+        Topic t;
+        t.set_name(el.first);
+        t.set_data(el.second);
+        t.set_type(Topic_Type_State);
+
+        if (!writer->Write(t))
+            break;
+    }
+
+    writer->WritesDone();
+    grpc::Status status = writer->Finish();
+
+    return status.ok();
+}
+
+
+bool WorkerCli::WaitForEvent(std::chrono::milliseconds timeout, std::function<void(Event)> callback)
+{
+    grpc::ClientContext context;
+
+    EventTimeout req;
+    req.set_millis(timeout.count());
+
+    std::unique_ptr<grpc::ClientReader<Event>> reader(stub_->WaitForEvent(&context, req));
+
+    Event ev;
+
+    while (reader->Read(&ev))
+        callback(ev);
+
+    grpc::Status status = reader->Finish();
+
+    return status.ok();
+}

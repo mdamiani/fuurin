@@ -24,51 +24,46 @@ message Uuid {
 
 
 message Endpoints {
-    repeated Endpoint endpoint = 1;
-}
-
-
-message Endpoint {
-    string delivery = 1;
-    string dispatch = 2;
-    string snapshot = 3;
+    repeated string delivery = 1;
+    repeated string dispatch = 2;
+    repeated string snapshot = 3;
 }
 
 
 message Subscriptions {
     bool wildcard = 1;
-    repeated bytes names = 2;
+    repeated bytes name = 2;
 }
 
 
 message Topic {
-    bytes name = 1;
-    bytes data = 2;
-}
-
-
-message TopicEvent {
     enum Type {
         State = 0;
         Event = 1;
     }
 
-    Type type = 1;
-    uint64 seqn = 2;
-    Uuid broker = 3;
-    Uuid worker = 4;
-    Topic topic = 5;
+    bytes name = 1;
+    bytes data = 2;
+    Type type = 3;
+}
+
+
+message TopicEvent {
+    SeqNum seqn = 1;
+    Uuid broker = 2;
+    Uuid worker = 3;
+    Topic topic = 4;
 }
 
 
 message Config {
-    Subscriptions subscriptions = 3;
+    Subscriptions subscriptions = 1;
 }
 
 
 message ConfigEvent {
     Uuid uuid = 1;
-    SeqNum seqNum = 2;
+    SeqNum seqn = 2;
     Endpoints endpoints = 3;
     Config config = 4;
 }
@@ -76,19 +71,20 @@ message ConfigEvent {
 
 message Event {
     enum Type {
-        Invalid = 0;
-        Started = 1;
-        Stopped = 2;
-        Offline = 3;
-        Online = 4;
-        Delivery = 5;
-        SyncRequest = 6;
-        SyncBegin = 7;
-        SyncElement = 8;
-        SyncSuccess = 9;
-        SyncError = 10;
-        SyncDownloadOn = 11;
-        SyncDownloadOff = 12;
+        RCPSetup = 0;
+        RCPTeardown = 1;
+        Started = 2;
+        Stopped = 3;
+        Offline = 4;
+        Online = 5;
+        Delivery = 6;
+        SyncRequest = 7;
+        SyncBegin = 8;
+        SyncElement = 9;
+        SyncSuccess = 10;
+        SyncError = 11;
+        SyncDownloadOn = 12;
+        SyncDownloadOff = 13;
     }
 
     Type type = 1;
@@ -99,6 +95,7 @@ message Event {
     }
 }
 
+
 message EventTimeout {
     int32 millis = 1;
 }
@@ -107,17 +104,13 @@ message EventTimeout {
 service WorkerService {
     rpc GetUuid(google.protobuf.Empty) returns (Uuid) {}
     rpc GetSeqNum(google.protobuf.Empty) returns (SeqNum) {}
+    rpc SetConfig(Config) returns (google.protobuf.Empty) {}
 
-    rpc Start(Config) returns (google.protobuf.Empty) {}
+    rpc Start(google.protobuf.Empty) returns (google.protobuf.Empty) {}
     rpc Stop(google.protobuf.Empty) returns (google.protobuf.Empty) {}
+    rpc Sync(google.protobuf.Empty) returns (google.protobuf.Empty) {}
 
     rpc Dispatch(stream Topic) returns (google.protobuf.Empty) {}
 
     rpc WaitForEvent(EventTimeout) returns (stream Event) {}
-    rpc WaitForTopic(EventTimeout) returns (stream Event) {}
-
-    rpc WaitForStarted(EventTimeout) returns (Event) {}
-    rpc WaitForStopped(EventTimeout) returns (Event) {}
-    rpc WaitForOnline(EventTimeout) returns (Event) {}
-    rpc WaitForOffline(EventTimeout) returns (Event) {}
 }

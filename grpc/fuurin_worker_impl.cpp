@@ -10,26 +10,134 @@
 
 #include "fuurin_worker_impl.h"
 
+#include "fuurin/zmqcontext.h"
+#include "fuurin/zmqsocket.h"
+#include "fuurin/zmqpoller.h"
+#include "fuurin/zmqpart.h"
+#include "fuurin/zmqpartmulti.h"
+#include "fuurin/zmqcancel.h"
 #include "fuurin/worker.h"
+#include "fuurin/workerconfig.h"
 #include "fuurin/uuid.h"
+#include "fuurin/logger.h"
+
+#include <grpcpp/server.h>
+#include <grpcpp/server_builder.h>
+
+#include <string_view>
+#include <optional>
+#include <vector>
 
 
-WorkerServiceImpl::WorkerServiceImpl()
-    : worker_{new fuurin::Worker}
+namespace flog = fuurin::log;
+
+using namespace std::literals::string_view_literals;
+using namespace std::literals::chrono_literals;
+
+namespace {
+template<typename... Args>
+void log_info(Args&&... args)
 {
+    flog::Arg arr[] = {args...};
+    flog::Logger::info({__FILE__, __LINE__}, arr, sizeof...(Args));
 }
 
 
-WorkerServiceImpl::~WorkerServiceImpl()
+template<typename... Args>
+void log_fatal(Args&&... args)
 {
+    flog::Arg arr[] = {args...};
+    flog::Logger::fatal({__FILE__, __LINE__}, arr, sizeof...(Args));
+}
+
+
+template<typename T>
+fuurin::zmq::Part protoSerialize(const T* val)
+{
+    fuurin::zmq::Part ret{fuurin::zmq::Part::msg_init_size, val->ByteSizeLong()};
+    val->SerializeToArray(ret.data(), ret.size());
+    return ret;
+}
+
+
+template<typename T>
+std::optional<T> protoParse(std::string_view name, const fuurin::zmq::Part& val)
+{
+    T ret;
+    if (!ret.ParseFromArray(val.data(), val.size())) {
+        log_info(flog::Arg(name), flog::Arg("error"sv, "failed ParseFromArray"sv));
+        return {};
+    }
+    return {ret};
+}
+
+} // namespace
+
+
+WorkerServiceImpl::WorkerServiceImpl(const std::string& server_addr)
+    : server_addr_{server_addr}
+    , worker_{std::make_unique<fuurin::Worker>()}
+    , zrpcClient_{std::make_unique<fuurin::zmq::Socket>(worker_->context(), fuurin::zmq::Socket::CLIENT)}
+    , zrpcServer_{std::make_unique<fuurin::zmq::Socket>(worker_->context(), fuurin::zmq::Socket::SERVER)}
+    , zrpcEvents_{std::make_unique<fuurin::zmq::Socket>(worker_->context(), fuurin::zmq::Socket::RADIO)}
+    , zcanc1_{std::make_unique<fuurin::zmq::Cancellation>(worker_->context(), "WorkerServiceImpl_canc1")}
+    , zcanc2_{std::make_unique<fuurin::zmq::Cancellation>(worker_->context(), "WorkerServiceImpl_canc2")}
+{
+    zrpcEvents_->setEndpoints({"inproc://rpc-events"});
+    zrpcServer_->setEndpoints({"inproc://rpc-worker"});
+    zrpcClient_->setEndpoints({"inproc://rpc-worker"});
+
+    zrpcEvents_->bind();
+    zrpcServer_->bind();
+    zrpcClient_->connect();
+
+    client_ = std::async(std::launch::async, &WorkerServiceImpl::runClient, this);
+    events_ = std::async(std::launch::async, &WorkerServiceImpl::runEvents, this);
+}
+
+
+WorkerServiceImpl::~WorkerServiceImpl() noexcept
+{
+    zcanc1_->cancel();
+    client_.get();
+    events_.get();
+}
+
+
+auto WorkerServiceImpl::Run(const std::string& addr) -> std::tuple<
+    std::unique_ptr<WorkerServiceImpl>,
+    std::future<void>,
+    CancelFn>
+{
+    auto service = new WorkerServiceImpl{addr};
+    auto cancel = std::bind(&WorkerServiceImpl::shutdown, service);
+    auto future = std::async(std::launch::async, &WorkerServiceImpl::runServer, service);
+
+    return {
+        std::unique_ptr<WorkerServiceImpl>{service},
+        std::move(future),
+        std::move(cancel),
+    };
+}
+
+
+void WorkerServiceImpl::shutdown()
+{
+    zcanc2_->cancel();
+    server_->Shutdown();
+
+    sendRPC(RPC::SetStop);
 }
 
 
 grpc::Status WorkerServiceImpl::GetUuid(grpc::ServerContext*,
     const google::protobuf::Empty*, Uuid* resp)
 {
-    const auto bytes = worker_->uuid().bytes();
+    sendRPC(RPC::GetUuid);
+
+    const auto bytes = fuurin::Uuid::fromPart(recvRPC()).bytes();
     resp->set_data(bytes.data(), bytes.size());
+
     return grpc::Status::OK;
 }
 
@@ -37,6 +145,386 @@ grpc::Status WorkerServiceImpl::GetUuid(grpc::ServerContext*,
 grpc::Status WorkerServiceImpl::GetSeqNum(grpc::ServerContext*,
     const google::protobuf::Empty*, SeqNum* resp)
 {
-    resp->set_value(worker_->seqNumber());
+    sendRPC(RPC::GetSeqNum);
+
+    const auto seqn = recvRPC().toUint64();
+    resp->set_value(seqn);
+
     return grpc::Status::OK;
+}
+
+
+grpc::Status WorkerServiceImpl::SetConfig(grpc::ServerContext*,
+    const Config* conf, google::protobuf::Empty*)
+{
+    sendRPC(RPC::SetConfig, protoSerialize(conf));
+
+    return grpc::Status::OK;
+}
+
+
+grpc::Status WorkerServiceImpl::Start(grpc::ServerContext*,
+    const google::protobuf::Empty*, google::protobuf::Empty*)
+{
+    sendRPC(RPC::SetStart);
+
+    return grpc::Status::OK;
+}
+
+
+grpc::Status WorkerServiceImpl::Stop(grpc::ServerContext*,
+    const google::protobuf::Empty*, google::protobuf::Empty*)
+{
+    sendRPC(RPC::SetStop);
+
+    return grpc::Status::OK;
+}
+
+
+grpc::Status WorkerServiceImpl::Sync(grpc::ServerContext*,
+    const google::protobuf::Empty*, google::protobuf::Empty*)
+{
+    sendRPC(RPC::SetSync);
+
+    return grpc::Status::OK;
+}
+
+
+grpc::Status WorkerServiceImpl::Dispatch(grpc::ServerContext*,
+    grpc::ServerReader<Topic>* stream, google::protobuf::Empty*)
+{
+    Topic topic;
+
+    while (stream->Read(&topic)) {
+        sendRPC(RPC::SetDispatch, protoSerialize(&topic));
+    }
+
+    return grpc::Status::OK;
+}
+
+
+grpc::Status WorkerServiceImpl::WaitForEvent(grpc::ServerContext* context,
+    const EventTimeout* timeout, grpc::ServerWriter<Event>* stream)
+{
+    fuurin::zmq::Socket zevDish{worker_->context(), fuurin::zmq::Socket::DISH};
+    zevDish.setEndpoints({"inproc://rpc-events"});
+    zevDish.setGroups({"EVNT"});
+    zevDish.connect();
+
+    fuurin::zmq::Cancellation tmeoCanc{worker_->context(), "WorkerServiceImpl::WaitForEvent_canc"};
+    if (timeout->millis() > 0)
+        tmeoCanc.setDeadline(std::chrono::milliseconds{timeout->millis()});
+
+    fuurin::zmq::Poller poll{fuurin::zmq::PollerEvents::Type::Read, 5s,
+        &zevDish, zcanc2_.get(), &tmeoCanc};
+
+    const auto createEvent = [](Event_Type type) {
+        Event e;
+        e.set_type(type);
+        return e;
+    };
+
+    stream->Write(createEvent(Event_Type_RCPSetup));
+
+    grpc::Status ret;
+
+    for (;;) {
+        const auto sock = poll.wait();
+
+        if (context->IsCancelled())
+            return grpc::Status::CANCELLED;
+
+        for (auto s : sock) {
+            if (s == zcanc2_.get()) {
+                stream->Write(createEvent(Event_Type_RCPTeardown));
+                return grpc::Status::CANCELLED;
+            }
+
+            if (s == &tmeoCanc) {
+                stream->Write(createEvent(Event_Type_RCPTeardown));
+                return grpc::Status::OK;
+            }
+
+            fuurin::zmq::Part pay;
+            zevDish.recv(&pay);
+
+            const auto ev = getEvent(pay);
+            if (ev)
+                stream->Write(ev.value());
+        }
+    }
+
+    return grpc::Status{grpc::INTERNAL, "internal error"};
+}
+
+
+void WorkerServiceImpl::runServer()
+{
+    grpc::ServerBuilder builder;
+
+    builder.AddListeningPort(server_addr_, grpc::InsecureServerCredentials());
+    builder.RegisterService(this);
+
+    server_ = builder.BuildAndStart();
+    log_info(flog::Arg{"Server listening"sv}, flog::Arg{"address"sv, server_addr_});
+
+    server_->Wait();
+}
+
+
+void WorkerServiceImpl::runClient()
+{
+    log_info(flog::Arg{"Starting worker..."sv});
+
+    fuurin::zmq::Poller poll{fuurin::zmq::PollerEvents::Type::Read,
+        zrpcServer_.get(), zcanc1_.get()};
+
+    for (;;) {
+        for (auto s : poll.wait()) {
+            if (s == zcanc1_.get())
+                return;
+
+            fuurin::zmq::Part r;
+            zrpcServer_->recv(&r);
+
+            auto [rpc, pay] = fuurin::zmq::PartMulti::unpack<RPCType, fuurin::zmq::Part>(r);
+
+            auto reply = serveRPC(RPC{rpc}, pay);
+
+            if (!reply.empty())
+                zrpcServer_->send(reply.withRoutingID(r.routingID()));
+        }
+    }
+}
+
+
+void WorkerServiceImpl::runEvents()
+{
+    log_info(flog::Arg{"Starting events..."sv});
+
+    for (;;) {
+        const auto& ev = worker_->waitForEvent(zcanc1_.get());
+        if (ev.notification() == fuurin::Event::Notification::Timeout)
+            return;
+
+        zrpcEvents_->send(ev.toPart().withGroup("EVNT"));
+    }
+}
+
+
+void WorkerServiceImpl::sendRPC(RPC type)
+{
+    sendRPC(type, fuurin::zmq::Part{});
+}
+
+
+void WorkerServiceImpl::sendRPC(RPC type, fuurin::zmq::Part&& pay)
+{
+    zrpcClient_->send(fuurin::zmq::PartMulti::pack(static_cast<RPCType>(type), std::move(pay)));
+}
+
+
+fuurin::zmq::Part WorkerServiceImpl::recvRPC()
+{
+    fuurin::zmq::Part reply;
+    zrpcClient_->recv(&reply);
+
+    return reply;
+}
+
+
+fuurin::zmq::Part WorkerServiceImpl::serveRPC(RPC type, const fuurin::zmq::Part& pay)
+{
+    fuurin::zmq::Part ret;
+
+    switch (type) {
+    case RPC::GetUuid:
+        ret = worker_->uuid().toPart();
+        break;
+
+    case RPC::GetSeqNum:
+        ret = fuurin::zmq::Part{worker_->seqNumber()};
+        break;
+
+    case RPC::SetConfig: {
+        const auto conf = protoParse<Config>("RPC::SetConfig"sv, pay);
+        if (!conf)
+            break;
+        setConfig(conf.value());
+        break;
+    }
+
+    case RPC::SetStart:
+        if (!worker_->isRunning())
+            active_ = worker_->start();
+        break;
+
+    case RPC::SetStop:
+        if (worker_->isRunning()) {
+            worker_->stop();
+            active_.get();
+        }
+        break;
+
+    case RPC::SetSync:
+        worker_->sync();
+        break;
+
+    case RPC::SetDispatch: {
+        const auto topic = protoParse<Topic>("RPC::SetDispatch"sv, pay);
+        if (!topic)
+            break;
+        setDispatch(topic.value());
+        break;
+    }
+    };
+
+    return ret;
+}
+
+
+void WorkerServiceImpl::setConfig(const Config& conf)
+{
+    if (conf.subscriptions().wildcard()) {
+        worker_->setTopicsAll();
+        return;
+    }
+
+    const size_t size = conf.subscriptions().name_size();
+    std::vector<fuurin::Topic::Name> topics{size};
+
+    for (size_t i = 0; i < size; ++i)
+        topics[i] = conf.subscriptions().name(i);
+
+    worker_->setTopicsNames(topics);
+}
+
+
+void WorkerServiceImpl::setDispatch(const Topic& topic)
+{
+    worker_->dispatch(fuurin::Topic::Name{topic.name()},
+        fuurin::Topic::Data{topic.data()},
+        topic.type() == Topic_Type_State
+            ? fuurin::Topic::State
+            : fuurin::Topic::Event);
+}
+
+std::optional<Event> WorkerServiceImpl::getEvent(const fuurin::zmq::Part& pay) const
+{
+    // TODO: event payload is here copied, we could just use a view over 'pay'.
+    const auto ev = fuurin::Event::fromPart(pay);
+
+    if (ev.notification() == fuurin::Event::Notification::Timeout ||
+        ev.notification() == fuurin::Event::Notification::Discard ||
+        ev.type() == fuurin::Event::Type::Invalid) //
+    {
+        return {};
+    }
+
+    Event ret;
+
+    const auto fillConfig = [](const fuurin::Event& ev, ConfigEvent* cfg) {
+        const auto wc = fuurin::WorkerConfig::fromPart(ev.payload());
+
+        cfg->mutable_uuid()->set_data(wc.uuid.bytes().data(), wc.uuid.bytes().size());
+        cfg->mutable_seqn()->set_value(wc.seqNum);
+
+        for (const auto& endp : wc.endpDelivery)
+            cfg->mutable_endpoints()->add_delivery(endp);
+
+        for (const auto& endp : wc.endpDispatch)
+            cfg->mutable_endpoints()->add_dispatch(endp);
+
+        for (const auto& endp : wc.endpSnapshot)
+            cfg->mutable_endpoints()->add_snapshot(endp);
+
+        auto subscr = cfg->mutable_config()->mutable_subscriptions();
+
+        subscr->set_wildcard(wc.topicsAll);
+
+        for (const auto& name : wc.topicsNames)
+            subscr->add_name(name);
+    };
+
+    const auto fillTopic = [](const fuurin::Event& ev, TopicEvent* tpc) {
+        const auto t = fuurin::Topic::fromPart(ev.payload());
+
+        tpc->mutable_seqn()->set_value(t.seqNum());
+        tpc->mutable_broker()->set_data(t.broker().bytes().data(), t.broker().bytes().size());
+        tpc->mutable_worker()->set_data(t.worker().bytes().data(), t.worker().bytes().size());
+
+        switch (t.type()) {
+        case fuurin::Topic::Type::State:
+            tpc->mutable_topic()->set_type(Topic_Type_State);
+            break;
+
+        case fuurin::Topic::Type::Event:
+            tpc->mutable_topic()->set_type(Topic_Type_Event);
+            break;
+        };
+
+        tpc->mutable_topic()->set_name(t.name());
+        tpc->mutable_topic()->set_data(std::string(t.data().toString()));
+    };
+
+    switch (ev.type()) {
+    case fuurin::Event::Type::Started:
+        ret.set_type(Event_Type_Started);
+        fillConfig(ev, ret.mutable_configevent());
+        break;
+
+    case fuurin::Event::Type::Stopped:
+        ret.set_type(Event_Type_Stopped);
+        break;
+
+    case fuurin::Event::Type::Offline:
+        ret.set_type(Event_Type_Offline);
+        break;
+
+    case fuurin::Event::Type::Online:
+        ret.set_type(Event_Type_Online);
+        break;
+
+    case fuurin::Event::Type::Delivery:
+        ret.set_type(Event_Type_Delivery);
+        fillTopic(ev, ret.mutable_topicevent());
+        break;
+
+    case fuurin::Event::Type::SyncRequest:
+        ret.set_type(Event_Type_SyncRequest);
+        fillConfig(ev, ret.mutable_configevent());
+        break;
+
+    case fuurin::Event::Type::SyncBegin:
+        ret.set_type(Event_Type_SyncBegin);
+        break;
+
+    case fuurin::Event::Type::SyncElement:
+        ret.set_type(Event_Type_SyncElement);
+        fillTopic(ev, ret.mutable_topicevent());
+        break;
+
+    case fuurin::Event::Type::SyncSuccess:
+        ret.set_type(Event_Type_SyncSuccess);
+        break;
+
+    case fuurin::Event::Type::SyncError:
+        ret.set_type(Event_Type_SyncError);
+        break;
+
+    case fuurin::Event::Type::SyncDownloadOn:
+        ret.set_type(Event_Type_SyncDownloadOn);
+        break;
+
+    case fuurin::Event::Type::SyncDownloadOff:
+        ret.set_type(Event_Type_SyncDownloadOff);
+        break;
+
+    case fuurin::Event::Type::Invalid:
+    case fuurin::Event::Type::COUNT:
+        log_fatal(flog::Arg{"event type is unexpectedly invalid"sv});
+        break;
+    };
+
+    return {ret};
 }

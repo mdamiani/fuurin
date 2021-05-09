@@ -8,15 +8,16 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-#include "fuurin_worker_impl.h"
+#include "fuurin/broker.h"
 
 
 int main(int, char**)
 {
-    auto [service, future, cancel] = WorkerServiceImpl::Run("localhost:50051");
+    fuurin::Broker broker;
 
-    future.get();
-    cancel();
+    auto bf = broker.start();
+
+    bf.get();
 
     return 0;
 }

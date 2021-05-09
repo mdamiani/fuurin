@@ -17,18 +17,58 @@
 #include <grpcpp/server_context.h>
 
 #include <memory>
+#include <string>
+#include <future>
+#include <type_traits>
+#include <functional>
+#include <tuple>
 
 
 namespace fuurin {
+namespace zmq {
+class Socket;
+class Part;
+class Cancellation;
+} // namespace zmq
+
 class Worker;
-}
+} // namespace fuurin
 
 
 class WorkerServiceImpl final : public WorkerService::Service
 {
 public:
-    explicit WorkerServiceImpl();
-    ~WorkerServiceImpl();
+    enum struct RPC : uint8_t
+    {
+        GetUuid,
+        GetSeqNum,
+        SetConfig,
+        SetStart,
+        SetStop,
+        SetSync,
+        SetDispatch,
+    };
+
+    using RPCType = std::underlying_type_t<RPC>;
+    using CancelFn = std::function<void()>;
+
+    /**
+     * Disable copy.
+     */
+    ///@{
+    WorkerServiceImpl(const WorkerServiceImpl&) = delete;
+    WorkerServiceImpl& operator=(const WorkerServiceImpl&) = delete;
+    ///@}
+
+
+public:
+    static auto Run(const std::string& addr) -> std::tuple<
+        std::unique_ptr<WorkerServiceImpl>,
+        std::future<void>,
+        CancelFn>;
+
+public:
+    ~WorkerServiceImpl() noexcept;
 
     grpc::Status GetUuid(grpc::ServerContext*,
         const google::protobuf::Empty*,
@@ -38,9 +78,64 @@ public:
         const google::protobuf::Empty*,
         SeqNum* response) override;
 
+    grpc::Status SetConfig(grpc::ServerContext*,
+        const Config* conf,
+        google::protobuf::Empty*) override;
+
+    grpc::Status Start(grpc::ServerContext*,
+        const google::protobuf::Empty*,
+        google::protobuf::Empty*) override;
+
+    grpc::Status Stop(grpc::ServerContext*,
+        const google::protobuf::Empty*,
+        google::protobuf::Empty*) override;
+
+    grpc::Status Sync(grpc::ServerContext*,
+        const google::protobuf::Empty*,
+        google::protobuf::Empty*) override;
+
+    grpc::Status Dispatch(grpc::ServerContext*,
+        grpc::ServerReader<Topic>* stream,
+        google::protobuf::Empty*) override;
+
+    grpc::Status WaitForEvent(grpc::ServerContext*,
+        const EventTimeout* timeout,
+        grpc::ServerWriter<Event>* stream) override;
+
 
 private:
-    std::unique_ptr<fuurin::Worker> worker_;
+    explicit WorkerServiceImpl(const std::string& server_addr);
+
+    void runServer();
+    void runClient();
+    void runEvents();
+
+    void shutdown();
+
+    void sendRPC(RPC type);
+    void sendRPC(RPC type, fuurin::zmq::Part&& pay);
+    fuurin::zmq::Part recvRPC();
+    fuurin::zmq::Part serveRPC(RPC type, const fuurin::zmq::Part& pay);
+
+    void setConfig(const Config& conf);
+    void setDispatch(const Topic& topic);
+    std::optional<Event> getEvent(const fuurin::zmq::Part& pay) const;
+
+
+private:
+    const std::string server_addr_;
+    const std::unique_ptr<fuurin::Worker> worker_;
+    const std::unique_ptr<fuurin::zmq::Socket> zrpcClient_;
+    const std::unique_ptr<fuurin::zmq::Socket> zrpcServer_;
+    const std::unique_ptr<fuurin::zmq::Socket> zrpcEvents_;
+    const std::unique_ptr<fuurin::zmq::Cancellation> zcanc1_;
+    const std::unique_ptr<fuurin::zmq::Cancellation> zcanc2_;
+
+    std::future<void> client_;
+    std::future<void> events_;
+    std::future<void> active_;
+
+    std::unique_ptr<grpc::Server> server_;
 };
 
 #endif // FUURIN_WORKER_IMPL_H
