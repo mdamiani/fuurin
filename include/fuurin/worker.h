@@ -20,6 +20,7 @@
 #include <vector>
 #include <tuple>
 #include <optional>
+#include <atomic>
 
 
 namespace fuurin {
@@ -213,7 +214,7 @@ protected:
     const std::unique_ptr<zmq::Socket> zseqs_; ///< ZMQ socket to send sequence number.
     const std::unique_ptr<zmq::Socket> zseqr_; ///< ZMQ socket to receive sequence number.
 
-    mutable Topic::SeqN seqNum_; ///< Worker sequence number.
+    mutable std::atomic<Topic::SeqN> seqNum_; ///< Worker sequence number.
 
     bool subscrAll_;                       ///< Whether to subscribe to every topic.
     std::vector<Topic::Name> subscrNames_; ///< List of topic names.

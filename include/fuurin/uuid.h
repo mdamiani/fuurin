@@ -15,6 +15,7 @@
 #include <functional>
 #include <string_view>
 #include <ostream>
+#include <mutex>
 
 
 namespace fuurin {
@@ -64,6 +65,11 @@ public:
     Uuid();
 
     /**
+     * \brief Copy constructor.
+     */
+    Uuid(const Uuid& other);
+
+    /**
      * \return Size in bytes of the uuid (always 16).
      *
      * \see Bytes
@@ -103,6 +109,12 @@ public:
      * \see toString()
      */
     std::string_view toShortString() const;
+
+    /**
+     * \brief Assignment operator.
+     * \param[in] rhs Uuid to copy from.
+     */
+    Uuid& operator=(const Uuid& rhs);
 
     /**
      * \brief Comparing operator.
@@ -199,9 +211,11 @@ private:
 
 
 private:
-    Bytes bytes_;         ///< UUID bytes.
-    mutable Srepr srepr_; ///< UUID string representation.
-    mutable bool cached_; ///< UUID string cached.
+    Bytes bytes_; ///< UUID bytes.
+
+    mutable std::mutex reprMux_; ///< UUID string conversion mutex.
+    mutable Srepr srepr_;        ///< UUID string representation.
+    mutable bool cached_;        ///< UUID string cached.
 };
 
 
