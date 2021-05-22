@@ -41,7 +41,7 @@ public:
 
     bool Dispatch(const std::vector<std::pair<std::string, std::string>>& stream);
 
-    bool WaitForEvent(std::chrono::milliseconds timeout, std::function<void(Event)> callback);
+    bool WaitForEvent(std::chrono::milliseconds timeout, std::function<bool(Event)> callback);
 
 private:
     std::unique_ptr<WorkerService::Stub> stub_;

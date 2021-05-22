@@ -116,7 +116,7 @@ bool WorkerCli::Dispatch(const std::vector<std::pair<std::string, std::string>>&
 }
 
 
-bool WorkerCli::WaitForEvent(std::chrono::milliseconds timeout, std::function<void(Event)> callback)
+bool WorkerCli::WaitForEvent(std::chrono::milliseconds timeout, std::function<bool(Event)> callback)
 {
     grpc::ClientContext context;
 
@@ -126,11 +126,17 @@ bool WorkerCli::WaitForEvent(std::chrono::milliseconds timeout, std::function<vo
     std::unique_ptr<grpc::ClientReader<Event>> reader(stub_->WaitForEvent(&context, req));
 
     Event ev;
+    bool cancelled = false;
 
-    while (reader->Read(&ev))
-        callback(ev);
+    while (reader->Read(&ev)) {
+        if (!callback(ev)) {
+            context.TryCancel();
+            cancelled = true;
+            break;
+        }
+    }
 
     grpc::Status status = reader->Finish();
 
-    return status.ok();
+    return status.ok() || cancelled;
 }

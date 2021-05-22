@@ -98,7 +98,7 @@ WorkerServiceImpl::WorkerServiceImpl(const std::string& server_addr)
 
 WorkerServiceImpl::~WorkerServiceImpl() noexcept
 {
-    zcanc1_->cancel();
+    sendRPC(RPC::Cancel);
     client_.get();
     events_.get();
 }
@@ -111,7 +111,12 @@ auto WorkerServiceImpl::Run(const std::string& addr) -> std::tuple<
 {
     auto service = new WorkerServiceImpl{addr};
     auto cancel = std::bind(&WorkerServiceImpl::shutdown, service);
-    auto future = std::async(std::launch::async, &WorkerServiceImpl::runServer, service);
+    auto promise = std::promise<void>{};
+    auto started = promise.get_future();
+    auto future = std::async(std::launch::async, &WorkerServiceImpl::runServer, service, &promise);
+
+    // wait for server started
+    started.get();
 
     return {
         std::unique_ptr<WorkerServiceImpl>{service},
@@ -258,7 +263,7 @@ grpc::Status WorkerServiceImpl::WaitForEvent(grpc::ServerContext* context,
 }
 
 
-void WorkerServiceImpl::runServer()
+void WorkerServiceImpl::runServer(std::promise<void>* started)
 {
     grpc::ServerBuilder builder;
 
@@ -267,6 +272,8 @@ void WorkerServiceImpl::runServer()
 
     server_ = builder.BuildAndStart();
     log_info(flog::Arg{"Server listening"sv}, flog::Arg{"address"sv, server_addr_});
+
+    started->set_value();
 
     server_->Wait();
 }
@@ -338,6 +345,10 @@ fuurin::zmq::Part WorkerServiceImpl::serveRPC(RPC type, const fuurin::zmq::Part&
     fuurin::zmq::Part ret;
 
     switch (type) {
+    case RPC::Cancel:
+        zcanc1_->cancel();
+        break;
+
     case RPC::GetUuid:
         ret = worker_->uuid().toPart();
         break;

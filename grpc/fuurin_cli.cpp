@@ -22,19 +22,6 @@
 using namespace std::literals::chrono_literals;
 
 
-fuurin::Uuid fromGrpcUuid(Uuid& uuid)
-{
-    fuurin::Uuid::Bytes bytes;
-    std::fill(bytes.begin(), bytes.end(), 0);
-
-    std::copy_n(uuid.mutable_data()->data(),
-        std::min(uuid.mutable_data()->size(), std::tuple_size<fuurin::Uuid::Bytes>::value),
-        bytes.data());
-
-    return fuurin::Uuid::fromBytes(bytes);
-}
-
-
 int main(int, char**)
 {
     WorkerCli cli{grpc::CreateChannel("localhost:50051",
@@ -48,13 +35,15 @@ int main(int, char**)
             << "Event:\n"
             << ev.DebugString()
             << std::endl;
+
+        return true;
     });
 
     auto evf = std::async(std::launch::async, callback);
 
     std::cout
         << "Uuid: "
-        << (uuid ? fromGrpcUuid(*uuid).toShortString() : "n/a")
+        << (uuid ? uuid->DebugString() : "n/a")
         << std::endl;
 
     std::cout

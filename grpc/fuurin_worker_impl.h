@@ -40,6 +40,7 @@ class WorkerServiceImpl final : public WorkerService::Service
 public:
     enum struct RPC : uint8_t
     {
+        Cancel,
         GetUuid,
         GetSeqNum,
         SetConfig,
@@ -67,9 +68,10 @@ public:
         std::future<void>,
         CancelFn>;
 
-public:
     ~WorkerServiceImpl() noexcept;
 
+
+protected:
     grpc::Status GetUuid(grpc::ServerContext*,
         const google::protobuf::Empty*,
         Uuid* response) override;
@@ -106,7 +108,7 @@ public:
 private:
     explicit WorkerServiceImpl(const std::string& server_addr);
 
-    void runServer();
+    void runServer(std::promise<void>* started);
     void runClient();
     void runEvents();
 
@@ -123,6 +125,8 @@ private:
 
 
 private:
+    friend class TestWorkerServiceImpl;
+
     const std::string server_addr_;
     const std::unique_ptr<fuurin::Worker> worker_;
     const std::unique_ptr<fuurin::zmq::Socket> zrpcClient_;

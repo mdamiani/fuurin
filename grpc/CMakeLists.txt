@@ -88,3 +88,18 @@ add_executable(${_gRPC_broker} fuurin_broker.cpp)
 add_dependencies(${_gRPC_broker} fuurin_static)
 target_include_directories(${_gRPC_broker} PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
 target_link_libraries(${_gRPC_broker} fuurin_static)
+
+
+if(BUILD_TESTS)
+    AddTest(test_grpc)
+
+    target_sources(test_grpc PUBLIC
+        fuurin_worker_impl.cpp
+        fuurin_cli_impl.cpp
+        ${wrk_proto_srcs}
+        ${wrk_grpc_srcs}
+    )
+
+    target_include_directories(test_grpc PUBLIC "${CMAKE_CURRENT_BINARY_DIR}" ${gRPC_INC})
+    target_link_libraries(test_grpc protobuf::libprotobuf ${gRPC_LIB})
+endif()
