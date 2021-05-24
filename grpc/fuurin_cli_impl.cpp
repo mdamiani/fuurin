@@ -92,7 +92,7 @@ bool WorkerCli::Sync()
 }
 
 
-bool WorkerCli::Dispatch(const std::vector<std::pair<std::string, std::string>>& stream)
+bool WorkerCli::Dispatch(const std::vector<std::pair<std::string, std::string>>& stream, Topic_Type type)
 {
     grpc::ClientContext context;
 
@@ -103,7 +103,7 @@ bool WorkerCli::Dispatch(const std::vector<std::pair<std::string, std::string>>&
         Topic t;
         t.set_name(el.first);
         t.set_data(el.second);
-        t.set_type(Topic_Type_State);
+        t.set_type(type);
 
         if (!writer->Write(t))
             break;

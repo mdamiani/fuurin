@@ -32,6 +32,7 @@
 namespace flog = fuurin::log;
 
 using namespace std::literals::string_view_literals;
+using namespace std::literals::string_literals;
 using namespace std::literals::chrono_literals;
 
 namespace {
@@ -82,6 +83,7 @@ WorkerServiceImpl::WorkerServiceImpl(const std::string& server_addr)
     , zrpcEvents_{std::make_unique<fuurin::zmq::Socket>(worker_->context(), fuurin::zmq::Socket::RADIO)}
     , zcanc1_{std::make_unique<fuurin::zmq::Cancellation>(worker_->context(), "WorkerServiceImpl_canc1")}
     , zcanc2_{std::make_unique<fuurin::zmq::Cancellation>(worker_->context(), "WorkerServiceImpl_canc2")}
+    , cancNum_{0}
 {
     zrpcEvents_->setEndpoints({"inproc://rpc-events"});
     zrpcServer_->setEndpoints({"inproc://rpc-worker"});
@@ -216,7 +218,9 @@ grpc::Status WorkerServiceImpl::WaitForEvent(grpc::ServerContext* context,
     zevDish.setGroups({"EVNT"});
     zevDish.connect();
 
-    fuurin::zmq::Cancellation tmeoCanc{worker_->context(), "WorkerServiceImpl::WaitForEvent_canc"};
+    fuurin::zmq::Cancellation tmeoCanc{worker_->context(),
+        "WorkerServiceImpl::WaitForEvent_canc#"s + std::to_string(++cancNum_)};
+
     if (timeout->millis() > 0)
         tmeoCanc.setDeadline(std::chrono::milliseconds{timeout->millis()});
 

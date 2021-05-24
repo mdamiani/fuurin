@@ -22,6 +22,7 @@
 #include <type_traits>
 #include <functional>
 #include <tuple>
+#include <atomic>
 
 
 namespace fuurin {
@@ -134,6 +135,8 @@ private:
     const std::unique_ptr<fuurin::zmq::Socket> zrpcEvents_;
     const std::unique_ptr<fuurin::zmq::Cancellation> zcanc1_;
     const std::unique_ptr<fuurin::zmq::Cancellation> zcanc2_;
+
+    std::atomic<uint32_t> cancNum_;
 
     std::future<void> client_;
     std::future<void> events_;

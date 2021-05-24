@@ -39,7 +39,8 @@ public:
     bool Stop();
     bool Sync();
 
-    bool Dispatch(const std::vector<std::pair<std::string, std::string>>& stream);
+    bool Dispatch(const std::vector<std::pair<std::string, std::string>>& stream,
+        Topic_Type type = Topic_Type_State);
 
     bool WaitForEvent(std::chrono::milliseconds timeout, std::function<bool(Event)> callback);
 
