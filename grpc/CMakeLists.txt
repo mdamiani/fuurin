@@ -62,6 +62,15 @@ add_custom_command(
     DEPENDS "${wrk_proto}")
 
 
+# We are using system gRPC libraries which are not compiled with Sanitizers:
+# https://github.com/grpc/grpc/issues/21838
+# https://github.com/grpc/grpc/issues/22238
+set(GRPC_SAN_SUPPR
+    GRPC_ASAN_SUPPRESSED
+    GRPC_TSAN_SUPPRESSED
+)
+
+
 # Targets
 foreach(_target
     fuurin_worker
@@ -76,6 +85,7 @@ foreach(_target
         ${wrk_grpc_srcs})
 
     add_dependencies(${_target} fuurin_static)
+    target_compile_definitions(${_target} PUBLIC ${GRPC_SAN_SUPPR})
     target_include_directories(${_target} PUBLIC "${CMAKE_CURRENT_BINARY_DIR}" ${gRPC_INC})
     target_link_libraries(${_target} fuurin_static protobuf::libprotobuf ${gRPC_LIB})
 endforeach()
@@ -86,6 +96,7 @@ set(_gRPC_broker fuurin_broker)
 message("-- Adding gRPC ${_gRPC_broker}")
 add_executable(${_gRPC_broker} fuurin_broker.cpp)
 add_dependencies(${_gRPC_broker} fuurin_static)
+target_compile_definitions(${_gRPC_broker} PUBLIC ${GRPC_SAN_SUPPR})
 target_include_directories(${_gRPC_broker} PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
 target_link_libraries(${_gRPC_broker} fuurin_static)
 
@@ -100,6 +111,7 @@ if(BUILD_TESTS)
         ${wrk_grpc_srcs}
     )
 
+    target_compile_definitions(test_grpc PUBLIC ${GRPC_SAN_SUPPR})
     target_include_directories(test_grpc PUBLIC "${CMAKE_CURRENT_BINARY_DIR}" ${gRPC_INC})
     target_link_libraries(test_grpc protobuf::libprotobuf ${gRPC_LIB})
 endif()

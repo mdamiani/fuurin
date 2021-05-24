@@ -58,3 +58,5 @@ AddTest(test_syncmachine)
 AddTest(test_uuid)
 AddTest(test_network)
 AddTest(test_tokenpool)
+
+target_compile_definitions(test_common PRIVATE ${LIB_COMPILE_DEFS})
