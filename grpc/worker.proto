@@ -100,6 +100,7 @@ service WorkerService {
     rpc GetUuid(google.protobuf.Empty) returns (Uuid) {}
     rpc GetSeqNum(google.protobuf.Empty) returns (SeqNum) {}
 
+    rpc SetEndpoints(Endpoints) returns (google.protobuf.Empty) {}
     rpc SetSubscriptions(Subscriptions) returns (google.protobuf.Empty) {}
 
     rpc Start(google.protobuf.Empty) returns (google.protobuf.Empty) {}

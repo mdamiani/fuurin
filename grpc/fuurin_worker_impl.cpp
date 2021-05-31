@@ -25,6 +25,7 @@
 #include <grpcpp/server_builder.h>
 
 #include <string_view>
+#include <string>
 #include <optional>
 #include <vector>
 
@@ -156,6 +157,15 @@ grpc::Status WorkerServiceImpl::GetSeqNum(grpc::ServerContext*,
 
     const auto seqn = recvRPC().toUint64();
     resp->set_value(seqn);
+
+    return grpc::Status::OK;
+}
+
+
+grpc::Status WorkerServiceImpl::SetEndpoints(grpc::ServerContext*,
+    const Endpoints* endp, google::protobuf::Empty*)
+{
+    sendRPC(RPC::SetEndpoints, protoSerialize(endp));
 
     return grpc::Status::OK;
 }
@@ -361,6 +371,14 @@ fuurin::zmq::Part WorkerServiceImpl::serveRPC(RPC type, const fuurin::zmq::Part&
         ret = fuurin::zmq::Part{worker_->seqNumber()};
         break;
 
+    case RPC::SetEndpoints: {
+        const auto endp = protoParse<Endpoints>("RPC::SetEndpoints"sv, pay);
+        if (!endp)
+            break;
+        applyEndpoints(endp.value());
+        break;
+    }
+
     case RPC::SetSubscriptions: {
         const auto subscr = protoParse<Subscriptions>("RPC::SetSubscriptions"sv, pay);
         if (!subscr)
@@ -412,6 +430,24 @@ void WorkerServiceImpl::applySubscriptions(const Subscriptions& subscr)
         topics[i] = subscr.name(i);
 
     worker_->setTopicsNames(topics);
+}
+
+
+void WorkerServiceImpl::applyEndpoints(const Endpoints& endp)
+{
+    std::vector<std::string> delivery, dispatch, snapshot;
+
+    for (int i = 0; i < endp.delivery_size(); ++i) {
+        delivery.push_back(endp.delivery(i));
+    }
+    for (int i = 0; i < endp.dispatch_size(); ++i) {
+        dispatch.push_back(endp.dispatch(i));
+    }
+    for (int i = 0; i < endp.snapshot_size(); ++i) {
+        snapshot.push_back(endp.snapshot(i));
+    }
+
+    worker_->setEndpoints(delivery, dispatch, snapshot);
 }
 
 

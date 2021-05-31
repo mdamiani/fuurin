@@ -43,6 +43,29 @@ std::optional<SeqNum> WorkerCli::GetSeqNum()
 }
 
 
+bool WorkerCli::SetEndpoints(std::vector<std::string> delivery, std::vector<std::string> dispatch,
+    std::vector<std::string> snapshot)
+{
+    grpc::ClientContext context;
+    Endpoints endp;
+
+    for (const auto& el : delivery) {
+        endp.add_delivery(el);
+    }
+    for (const auto& el : dispatch) {
+        endp.add_dispatch(el);
+    }
+    for (const auto& el : snapshot) {
+        endp.add_snapshot(el);
+    }
+
+    google::protobuf::Empty ret;
+    const grpc::Status status = stub_->SetEndpoints(&context, endp, &ret);
+
+    return status.ok();
+}
+
+
 bool WorkerCli::SetSubscriptions(bool wildcard, std::vector<std::string> names)
 {
     grpc::ClientContext context;

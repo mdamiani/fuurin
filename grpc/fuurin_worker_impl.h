@@ -83,6 +83,7 @@ protected:
         Cancel,           ///< Stop server.
         GetUuid,          ///< Get UUID.
         GetSeqNum,        ///< Get sequence number.
+        SetEndpoints,     ///< Set connection endpoints.
         SetSubscriptions, ///< Set topics subscriptions.
         SetStart,         ///< Start worker and connect to the broker.
         SetStop,          ///< Stop worker and disconnect from broker.
@@ -106,6 +107,13 @@ protected:
     grpc::Status GetSeqNum(grpc::ServerContext*,
         const google::protobuf::Empty*,
         SeqNum* response) override;
+
+    /**
+     * \brief RPC to set worker endpoints.
+     */
+    grpc::Status SetEndpoints(grpc::ServerContext*,
+        const Endpoints* endp,
+        google::protobuf::Empty*) override;
 
     /**
      * \brief RPC to set worker configuration.
@@ -208,6 +216,13 @@ private:
      * \param[in] subscr Requested subscriptions.
      */
     void applySubscriptions(const Subscriptions& subscr);
+
+    /**
+     * \brief Applies endpoints to the worker.
+     *
+     * \param[in] endp Requested endpoints.
+     */
+    void applyEndpoints(const Endpoints& endp);
 
     /**
      * \brief Actually dispatches a topic with worker.

@@ -216,6 +216,41 @@ BOOST_FIXTURE_TEST_CASE(testOffline, ServiceFixture)
 }
 
 
+BOOST_FIXTURE_TEST_CASE(testSetEndpoints, ServiceFixture)
+{
+    std::vector<std::string> del{"tcp://127.0.0.1:50101", "tcp://127.0.0.1:50102", "tcp://127.0.0.1:50103"};
+    std::vector<std::string> dis{"tcp://127.0.0.1:50201", "tcp://127.0.0.1:50202", "tcp://127.0.0.1:50203"};
+    std::vector<std::string> snp{"tcp://127.0.0.1:50301", "tcp://127.0.0.1:50302", "tcp://127.0.0.1:50303"};
+
+    BOOST_TEST(client->SetEndpoints(del, dis, snp));
+
+    auto events = waitForGRPCEvents(client.get(), 5s,
+        {Event::Started},
+        {Event::RCPSetup},
+        [this](Event_Type) {
+            BOOST_TEST(client->Start());
+        });
+
+    BOOST_REQUIRE((events.size() == 1));
+    auto ev = events.front();
+    auto ee = ev.mutable_configevent()->mutable_endpoints();
+
+    BOOST_REQUIRE(size_t(ee->delivery_size()) == del.size());
+    BOOST_REQUIRE(size_t(ee->dispatch_size()) == dis.size());
+    BOOST_REQUIRE(size_t(ee->snapshot_size()) == snp.size());
+
+    for (size_t i = 0; i < del.size(); ++i) {
+        BOOST_TEST(del[i] == ee->delivery(i));
+    }
+    for (size_t i = 0; i < dis.size(); ++i) {
+        BOOST_TEST(dis[i] == ee->dispatch(i));
+    }
+    for (size_t i = 0; i < snp.size(); ++i) {
+        BOOST_TEST(snp[i] == ee->snapshot(i));
+    }
+}
+
+
 BOOST_FIXTURE_TEST_CASE(testSetSubscriptionsTopicsNames, ServiceFixture)
 {
     BOOST_TEST(client->SetSubscriptions(false, {"topicA", "topicB"}));
@@ -446,6 +481,14 @@ BOOST_FIXTURE_TEST_CASE(testSyncOk, ServiceFixture)
             auto cfgsub = cfgev->mutable_subscriptions();
             BOOST_TEST(cfgsub->wildcard() == true);
             BOOST_TEST(cfgsub->name_size() == 0);
+
+            auto cfgendp = cfgev->mutable_endpoints();
+            BOOST_REQUIRE(cfgendp->delivery_size() == 1);
+            BOOST_REQUIRE(cfgendp->dispatch_size() == 1);
+            BOOST_REQUIRE(cfgendp->snapshot_size() == 1);
+            BOOST_TEST(cfgendp->delivery(0) == "ipc:///tmp/worker_delivery");
+            BOOST_TEST(cfgendp->dispatch(0) == "ipc:///tmp/worker_dispatch");
+            BOOST_TEST(cfgendp->snapshot(0) == "ipc:///tmp/broker_snapshot");
             break;
         }
 

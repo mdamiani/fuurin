@@ -21,6 +21,7 @@
 #include <memory>
 #include <optional>
 #include <vector>
+#include <string>
 #include <utility>
 #include <chrono>
 
@@ -33,6 +34,8 @@ public:
     std::optional<Uuid> GetUuid();
     std::optional<SeqNum> GetSeqNum();
 
+    bool SetEndpoints(std::vector<std::string> delivery, std::vector<std::string> dispatch,
+        std::vector<std::string> snapshot);
     bool SetSubscriptions(bool wildcard, std::vector<std::string> names);
 
     bool Start();
