@@ -17,13 +17,18 @@
 #include "fuurin/broker.h"
 #include "fuurin/worker.h"
 
+#include "utils.h"
+
 #include <google/protobuf/util/message_differencer.h>
 #include <grpcpp/create_channel.h>
 
 #include <string>
 #include <future>
 #include <memory>
+#include <vector>
 #include <list>
+#include <tuple>
+#include <algorithm>
 
 
 namespace utf = boost::unit_test;
@@ -527,4 +532,79 @@ BOOST_AUTO_TEST_CASE(shutdownWaitForEventClient, *utf::timeout(10))
 
     servCanc();
     servFut.get();
+}
+
+
+namespace std {
+inline std::ostream& operator<<(std::ostream& os, const std::vector<std::string>& v)
+{
+    os << "[";
+    for (const auto& el : v)
+        os << el << " ";
+    os << "]";
+
+    return os;
+}
+} // namespace std
+
+using V = std::vector<std::string>;
+
+BOOST_DATA_TEST_CASE(testParseArgsEndpoints,
+    bdata::make({
+        std::make_tuple(V{}, 1,
+            V{"ipc:///tmp/worker_delivery"},
+            V{"ipc:///tmp/worker_dispatch"},
+            V{"ipc:///tmp/broker_snapshot"}),
+        std::make_tuple(V{"unused1", "unused2", "unused3"}, 5,
+            V{"ipc:///tmp/worker_delivery"},
+            V{"ipc:///tmp/worker_dispatch"},
+            V{"ipc:///tmp/broker_snapshot"}),
+        std::make_tuple(V{"deliv1"}, 1,
+            V{"deliv1"},
+            V{},
+            V{}),
+        std::make_tuple(V{"deliv1", "dispt1"}, 1,
+            V{"deliv1"},
+            V{"dispt1"},
+            V{}),
+        std::make_tuple(V{"deliv1", "dispt1", "snapt1"}, 1,
+            V{"deliv1"},
+            V{"dispt1"},
+            V{"snapt1"}),
+        std::make_tuple(V{"deliv1", "dispt1", "snapt1", "deliv2"}, 1,
+            V{"deliv1", "deliv2"},
+            V{"dispt1"},
+            V{"snapt1"}),
+        std::make_tuple(V{"deliv1", "dispt1", "snapt1", "deliv2", "dispt2"}, 1,
+            V{"deliv1", "deliv2"},
+            V{"dispt1", "dispt2"},
+            V{"snapt1"}),
+        std::make_tuple(V{"deliv1", "dispt1", "snapt1", "deliv2", "dispt2", "snapt2"}, 1,
+            V{"deliv1", "deliv2"},
+            V{"dispt1", "dispt2"},
+            V{"snapt1", "snapt2"}),
+    }),
+    argv, startIdx, wantDelivery, wantDispatch, wantSnapshot)
+{
+    fuurin::Broker b;
+
+    char* argvP[32];
+    char argvC[32][32];
+
+    BOOST_REQUIRE(argv.size() + 1 <= sizeof(argvC) / sizeof(argvC[0]));
+
+    for (size_t i = 0; i < argv.size(); ++i) {
+        auto el = argv[i];
+        BOOST_REQUIRE(el.size() + 1 <= sizeof(argvC[i + 1]));
+
+        std::copy_n(el.data(), el.size(), argvC[i + 1]);
+        argvC[i + 1][el.size()] = '\0';
+        argvP[i + 1] = argvC[i + 1];
+    }
+
+    utils::parseArgsEndpoints(argv.size() + 1, argvP, startIdx, &b);
+
+    BOOST_TEST(wantDelivery == b.endpointDelivery());
+    BOOST_TEST(wantDispatch == b.endpointDispatch());
+    BOOST_TEST(wantSnapshot == b.endpointSnapshot());
 }

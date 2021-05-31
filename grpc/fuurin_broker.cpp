@@ -9,11 +9,14 @@
  */
 
 #include "fuurin/broker.h"
+#include "utils.h"
 
 
-int main(int, char**)
+int main(int argc, char** argv)
 {
     fuurin::Broker broker;
+
+    utils::parseArgsEndpoints(argc, argv, 1, &broker);
 
     auto bf = broker.start();
 

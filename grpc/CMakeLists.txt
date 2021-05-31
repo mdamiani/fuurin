@@ -94,7 +94,7 @@ endforeach()
 set(_gRPC_broker fuurin_broker)
 
 message("-- Adding gRPC ${_gRPC_broker}")
-add_executable(${_gRPC_broker} fuurin_broker.cpp)
+add_executable(${_gRPC_broker} fuurin_broker.cpp utils.cpp)
 add_dependencies(${_gRPC_broker} fuurin_static)
 target_compile_definitions(${_gRPC_broker} PUBLIC ${GRPC_SAN_SUPPR})
 target_include_directories(${_gRPC_broker} PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
@@ -107,6 +107,7 @@ if(BUILD_TESTS)
     target_sources(test_grpc PUBLIC
         fuurin_worker_impl.cpp
         fuurin_cli_impl.cpp
+        utils.cpp
         ${wrk_proto_srcs}
         ${wrk_grpc_srcs}
     )
