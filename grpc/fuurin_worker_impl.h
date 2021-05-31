@@ -80,14 +80,14 @@ protected:
      */
     enum struct RPC : uint8_t
     {
-        Cancel,      ///< Stop server.
-        GetUuid,     ///< Get UUID.
-        GetSeqNum,   ///< Get sequence number.
-        SetConfig,   ///< Set configuration.
-        SetStart,    ///< Start worker and connect to the broker.
-        SetStop,     ///< Stop worker and disconnect from broker.
-        SetSync,     ///< Synchronize with broker.
-        SetDispatch, ///< Dispatches data to the broker.
+        Cancel,           ///< Stop server.
+        GetUuid,          ///< Get UUID.
+        GetSeqNum,        ///< Get sequence number.
+        SetSubscriptions, ///< Set topics subscriptions.
+        SetStart,         ///< Start worker and connect to the broker.
+        SetStop,          ///< Stop worker and disconnect from broker.
+        SetSync,          ///< Synchronize with broker.
+        SetDispatch,      ///< Dispatches data to the broker.
     };
 
     ///< Underlying type of RPC kind.
@@ -110,8 +110,8 @@ protected:
     /**
      * \brief RPC to set worker configuration.
      */
-    grpc::Status SetConfig(grpc::ServerContext*,
-        const Config* conf,
+    grpc::Status SetSubscriptions(grpc::ServerContext*,
+        const Subscriptions* subscr,
         google::protobuf::Empty*) override;
 
     /**
@@ -203,11 +203,11 @@ private:
     fuurin::zmq::Part serveRPC(RPC type, const fuurin::zmq::Part& pay);
 
     /**
-     * \brief Applies a configurationt to the worker.
+     * \brief Applies subscriptions to the worker.
      *
-     * \param[in] conf Requested configuration.
+     * \param[in] subscr Requested subscriptions.
      */
-    void setConfig(const Config& conf);
+    void applySubscriptions(const Subscriptions& subscr);
 
     /**
      * \brief Actually dispatches a topic with worker.

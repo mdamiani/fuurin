@@ -161,10 +161,10 @@ grpc::Status WorkerServiceImpl::GetSeqNum(grpc::ServerContext*,
 }
 
 
-grpc::Status WorkerServiceImpl::SetConfig(grpc::ServerContext*,
-    const Config* conf, google::protobuf::Empty*)
+grpc::Status WorkerServiceImpl::SetSubscriptions(grpc::ServerContext*,
+    const Subscriptions* subscr, google::protobuf::Empty*)
 {
-    sendRPC(RPC::SetConfig, protoSerialize(conf));
+    sendRPC(RPC::SetSubscriptions, protoSerialize(subscr));
 
     return grpc::Status::OK;
 }
@@ -361,11 +361,11 @@ fuurin::zmq::Part WorkerServiceImpl::serveRPC(RPC type, const fuurin::zmq::Part&
         ret = fuurin::zmq::Part{worker_->seqNumber()};
         break;
 
-    case RPC::SetConfig: {
-        const auto conf = protoParse<Config>("RPC::SetConfig"sv, pay);
-        if (!conf)
+    case RPC::SetSubscriptions: {
+        const auto subscr = protoParse<Subscriptions>("RPC::SetSubscriptions"sv, pay);
+        if (!subscr)
             break;
-        setConfig(conf.value());
+        applySubscriptions(subscr.value());
         break;
     }
 
@@ -398,18 +398,18 @@ fuurin::zmq::Part WorkerServiceImpl::serveRPC(RPC type, const fuurin::zmq::Part&
 }
 
 
-void WorkerServiceImpl::setConfig(const Config& conf)
+void WorkerServiceImpl::applySubscriptions(const Subscriptions& subscr)
 {
-    if (conf.subscriptions().wildcard()) {
+    if (subscr.wildcard()) {
         worker_->setTopicsAll();
         return;
     }
 
-    const size_t size = conf.subscriptions().name_size();
+    const size_t size = subscr.name_size();
     std::vector<fuurin::Topic::Name> topics{size};
 
     for (size_t i = 0; i < size; ++i)
-        topics[i] = conf.subscriptions().name(i);
+        topics[i] = subscr.name(i);
 
     worker_->setTopicsNames(topics);
 }
@@ -444,16 +444,18 @@ std::optional<Event> WorkerServiceImpl::getEvent(const fuurin::zmq::Part& pay) c
         cfg->mutable_uuid()->set_data(wc.uuid.bytes().data(), wc.uuid.bytes().size());
         cfg->mutable_seqn()->set_value(wc.seqNum);
 
+        auto cfgendp = cfg->mutable_endpoints();
+
         for (const auto& endp : wc.endpDelivery)
-            cfg->mutable_endpoints()->add_delivery(endp);
+            cfgendp->add_delivery(endp);
 
         for (const auto& endp : wc.endpDispatch)
-            cfg->mutable_endpoints()->add_dispatch(endp);
+            cfgendp->add_dispatch(endp);
 
         for (const auto& endp : wc.endpSnapshot)
-            cfg->mutable_endpoints()->add_snapshot(endp);
+            cfgendp->add_snapshot(endp);
 
-        auto subscr = cfg->mutable_config()->mutable_subscriptions();
+        auto subscr = cfg->mutable_subscriptions();
 
         subscr->set_wildcard(wc.topicsAll);
 

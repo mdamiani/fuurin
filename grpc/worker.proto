@@ -56,16 +56,11 @@ message TopicEvent {
 }
 
 
-message Config {
-    Subscriptions subscriptions = 1;
-}
-
-
 message ConfigEvent {
     Uuid uuid = 1;
     SeqNum seqn = 2;
     Endpoints endpoints = 3;
-    Config config = 4;
+    Subscriptions subscriptions = 4;
 }
 
 
@@ -104,7 +99,8 @@ message EventTimeout {
 service WorkerService {
     rpc GetUuid(google.protobuf.Empty) returns (Uuid) {}
     rpc GetSeqNum(google.protobuf.Empty) returns (SeqNum) {}
-    rpc SetConfig(Config) returns (google.protobuf.Empty) {}
+
+    rpc SetSubscriptions(Subscriptions) returns (google.protobuf.Empty) {}
 
     rpc Start(google.protobuf.Empty) returns (google.protobuf.Empty) {}
     rpc Stop(google.protobuf.Empty) returns (google.protobuf.Empty) {}

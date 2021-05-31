@@ -216,7 +216,7 @@ BOOST_FIXTURE_TEST_CASE(testOffline, ServiceFixture)
 }
 
 
-BOOST_FIXTURE_TEST_CASE(testSetConfigTopicsNames, ServiceFixture)
+BOOST_FIXTURE_TEST_CASE(testSetSubscriptionsTopicsNames, ServiceFixture)
 {
     BOOST_TEST(client->SetSubscriptions(false, {"topicA", "topicB"}));
 
@@ -229,7 +229,7 @@ BOOST_FIXTURE_TEST_CASE(testSetConfigTopicsNames, ServiceFixture)
 
     BOOST_REQUIRE((events.size() == 1));
     auto ev = events.front();
-    auto ss = ev.mutable_configevent()->mutable_config()->mutable_subscriptions();
+    auto ss = ev.mutable_configevent()->mutable_subscriptions();
 
     BOOST_TEST(ss->wildcard() == false);
     BOOST_TEST(ss->name_size() == 2);
@@ -238,7 +238,7 @@ BOOST_FIXTURE_TEST_CASE(testSetConfigTopicsNames, ServiceFixture)
 }
 
 
-BOOST_FIXTURE_TEST_CASE(testSetConfigTopicsAll, ServiceFixture)
+BOOST_FIXTURE_TEST_CASE(testSetSubscriptionsTopicsAll, ServiceFixture)
 {
     BOOST_TEST(client->SetSubscriptions(true, {}));
 
@@ -251,7 +251,7 @@ BOOST_FIXTURE_TEST_CASE(testSetConfigTopicsAll, ServiceFixture)
 
     BOOST_TEST((events.size() == 1));
     auto ev = events.front();
-    auto ss = ev.mutable_configevent()->mutable_config()->mutable_subscriptions();
+    auto ss = ev.mutable_configevent()->mutable_subscriptions();
 
     BOOST_TEST(ss->wildcard() == true);
     BOOST_TEST(ss->name_size() == 0);
@@ -443,7 +443,7 @@ BOOST_FIXTURE_TEST_CASE(testSyncOk, ServiceFixture)
             BOOST_TEST(fromGrpcUuid(*cfgev->mutable_uuid()) == worker->uuid());
             BOOST_TEST(cfgev->mutable_seqn()->value() == 2ull);
 
-            auto cfgsub = cfgev->mutable_config()->mutable_subscriptions();
+            auto cfgsub = cfgev->mutable_subscriptions();
             BOOST_TEST(cfgsub->wildcard() == true);
             BOOST_TEST(cfgsub->name_size() == 0);
             break;

@@ -46,14 +46,14 @@ std::optional<SeqNum> WorkerCli::GetSeqNum()
 bool WorkerCli::SetSubscriptions(bool wildcard, std::vector<std::string> names)
 {
     grpc::ClientContext context;
-    Config conf;
+    Subscriptions subscr;
 
-    conf.mutable_subscriptions()->set_wildcard(wildcard);
+    subscr.set_wildcard(wildcard);
     for (const auto& name : names)
-        conf.mutable_subscriptions()->add_name(name);
+        subscr.add_name(name);
 
     google::protobuf::Empty ret;
-    const grpc::Status status = stub_->SetConfig(&context, conf, &ret);
+    const grpc::Status status = stub_->SetSubscriptions(&context, subscr, &ret);
 
     return status.ok();
 }
