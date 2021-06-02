@@ -24,6 +24,7 @@
 #include <functional>
 #include <tuple>
 #include <atomic>
+#include <chrono>
 
 
 namespace fuurin {
@@ -46,6 +47,10 @@ public:
     ///< Cancel function type, for server stopping.
     using CancelFn = std::function<void()>;
 
+    ///< Latency for other monitoring events.
+    static constexpr std::chrono::seconds LatencyDuration{5};
+
+
     /**
      * Disable copy.
      */
@@ -60,6 +65,7 @@ public:
      * \brief Runs the GRPC server.
      *
      * \param[in] addr Server address to listen to.
+     * \param[in] endp Connection endpoints.
      *
      * \return A tuple with a server instantion, a future to wait for
      *      and a function to stop the server.
@@ -241,6 +247,15 @@ private:
      * \return A RCP event to send back to the RPC client, in case of no errors.
      */
     std::optional<Event> getEvent(const fuurin::zmq::Part& pay) const;
+
+    /**
+     * \brief Tries to get the \ref active_ result, if \c valid.
+     *
+     * It prints errors in case of any.
+     *
+     * \param[in] timeout Waiting timeout, negative value will cause no expiration.
+     */
+    void tryGetStartedResult(std::chrono::milliseconds timeout = std::chrono::milliseconds(-1));
 
 
 private:

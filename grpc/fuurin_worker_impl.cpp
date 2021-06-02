@@ -20,6 +20,8 @@
 #include "fuurin/workerconfig.h"
 #include "fuurin/uuid.h"
 #include "fuurin/logger.h"
+#include "fuurin/errors.h"
+#include "fuurin/zmqtimer.h"
 
 #include <grpcpp/server.h>
 #include <grpcpp/server_builder.h>
@@ -35,6 +37,7 @@ namespace flog = fuurin::log;
 using namespace std::literals::string_view_literals;
 using namespace std::literals::string_literals;
 using namespace std::literals::chrono_literals;
+
 
 namespace {
 template<typename... Args>
@@ -228,7 +231,7 @@ grpc::Status WorkerServiceImpl::WaitForEvent(grpc::ServerContext* context,
     if (timeout->millis() > 0)
         tmeoCanc.setDeadline(std::chrono::milliseconds{timeout->millis()});
 
-    fuurin::zmq::Poller poll{fuurin::zmq::PollerEvents::Type::Read, 5s,
+    fuurin::zmq::Poller poll{fuurin::zmq::PollerEvents::Type::Read, LatencyDuration,
         &zevDish, zcanc2_.get(), &tmeoCanc};
 
     const auto createEvent = [](Event_Type type) {
@@ -288,13 +291,23 @@ void WorkerServiceImpl::runServer(std::promise<void>* started)
 
 void WorkerServiceImpl::runClient()
 {
+    fuurin::zmq::Timer mon{worker_->context(), "WorkerServiceImpl::runClient_monitor"};
+    mon.setInterval(LatencyDuration);
+    mon.start();
+
     fuurin::zmq::Poller poll{fuurin::zmq::PollerEvents::Type::Read,
-        zrpcServer_.get(), zcanc1_.get()};
+        zrpcServer_.get(), zcanc1_.get(), &mon};
 
     for (;;) {
         for (auto s : poll.wait()) {
             if (s == zcanc1_.get())
                 return;
+
+            if (s == &mon) {
+                mon.consume();
+                tryGetStartedResult(0ms);
+                continue;
+            }
 
             fuurin::zmq::Part r;
             zrpcServer_->recv(&r);
@@ -376,8 +389,8 @@ fuurin::zmq::Part WorkerServiceImpl::serveRPC(RPC type, const fuurin::zmq::Part&
     case RPC::SetStop:
         if (worker_->isRunning()) {
             worker_->stop();
-            active_.get();
         }
+        tryGetStartedResult();
         break;
 
     case RPC::SetSync:
@@ -557,4 +570,24 @@ std::optional<Event> WorkerServiceImpl::getEvent(const fuurin::zmq::Part& pay) c
     };
 
     return {ret};
+}
+
+
+void WorkerServiceImpl::tryGetStartedResult(std::chrono::milliseconds timeout)
+{
+    if (!active_.valid())
+        return;
+
+    if (timeout >= 0ms) {
+        if (active_.wait_for(timeout) != std::future_status::ready)
+            return;
+    }
+
+    try {
+        active_.get();
+    } catch (const fuurin::err::Error& e) {
+        // TODO: use logger helper functions
+        flog::Arg args[] = {flog::Arg{"error"sv, std::string_view(e.what())}, e.arg()};
+        fuurin::log::Logger::error(e.loc(), args, 2);
+    }
 }

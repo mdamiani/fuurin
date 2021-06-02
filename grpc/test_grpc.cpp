@@ -29,6 +29,7 @@
 #include <list>
 #include <tuple>
 #include <algorithm>
+#include <thread>
 
 
 namespace utf = boost::unit_test;
@@ -44,6 +45,11 @@ public:
     static fuurin::Worker* getWorker(WorkerServiceImpl* p)
     {
         return p->worker_.get();
+    }
+
+    static std::future<void>* getActiveFuture(WorkerServiceImpl* p)
+    {
+        return &p->active_;
     }
 };
 
@@ -573,6 +579,45 @@ BOOST_AUTO_TEST_CASE(shutdownWaitForEventClient, *utf::timeout(10))
     auto client = WorkerCli{grpc::CreateChannel(address, grpc::InsecureChannelCredentials())};
 
     BOOST_TEST(client.WaitForEvent(0s, [](Event) { return false; }));
+
+    servCanc();
+    servFut.get();
+}
+
+
+BOOST_AUTO_TEST_CASE(errorGetOnStop, *utf::timeout(15))
+{
+    const std::string address{"localhost:50051"};
+    utils::Endpoints endp{{"invalid"}, {"invalid"}, {"invalid"}};
+
+
+    auto [service, servFut, servCanc, _] = WorkerServiceImpl::Run(address, endp);
+    auto client = WorkerCli{grpc::CreateChannel(address, grpc::InsecureChannelCredentials())};
+
+    BOOST_TEST(client.Start());
+    BOOST_TEST(client.Stop());
+
+    BOOST_TEST(TestWorkerServiceImpl::getActiveFuture(service.get())->valid() == false);
+
+    servCanc();
+    servFut.get();
+}
+
+
+BOOST_AUTO_TEST_CASE(errorGetOnMonitor, *utf::timeout(15))
+{
+    const std::string address{"localhost:50051"};
+    utils::Endpoints endp{{"invalid"}, {"invalid"}, {"invalid"}};
+
+
+    auto [service, servFut, servCanc, _] = WorkerServiceImpl::Run(address, endp);
+    auto client = WorkerCli{grpc::CreateChannel(address, grpc::InsecureChannelCredentials())};
+
+    BOOST_TEST(client.Start());
+
+    std::this_thread::sleep_for(WorkerServiceImpl::LatencyDuration + 2s);
+
+    BOOST_TEST(TestWorkerServiceImpl::getActiveFuture(service.get())->valid() == false);
 
     servCanc();
     servFut.get();
