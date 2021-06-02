@@ -38,14 +38,6 @@ using namespace std::literals::chrono_literals;
 
 namespace {
 template<typename... Args>
-void log_info(Args&&... args)
-{
-    flog::Arg arr[] = {args...};
-    flog::Logger::info({__FILE__, __LINE__}, arr, sizeof...(Args));
-}
-
-
-template<typename... Args>
 void log_fatal(Args&&... args)
 {
     flog::Arg arr[] = {args...};
@@ -63,14 +55,12 @@ fuurin::zmq::Part protoSerialize(const T* val)
 
 
 template<typename T>
-std::optional<T> protoParse(std::string_view name, const fuurin::zmq::Part& val)
+T protoParse(std::string_view name, const fuurin::zmq::Part& val)
 {
     T ret;
-    if (!ret.ParseFromArray(val.data(), val.size())) {
-        log_info(flog::Arg(name), flog::Arg("error"sv, "failed ParseFromArray"sv));
-        return {};
-    }
-    return {ret};
+    if (!ret.ParseFromArray(val.data(), val.size()))
+        log_fatal(flog::Arg(name), flog::Arg("error"sv, "failed ParseFromArray"sv));
+    return ret;
 }
 
 } // namespace
@@ -370,21 +360,13 @@ fuurin::zmq::Part WorkerServiceImpl::serveRPC(RPC type, const fuurin::zmq::Part&
         ret = fuurin::zmq::Part{worker_->seqNumber()};
         break;
 
-    case RPC::SetEndpoints: {
-        const auto endp = protoParse<Endpoints>("RPC::SetEndpoints"sv, pay);
-        if (!endp)
-            break;
-        applyEndpoints(endp.value());
+    case RPC::SetEndpoints:
+        applyEndpoints(protoParse<Endpoints>("RPC::SetEndpoints"sv, pay));
         break;
-    }
 
-    case RPC::SetSubscriptions: {
-        const auto subscr = protoParse<Subscriptions>("RPC::SetSubscriptions"sv, pay);
-        if (!subscr)
-            break;
-        applySubscriptions(subscr.value());
+    case RPC::SetSubscriptions:
+        applySubscriptions(protoParse<Subscriptions>("RPC::SetSubscriptions"sv, pay));
         break;
-    }
 
     case RPC::SetStart:
         if (!worker_->isRunning())
@@ -402,13 +384,9 @@ fuurin::zmq::Part WorkerServiceImpl::serveRPC(RPC type, const fuurin::zmq::Part&
         worker_->sync();
         break;
 
-    case RPC::SetDispatch: {
-        const auto topic = protoParse<Topic>("RPC::SetDispatch"sv, pay);
-        if (!topic)
-            break;
-        setDispatch(topic.value());
+    case RPC::SetDispatch:
+        setDispatch(protoParse<Topic>("RPC::SetDispatch"sv, pay));
         break;
-    }
     };
 
     return ret;
