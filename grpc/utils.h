@@ -12,6 +12,8 @@
 
 #include <vector>
 #include <string>
+#include <chrono>
+#include <future>
 
 
 namespace fuurin {
@@ -98,6 +100,17 @@ void printArgsEndpoints(const Endpoints& endpts);
  * \param[in] addr Server address.
  */
 void printArgsServerAddress(const std::string& addr);
+
+
+/**
+ * \brief Waits for result from the passed \c future.
+ *
+ * In case of errors, it prints out the exception message.
+ *
+ * \param[in] future Future to wait for.
+ * \param[in] timeout Timeout to get result. Negative value will cause no expiration.
+ */
+void waitForResult(std::future<void>* future, std::chrono::milliseconds timeout = std::chrono::milliseconds(-1));
 
 } // namespace utils
 

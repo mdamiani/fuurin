@@ -22,7 +22,7 @@ int main(int argc, char** argv)
 
     auto bf = broker.start();
 
-    bf.get();
+    utils::waitForResult(&bf);
 
     return 0;
 }

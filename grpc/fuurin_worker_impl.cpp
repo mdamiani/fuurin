@@ -20,7 +20,6 @@
 #include "fuurin/workerconfig.h"
 #include "fuurin/uuid.h"
 #include "fuurin/logger.h"
-#include "fuurin/errors.h"
 #include "fuurin/zmqtimer.h"
 
 #include <grpcpp/server.h>
@@ -310,7 +309,7 @@ void WorkerServiceImpl::runClient()
 
             if (s == &mon) {
                 mon.consume();
-                tryGetStartedResult(0ms);
+                utils::waitForResult(&active_, 0ms);
                 continue;
             }
 
@@ -395,7 +394,7 @@ fuurin::zmq::Part WorkerServiceImpl::serveRPC(RPC type, const fuurin::zmq::Part&
         if (worker_->isRunning()) {
             worker_->stop();
         }
-        tryGetStartedResult();
+        utils::waitForResult(&active_);
         break;
 
     case RPC::SetSync:
@@ -575,24 +574,4 @@ std::optional<Event> WorkerServiceImpl::getEvent(const fuurin::zmq::Part& pay) c
     };
 
     return {ret};
-}
-
-
-void WorkerServiceImpl::tryGetStartedResult(std::chrono::milliseconds timeout)
-{
-    if (!active_.valid())
-        return;
-
-    if (timeout >= 0ms) {
-        if (active_.wait_for(timeout) != std::future_status::ready)
-            return;
-    }
-
-    try {
-        active_.get();
-    } catch (const fuurin::err::Error& e) {
-        // TODO: use logger helper functions
-        flog::Arg args[] = {flog::Arg{"error"sv, std::string_view(e.what())}, e.arg()};
-        fuurin::log::Logger::error(e.loc(), args, 2);
-    }
 }

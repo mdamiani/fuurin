@@ -249,15 +249,6 @@ private:
      */
     std::optional<Event> getEvent(const fuurin::zmq::Part& pay) const;
 
-    /**
-     * \brief Tries to get the \ref active_ result, if \c valid.
-     *
-     * It prints errors in case of any.
-     *
-     * \param[in] timeout Waiting timeout, negative value will cause no expiration.
-     */
-    void tryGetStartedResult(std::chrono::milliseconds timeout = std::chrono::milliseconds(-1));
-
 
 private:
     ///< Test class.

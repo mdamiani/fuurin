@@ -10,9 +10,17 @@
 
 #include "utils.h"
 #include "fuurin/runner.h"
+#include "fuurin/errors.h"
+#include "fuurin/logger.h"
 
+#include <string_view>
 #include <iostream>
 
+
+using namespace std::literals::string_view_literals;
+using namespace std::literals::chrono_literals;
+
+namespace flog = fuurin::log;
 
 namespace utils {
 
@@ -80,6 +88,26 @@ void printArgsEndpoints(const Endpoints& endpts)
 void printArgsServerAddress(const std::string& addr)
 {
     std::cout << "Server address: " << addr << "\n";
+}
+
+
+void waitForResult(std::future<void>* future, std::chrono::milliseconds timeout)
+{
+    if (!future->valid())
+        return;
+
+    if (timeout >= 0ms) {
+        if (future->wait_for(timeout) != std::future_status::ready)
+            return;
+    }
+
+    try {
+        future->get();
+    } catch (const fuurin::err::Error& e) {
+        // TODO: use logger helper functions
+        flog::Arg args[] = {flog::Arg{"error"sv, std::string_view(e.what())}, e.arg()};
+        fuurin::log::Logger::error(e.loc(), args, 2);
+    }
 }
 
 } // namespace utils
