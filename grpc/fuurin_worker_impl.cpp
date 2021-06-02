@@ -104,24 +104,26 @@ auto WorkerServiceImpl::Run(const std::string& addr, const utils::Endpoints& end
     std::unique_ptr<WorkerServiceImpl>,
     std::future<void>,
     CancelFn,
-    utils::Endpoints>
+    utils::Endpoints,
+    bool>
 {
     auto service = new WorkerServiceImpl{addr};
     auto retEndp = utils::applyArgsEndpoints(endp, service->worker_.get());
 
     auto cancel = std::bind(&WorkerServiceImpl::shutdown, service);
-    auto promise = std::promise<void>{};
+    auto promise = std::promise<bool>{};
     auto started = promise.get_future();
     auto future = std::async(std::launch::async, &WorkerServiceImpl::runServer, service, &promise);
 
     // wait for server started
-    started.get();
+    auto succ = started.get();
 
     return {
         std::unique_ptr<WorkerServiceImpl>{service},
         std::move(future),
         std::move(cancel),
         retEndp,
+        succ,
     };
 }
 
@@ -129,7 +131,9 @@ auto WorkerServiceImpl::Run(const std::string& addr, const utils::Endpoints& end
 void WorkerServiceImpl::shutdown()
 {
     zcanc2_->cancel();
-    server_->Shutdown();
+
+    if (server_)
+        server_->Shutdown();
 
     sendRPC(RPC::SetStop);
 }
@@ -274,7 +278,7 @@ grpc::Status WorkerServiceImpl::WaitForEvent(grpc::ServerContext* context,
 }
 
 
-void WorkerServiceImpl::runServer(std::promise<void>* started)
+void WorkerServiceImpl::runServer(std::promise<bool>* started)
 {
     grpc::ServerBuilder builder;
 
@@ -283,9 +287,10 @@ void WorkerServiceImpl::runServer(std::promise<void>* started)
 
     server_ = builder.BuildAndStart();
 
-    started->set_value();
+    started->set_value(server_ != nullptr);
 
-    server_->Wait();
+    if (server_)
+        server_->Wait();
 }
 
 

@@ -11,16 +11,22 @@
 #include "fuurin_worker_impl.h"
 #include "utils.h"
 
+#include <iostream>
+
 
 int main(int argc, char** argv)
 {
     auto serverAddr = utils::parseArgsServerAddress(argc, argv, 1);
 
-    auto [service, future, cancel, endpts] = WorkerServiceImpl::Run(serverAddr,
+    auto [service, future, cancel, endpts, succ] = WorkerServiceImpl::Run(serverAddr,
         utils::parseArgsEndpoints(argc, argv, 2));
 
-    utils::printArgsServerAddress(serverAddr);
-    utils::printArgsEndpoints(endpts);
+    if (succ) {
+        utils::printArgsServerAddress(serverAddr);
+        utils::printArgsEndpoints(endpts);
+    } else {
+        std::cerr << "Error: Server start failed\n";
+    }
 
     future.get();
     cancel();

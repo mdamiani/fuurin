@@ -74,7 +74,8 @@ public:
         std::unique_ptr<WorkerServiceImpl>,
         std::future<void>,
         CancelFn,
-        utils::Endpoints>;
+        utils::Endpoints,
+        bool>;
 
     /**
      * \brief Destructor.
@@ -178,7 +179,7 @@ private:
      *
      * \param[in] started Promise to sets when the servers has actually created and started.
      */
-    void runServer(std::promise<void>* started);
+    void runServer(std::promise<bool>* started);
 
     /**
      * \brief Runs the worker main loop, to multiplex client's requests.

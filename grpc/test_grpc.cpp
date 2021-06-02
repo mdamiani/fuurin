@@ -61,9 +61,12 @@ struct ServiceFixture
         const std::string address{"localhost:50051"};
         brokFut = broker.start();
         utils::Endpoints endpts;
-        std::tie(service, servFut, servCanc, endpts) = WorkerServiceImpl::Run(address, utils::Endpoints{});
+        bool succ;
+        std::tie(service, servFut, servCanc, endpts, succ) = WorkerServiceImpl::Run(address, {});
         client = std::make_unique<WorkerCli>(grpc::CreateChannel(address, grpc::InsecureChannelCredentials()));
         worker = TestWorkerServiceImpl::getWorker(service.get());
+
+        BOOST_TEST(succ);
     }
 
     ~ServiceFixture()
@@ -558,12 +561,14 @@ BOOST_FIXTURE_TEST_CASE(testSyncErr, ServiceFixture)
 BOOST_AUTO_TEST_CASE(shutdownWaitForEventServer, *utf::timeout(10))
 {
     const std::string address{"localhost:50051"};
-    auto [service, servFut, servCanc, _] = WorkerServiceImpl::Run(address, utils::Endpoints{});
+    auto [service, servFut, servCanc, _, succ] = WorkerServiceImpl::Run(address, {});
     auto client = WorkerCli{grpc::CreateChannel(address, grpc::InsecureChannelCredentials())};
 
     auto f = std::async(std::launch::async, [&client]() {
         return client.WaitForEvent(0s, [](Event) { return true; });
     });
+
+    BOOST_TEST(succ);
 
     servCanc();
     servFut.get();
@@ -575,9 +580,10 @@ BOOST_AUTO_TEST_CASE(shutdownWaitForEventServer, *utf::timeout(10))
 BOOST_AUTO_TEST_CASE(shutdownWaitForEventClient, *utf::timeout(10))
 {
     const std::string address{"localhost:50051"};
-    auto [service, servFut, servCanc, _] = WorkerServiceImpl::Run(address, utils::Endpoints{});
+    auto [service, servFut, servCanc, _, succ] = WorkerServiceImpl::Run(address, {});
     auto client = WorkerCli{grpc::CreateChannel(address, grpc::InsecureChannelCredentials())};
 
+    BOOST_TEST(succ);
     BOOST_TEST(client.WaitForEvent(0s, [](Event) { return false; }));
 
     servCanc();
@@ -590,10 +596,10 @@ BOOST_AUTO_TEST_CASE(errorGetOnStop, *utf::timeout(15))
     const std::string address{"localhost:50051"};
     utils::Endpoints endp{{"invalid"}, {"invalid"}, {"invalid"}};
 
-
-    auto [service, servFut, servCanc, _] = WorkerServiceImpl::Run(address, endp);
+    auto [service, servFut, servCanc, _, succ] = WorkerServiceImpl::Run(address, endp);
     auto client = WorkerCli{grpc::CreateChannel(address, grpc::InsecureChannelCredentials())};
 
+    BOOST_TEST(succ);
     BOOST_TEST(client.Start());
     BOOST_TEST(client.Stop());
 
@@ -609,15 +615,29 @@ BOOST_AUTO_TEST_CASE(errorGetOnMonitor, *utf::timeout(15))
     const std::string address{"localhost:50051"};
     utils::Endpoints endp{{"invalid"}, {"invalid"}, {"invalid"}};
 
-
-    auto [service, servFut, servCanc, _] = WorkerServiceImpl::Run(address, endp);
+    auto [service, servFut, servCanc, _, succ] = WorkerServiceImpl::Run(address, endp);
     auto client = WorkerCli{grpc::CreateChannel(address, grpc::InsecureChannelCredentials())};
 
+    BOOST_TEST(succ);
     BOOST_TEST(client.Start());
 
     std::this_thread::sleep_for(WorkerServiceImpl::LatencyDuration + 2s);
 
     BOOST_TEST(TestWorkerServiceImpl::getActiveFuture(service.get())->valid() == false);
+
+    servCanc();
+    servFut.get();
+}
+
+
+BOOST_AUTO_TEST_CASE(badServerAddress, *utf::timeout(10))
+{
+    const std::string address{"invalid"};
+
+    auto [service, servFut, servCanc, _, succ] = WorkerServiceImpl::Run(address, {});
+    auto client = WorkerCli{grpc::CreateChannel(address, grpc::InsecureChannelCredentials())};
+
+    BOOST_TEST(!succ);
 
     servCanc();
     servFut.get();
