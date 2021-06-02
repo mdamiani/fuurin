@@ -14,9 +14,12 @@
 
 int main(int argc, char** argv)
 {
-    auto [service, future, cancel, endpts] = WorkerServiceImpl::Run("localhost:50051",
-        utils::parseArgsEndpoints(argc, argv, 1));
+    auto serverAddr = utils::parseArgsServerAddress(argc, argv, 1);
 
+    auto [service, future, cancel, endpts] = WorkerServiceImpl::Run(serverAddr,
+        utils::parseArgsEndpoints(argc, argv, 2));
+
+    utils::printArgsServerAddress(serverAddr);
     utils::printArgsEndpoints(endpts);
 
     future.get();

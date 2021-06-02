@@ -47,7 +47,6 @@ Endpoints parseAndApplyArgsEndpoints(int argc, char** argv, int startIdx, fuurin
 
 
 /**
- *
  * \brief Parses endpoints starting at specified index of command line arguments.
  *
  * \param[in] argc Command line \c argc.
@@ -57,6 +56,18 @@ Endpoints parseAndApplyArgsEndpoints(int argc, char** argv, int startIdx, fuurin
  * \return Connection endpoints, or an empty value.
  */
 Endpoints parseArgsEndpoints(int argc, char** argv, int startIdx);
+
+
+/**
+ * \brief Parses gRPC server address at the specified index of command line arguments.
+ *
+ * \param[in] argc Command line \c argc.
+ * \param[in] argv Command line \c argv.
+ * \param[in] startIdx Index of \c argv at which parsing is started.
+ *
+ * \return Server address, or "localhost:50051" as default address.
+ */
+std::string parseArgsServerAddress(int argc, char** argv, int startIdx);
 
 
 /**
@@ -79,6 +90,14 @@ Endpoints applyArgsEndpoints(Endpoints endpts, fuurin::Runner* runner);
  * \param[in] endpts Endpoints to print.
  */
 void printArgsEndpoints(const Endpoints& endpts);
+
+
+/**
+ * \brief Prints the server address.
+ *
+ * \param[in] addr Server address.
+ */
+void printArgsServerAddress(const std::string& addr);
 
 } // namespace utils
 

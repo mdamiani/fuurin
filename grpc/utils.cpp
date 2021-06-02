@@ -34,6 +34,15 @@ Endpoints parseArgsEndpoints(int argc, char** argv, int startIdx)
 }
 
 
+std::string parseArgsServerAddress(int argc, char** argv, int startIdx)
+{
+    if (startIdx >= argc)
+        return "localhost:50051";
+
+    return argv[startIdx];
+}
+
+
 Endpoints applyArgsEndpoints(Endpoints endpts, fuurin::Runner* runner)
 {
     if (!endpts.delivery.empty() || !endpts.dispatch.empty() || !endpts.snapshot.empty())
@@ -65,6 +74,12 @@ void printArgsEndpoints(const Endpoints& endpts)
     for (const auto& el : endpts.snapshot)
         std::cout << el << " ";
     std::cout << "\n";
+}
+
+
+void printArgsServerAddress(const std::string& addr)
+{
+    std::cout << "Server address: " << addr << "\n";
 }
 
 } // namespace utils

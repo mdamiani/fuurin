@@ -289,7 +289,6 @@ void WorkerServiceImpl::runServer(std::promise<void>* started)
     builder.RegisterService(this);
 
     server_ = builder.BuildAndStart();
-    log_info(flog::Arg{"Server listening"sv}, flog::Arg{"address"sv, server_addr_});
 
     started->set_value();
 
@@ -299,8 +298,6 @@ void WorkerServiceImpl::runServer(std::promise<void>* started)
 
 void WorkerServiceImpl::runClient()
 {
-    log_info(flog::Arg{"Starting worker..."sv});
-
     fuurin::zmq::Poller poll{fuurin::zmq::PollerEvents::Type::Read,
         zrpcServer_.get(), zcanc1_.get()};
 
@@ -325,8 +322,6 @@ void WorkerServiceImpl::runClient()
 
 void WorkerServiceImpl::runEvents()
 {
-    log_info(flog::Arg{"Starting events..."sv});
-
     for (;;) {
         const auto& ev = worker_->waitForEvent(zcanc1_.get());
         if (ev.notification() == fuurin::Event::Notification::Timeout)
