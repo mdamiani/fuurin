@@ -54,7 +54,8 @@ struct ServiceFixture
     {
         const std::string address{"localhost:50051"};
         brokFut = broker.start();
-        std::tie(service, servFut, servCanc) = WorkerServiceImpl::Run(address);
+        utils::Endpoints endpts;
+        std::tie(service, servFut, servCanc, endpts) = WorkerServiceImpl::Run(address, utils::Endpoints{});
         client = std::make_unique<WorkerCli>(grpc::CreateChannel(address, grpc::InsecureChannelCredentials()));
         worker = TestWorkerServiceImpl::getWorker(service.get());
     }
@@ -551,7 +552,7 @@ BOOST_FIXTURE_TEST_CASE(testSyncErr, ServiceFixture)
 BOOST_AUTO_TEST_CASE(shutdownWaitForEventServer, *utf::timeout(10))
 {
     const std::string address{"localhost:50051"};
-    auto [service, servFut, servCanc] = WorkerServiceImpl::Run(address);
+    auto [service, servFut, servCanc, _] = WorkerServiceImpl::Run(address, utils::Endpoints{});
     auto client = WorkerCli{grpc::CreateChannel(address, grpc::InsecureChannelCredentials())};
 
     auto f = std::async(std::launch::async, [&client]() {
@@ -568,7 +569,7 @@ BOOST_AUTO_TEST_CASE(shutdownWaitForEventServer, *utf::timeout(10))
 BOOST_AUTO_TEST_CASE(shutdownWaitForEventClient, *utf::timeout(10))
 {
     const std::string address{"localhost:50051"};
-    auto [service, servFut, servCanc] = WorkerServiceImpl::Run(address);
+    auto [service, servFut, servCanc, _] = WorkerServiceImpl::Run(address, utils::Endpoints{});
     auto client = WorkerCli{grpc::CreateChannel(address, grpc::InsecureChannelCredentials())};
 
     BOOST_TEST(client.WaitForEvent(0s, [](Event) { return false; }));
@@ -592,7 +593,7 @@ inline std::ostream& operator<<(std::ostream& os, const std::vector<std::string>
 
 using V = std::vector<std::string>;
 
-BOOST_DATA_TEST_CASE(testParseArgsEndpoints,
+BOOST_DATA_TEST_CASE(testParseAndApplyArgsEndpoints,
     bdata::make({
         std::make_tuple(V{}, 1,
             V{"ipc:///tmp/worker_delivery"},
@@ -645,9 +646,13 @@ BOOST_DATA_TEST_CASE(testParseArgsEndpoints,
         argvP[i + 1] = argvC[i + 1];
     }
 
-    utils::parseArgsEndpoints(argv.size() + 1, argvP, startIdx, &b);
+    auto gotEndpts = utils::parseAndApplyArgsEndpoints(argv.size() + 1, argvP, startIdx, &b);
 
     BOOST_TEST(wantDelivery == b.endpointDelivery());
     BOOST_TEST(wantDispatch == b.endpointDispatch());
     BOOST_TEST(wantSnapshot == b.endpointSnapshot());
+
+    BOOST_TEST(wantDelivery == gotEndpts.delivery);
+    BOOST_TEST(wantDispatch == gotEndpts.dispatch);
+    BOOST_TEST(wantSnapshot == gotEndpts.snapshot);
 }

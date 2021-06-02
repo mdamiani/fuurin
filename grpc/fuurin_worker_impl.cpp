@@ -107,12 +107,15 @@ WorkerServiceImpl::~WorkerServiceImpl() noexcept
 }
 
 
-auto WorkerServiceImpl::Run(const std::string& addr) -> std::tuple<
+auto WorkerServiceImpl::Run(const std::string& addr, const utils::Endpoints& endp) -> std::tuple<
     std::unique_ptr<WorkerServiceImpl>,
     std::future<void>,
-    CancelFn>
+    CancelFn,
+    utils::Endpoints>
 {
     auto service = new WorkerServiceImpl{addr};
+    auto retEndp = utils::applyArgsEndpoints(endp, service->worker_.get());
+
     auto cancel = std::bind(&WorkerServiceImpl::shutdown, service);
     auto promise = std::promise<void>{};
     auto started = promise.get_future();
@@ -125,6 +128,7 @@ auto WorkerServiceImpl::Run(const std::string& addr) -> std::tuple<
         std::unique_ptr<WorkerServiceImpl>{service},
         std::move(future),
         std::move(cancel),
+        retEndp,
     };
 }
 

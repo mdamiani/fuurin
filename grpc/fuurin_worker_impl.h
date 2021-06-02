@@ -12,6 +12,7 @@
 #define FUURIN_WORKER_IMPL_H
 
 #include "worker.grpc.pb.h"
+#include "utils.h"
 
 #include <grpc/grpc.h>
 #include <grpcpp/server_context.h>
@@ -63,10 +64,11 @@ public:
      * \return A tuple with a server instantion, a future to wait for
      *      and a function to stop the server.
      */
-    static auto Run(const std::string& addr) -> std::tuple<
+    static auto Run(const std::string& addr, const utils::Endpoints& endp) -> std::tuple<
         std::unique_ptr<WorkerServiceImpl>,
         std::future<void>,
-        CancelFn>;
+        CancelFn,
+        utils::Endpoints>;
 
     /**
      * \brief Destructor.

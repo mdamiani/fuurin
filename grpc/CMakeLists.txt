@@ -81,6 +81,7 @@ foreach(_target
     add_executable(${_target}
         "${_target}.cpp"
         "${_target}_impl.cpp"
+        utils.cpp
         ${wrk_proto_srcs}
         ${wrk_grpc_srcs})
 

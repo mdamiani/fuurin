@@ -9,11 +9,15 @@
  */
 
 #include "fuurin_worker_impl.h"
+#include "utils.h"
 
 
-int main(int, char**)
+int main(int argc, char** argv)
 {
-    auto [service, future, cancel] = WorkerServiceImpl::Run("localhost:50051");
+    auto [service, future, cancel, endpts] = WorkerServiceImpl::Run("localhost:50051",
+        utils::parseArgsEndpoints(argc, argv, 1));
+
+    utils::printArgsEndpoints(endpts);
 
     future.get();
     cancel();

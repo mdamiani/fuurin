@@ -16,7 +16,9 @@ int main(int argc, char** argv)
 {
     fuurin::Broker broker;
 
-    utils::parseArgsEndpoints(argc, argv, 1, &broker);
+    auto endpts = utils::parseAndApplyArgsEndpoints(argc, argv, 1, &broker);
+
+    utils::printArgsEndpoints(endpts);
 
     auto bf = broker.start();
 
