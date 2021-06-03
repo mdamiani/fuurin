@@ -656,6 +656,27 @@ inline std::ostream& operator<<(std::ostream& os, const std::vector<std::string>
 }
 } // namespace std
 
+namespace {
+char** buildArgv(const std::vector<std::string>& argv)
+{
+    static char* argvP[32];
+    static char argvC[32][32];
+
+    BOOST_REQUIRE(argv.size() + 1 <= sizeof(argvC) / sizeof(argvC[0]));
+
+    for (size_t i = 0; i < argv.size(); ++i) {
+        auto el = argv[i];
+        BOOST_REQUIRE(el.size() + 1 <= sizeof(argvC[i + 1]));
+
+        std::copy_n(el.data(), el.size(), argvC[i + 1]);
+        argvC[i + 1][el.size()] = '\0';
+        argvP[i + 1] = argvC[i + 1];
+    }
+
+    return argvP;
+}
+} // namespace
+
 using V = std::vector<std::string>;
 
 BOOST_DATA_TEST_CASE(testParseAndApplyArgsEndpoints,
@@ -697,21 +718,7 @@ BOOST_DATA_TEST_CASE(testParseAndApplyArgsEndpoints,
 {
     fuurin::Broker b;
 
-    char* argvP[32];
-    char argvC[32][32];
-
-    BOOST_REQUIRE(argv.size() + 1 <= sizeof(argvC) / sizeof(argvC[0]));
-
-    for (size_t i = 0; i < argv.size(); ++i) {
-        auto el = argv[i];
-        BOOST_REQUIRE(el.size() + 1 <= sizeof(argvC[i + 1]));
-
-        std::copy_n(el.data(), el.size(), argvC[i + 1]);
-        argvC[i + 1][el.size()] = '\0';
-        argvP[i + 1] = argvC[i + 1];
-    }
-
-    auto gotEndpts = utils::parseAndApplyArgsEndpoints(argv.size() + 1, argvP, startIdx, &b);
+    auto gotEndpts = utils::parseAndApplyArgsEndpoints(argv.size() + 1, buildArgv(argv), startIdx, &b);
 
     BOOST_TEST(wantDelivery == b.endpointDelivery());
     BOOST_TEST(wantDispatch == b.endpointDispatch());
@@ -720,4 +727,19 @@ BOOST_DATA_TEST_CASE(testParseAndApplyArgsEndpoints,
     BOOST_TEST(wantDelivery == gotEndpts.delivery);
     BOOST_TEST(wantDispatch == gotEndpts.dispatch);
     BOOST_TEST(wantSnapshot == gotEndpts.snapshot);
+}
+
+
+BOOST_DATA_TEST_CASE(testParseArgsServerAddress,
+    bdata::make({
+        std::make_tuple(V{}, 1, "localhost:50051"),
+        std::make_tuple(V{"unused1", "unused2", "unused3"}, 5, "localhost:50051"),
+        std::make_tuple(V{"addr1", "addr2"}, 1, "addr1"),
+        std::make_tuple(V{"addr1", "addr2", "addr3"}, 2, "addr2"),
+    }),
+    argv, startIdx, wantAddr)
+{
+    auto gotAddr = utils::parseArgsServerAddress(argv.size() + 1, buildArgv(argv), startIdx);
+
+    BOOST_TEST(wantAddr == gotAddr);
 }
