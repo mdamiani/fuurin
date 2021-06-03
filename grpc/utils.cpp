@@ -35,7 +35,7 @@ Endpoints parseArgsEndpoints(int argc, char** argv, int startIdx)
 {
     std::vector<std::vector<std::string>> endp{3};
 
-    for (int i = startIdx, k = 0; i < argc; ++i, (k = ++k % endp.size()))
+    for (int i = startIdx, k = 0; i < argc; ++i, (k + 1 >= int(endp.size()) ? k = 0 : ++k))
         endp[k].push_back(std::string(argv[i]));
 
     return {endp[0], endp[1], endp[2]};
