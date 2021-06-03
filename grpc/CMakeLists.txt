@@ -73,8 +73,7 @@ set(GRPC_SAN_SUPPR
 
 # Targets
 foreach(_target
-    fuurin_worker
-    fuurin_cli)
+    fuurin_worker)
 
     message("-- Adding gRPC ${_target}")
 
