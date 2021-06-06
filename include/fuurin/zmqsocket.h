@@ -81,6 +81,8 @@ public:
     ///@}
 
     /**
+     * This method is thread-safe.
+     *
      * \return The underlying raw ZMQ pointer.
      */
     void* zmqPointer() const noexcept override;

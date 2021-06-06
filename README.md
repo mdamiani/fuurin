@@ -9,13 +9,16 @@ Simple and fast communication library based on [ZeroMQ](http://zeromq.org).
 
 It provides few easy to use C++ classes in order to connect different parties together.
 There are also C++ bindings to some ZMQ sockets and features, which are used by the library
-components themselves.
+components themselves. Finally there some system-level software components which
+can be accessed by [gRPC](https://grpc.io) calls, in order to hide ZMQ details and
+to be able to develop microservices in any language supported by gRPC.
 
 ## Table of Contents
 1. [Features](#Features)
-2. [Architecture](#Architecture)
-3. [Licenses](#Licenses)
-4. [Guidelines](#Guidelines)
+1. [Architecture](#Architecture)
+1. [gRPC](#gRPC)
+1. [Licenses](#Licenses)
+1. [Guidelines](#Guidelines)
 
 ## Features
 
@@ -32,13 +35,18 @@ components themselves.
 
  * Network Classes:
     - Microservices mini framework, based on workers and brokers.
-    - Connection management between worker and broker.
+    - Connection management between [worker](include/fuurin/worker.h) and [broker](include/fuurin/broker.h).
     - Redesigned and extended [ZMQ Clone Pattern](https://zguide.zeromq.org/docs/chapter5/#Reliable-Pub-Sub-Clone-Pattern).
     - Late joining management in publish/subscribe patterns.
     - Retry and keep alive to check for liveness.
     - Eventually consistent and coherent distributed system, for high availability.
     - Universally unique identifier support (UUID).
     - Reliability by means of supported redundant connections.
+
+ * gRPC service
+    - [fuurin_broker](grpc/fuurin_broker.cpp) is a software component which implements a fuurin broker.
+    - [fuurin_worker](grpc/fuurin_worker.cpp) is a software component which is both a gRPC server and fuurin worker.
+    - Clients may be written following the service [worker.proto](grpc/worker.proto) specification.
 
 (_TODO: add references to classes where possibile._)
 
@@ -152,6 +160,45 @@ to different brokers. A detailed state machine chart is shown below:
 ![Sync_State](http://www.plantuml.com/plantuml/png/RP59Rzim48Nl_1LpJ0g4w78psY10WgAvIhaLFH3as1BAHI17hesY_xrSdB49-qHgtZSpZqzFYLIarLdnyyClU7XuX1_A4XeXshc1JnAURKW8AUZVI9A5pn86J4ZWyK0d5IZ0Texf0lloZgMZr_3wKf2FKho4Fzu6bO41ASwud_qEabVB57AtbEAxcctfxvUFUKYfZglMc98KF8ZD5pduaS9oTz-cP2tEkubk0MLW0TRbbYfoF8J0E_uAW5OgWyCU8sGlQ55tCKZ61jJ1-o9l-7vD5HDGetxrEg93pt5TGJds4RrfkWxEAM_Eq5jKFcqnjdKuxx66cgRGcQ9upCHvcLC7YBMgm-epAe1VM8DbxrdWUrMABG7rAD_iG01VkpgKU0TSxF7klcCiRYbppLo1tcQ7OQKEuvLeAlCSt6AHq5HAmEaNzfuBM7eoqvxL07vXfxVXlAVJ13HxNJTiMcZmzHlG535dRSqLYOQvnmlidtX2RrPd_mC0)
 
 **TDB**: Handling of multiple snapshot endpoints to be implemented.
+
+
+## gRPC
+
+The [gRPC](https://grpc.io) interface in defined is the [worker.proto](grpc/worker.proto)
+specification file, which requires [protobuf](https://developers.google.com/protocol-buffers)
+at least version
+[3.15.8](https://github.com/protocolbuffers/protobuf/releases/tag/v3.15.8)
+and gRPC libraries at least version
+[1.37.1](https://github.com/grpc/grpc/releases/tag/v1.37.1).
+Such libraries are not provided by this project, but they are dynamically linked at system level.
+
+The gRPC service mainly provides the following calls, which all are thread-safe:
+
+  - *SetEndpoints*: Changes the fuurin worker endpoints.
+  - *SetSubscriptions*: Registers the topic names to sync with fuurin broker.
+  - *WaitForEvent*: Waits for any incoming events. In case of multiple clients, events are multiplexed,
+    that is they are all received by every client.
+  - *Start*: Starts the connection with broker. Following subsequent events are expected:
+    - *Started*: upon worker start.
+    - *Online*: upon connection with broker.
+  - *Stop*: Stops the connection with broker. Following subsequent events are expected:
+    - *Offline*: upon disconnection with broker.
+    - *Stopped*: upon worker stop.
+  - *Dispatch*: Sends a topic to the broker. Topic data is always treated as generic bytes. Following subsequent events are expected:
+    - *Delivery*: for every subscribed topic.
+  - *Sync*: Syncs with the broker. Following subsequent events are expected:
+    - *SyncDownloadOn*: upon sync start.
+    - *SyncRequest*: when sync request was sent to the broker.
+    - *SyncBegin*: when sync reply from broker was received.
+    - *SyncElement*: for every subscribed topic.
+    - *SyncElement*
+    - ....
+    - *SyncSuccess*: in case of sync success.
+    - *SyncError*: in case of sync error.
+    - *SyncDownloadOff*: upon sync stop.
+
+
+
 
 ## Licenses
 

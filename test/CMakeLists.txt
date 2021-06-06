@@ -36,7 +36,7 @@ function (AddTest TEST)
     message("-- Adding test ${TEST}")
 
     add_executable(${TEST} ${TEST}.cpp)
-    add_dependencies(${TEST} boost_utf google_benchmark)
+    add_dependencies(${TEST} fuurin_static boost_utf google_benchmark)
 
     target_link_libraries(${TEST} fuurin_static boost_test_framework benchmark)
     target_include_directories(${TEST} PRIVATE ../)
@@ -57,3 +57,6 @@ AddTest(test_connmachine)
 AddTest(test_syncmachine)
 AddTest(test_uuid)
 AddTest(test_network)
+AddTest(test_tokenpool)
+
+target_compile_definitions(test_common PRIVATE ${LIB_COMPILE_DEFS})

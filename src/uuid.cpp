@@ -71,6 +71,12 @@ Uuid::Uuid()
 }
 
 
+Uuid::Uuid(const Uuid& other)
+{
+    *this = other;
+}
+
+
 bool Uuid::isNull() const noexcept
 {
     return uuidFromBytes(bytes_).is_nil();
@@ -144,6 +150,8 @@ Uuid Uuid::fromBytes(const Bytes& b)
 
 void Uuid::cacheSrepr() const
 {
+    const std::lock_guard<std::mutex> lock{reprMux_};
+
     if (cached_)
         return;
 
@@ -161,6 +169,16 @@ Uuid Uuid::fromPart(const zmq::Part& part)
 zmq::Part Uuid::toPart() const
 {
     return zmq::PartMulti::pack(bytes_);
+}
+
+
+Uuid& Uuid::operator=(const Uuid& rhs)
+{
+    std::lock_guard<std::mutex> lock{reprMux_};
+    bytes_ = rhs.bytes_;
+    cached_ = rhs.cached_;
+    srepr_ = rhs.srepr_;
+    return *this;
 }
 
 

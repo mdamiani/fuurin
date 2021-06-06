@@ -8,7 +8,7 @@
  # file, You can obtain one at http://mozilla.org/MPL/2.0/.
  ##
 
-option(ENABLE_COVERAGE "Enable Doxygen" OFF)
+option(ENABLE_DOXYGEN "Enable Doxygen" OFF)
 if(ENABLE_DOXYGEN)
     message(STATUS "Doxygen enabled")
 else()
@@ -24,11 +24,13 @@ set(DOXYGEN_EXTRACT_PRIVATE YES)
 set(DOXYGEN_WARN_AS_ERROR YES)
 set(DOXYGEN_EXTRACT_ALL YES)
 set(DOXYGEN_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/doxygen")
+set(DOXYGEN_EXCLUDE_PATTERNS "*/test_grpc.cpp")
 
 # this target will only be built if specifically asked to.
 # run "make api-docs" to create the doxygen documentation
 doxygen_add_docs(doxygen
     include/fuurin
     src
+    grpc
     COMMENT "Generate API documentation with Doxygen"
 )

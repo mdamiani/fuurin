@@ -8,14 +8,21 @@ env:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
 
     steps:
     - uses: actions/checkout@v2
 
     - name: Install Packages
       shell: bash
-      run: sudo apt install -y doxygen graphviz
+      run: sudo apt install -y
+        doxygen
+        graphviz
+        protobuf-compiler
+        protobuf-compiler-grpc
+        libprotobuf-dev
+        libgrpc-dev
+        libgrpc++-dev
 
     - name: Create Build Environment
       run: cmake -E make_directory ${{github.workspace}}/build
@@ -30,6 +37,7 @@ jobs:
         -DENABLE_ASAN=1
         -DENABLE_COVERAGE=1
         -DENABLE_DOXYGEN=1
+        -DENABLE_SERVICE_GRPC=1
 
     - name: Build
       working-directory: ${{github.workspace}}/build

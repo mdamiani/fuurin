@@ -75,6 +75,7 @@ set(LIB_SOURCES
     src/session.cpp
     src/sessionworker.cpp
     src/sessionbroker.cpp
+    src/tokenpool.cpp
 )
 
 set(LIB_PUBLIC_HEADERS
@@ -105,6 +106,7 @@ set(LIB_PUBLIC_HEADERS
     include/fuurin/sessionenv.h
     include/fuurin/sessionworker.h
     include/fuurin/sessionbroker.h
+    include/fuurin/tokenpool.h
 )
 
 set(LIB_DEPS
@@ -125,6 +127,11 @@ set(LIB_COMPILE_FLAGS
     -Wextra
 )
 
+set(LIB_LINK_FLAGS
+    zmq
+    ${CMAKE_THREAD_LIBS_INIT}
+)
+
 set(LIB_COMPILE_DEFS
     BOOST_SCOPE_EXIT_CONFIG_USE_LAMBDAS
     ZMQ_BUILD_DRAFT_API
@@ -136,11 +143,15 @@ set(LIB_COMPILE_DEFS
 
 include(Coverage)
 
-target_compile_options(fuurin_shared PUBLIC ${LIB_COMPILE_FLAGS})
-target_compile_options(fuurin_static PUBLIC ${LIB_COMPILE_FLAGS})
+target_compile_definitions(fuurin_shared PRIVATE ${LIB_COMPILE_DEFS})
+target_compile_definitions(fuurin_static PRIVATE ${LIB_COMPILE_DEFS})
 
-target_compile_definitions(fuurin_shared PUBLIC ${LIB_COMPILE_DEFS})
-target_compile_definitions(fuurin_static PUBLIC ${LIB_COMPILE_DEFS})
+target_compile_options(fuurin_shared PUBLIC ${LIB_COMPILE_FLAGS} ${SANITIZERS_COMPILE_FLAGS})
+target_compile_options(fuurin_static PUBLIC ${LIB_COMPILE_FLAGS} ${SANITIZERS_COMPILE_FLAGS})
+
+target_link_libraries(fuurin_static PUBLIC ${LIB_LINK_FLAGS} ${SANITIZERS_LINK_FLAGS})
+target_link_libraries(fuurin_shared PUBLIC ${LIB_LINK_FLAGS} ${SANITIZERS_LINK_FLAGS})
+
 
 set_target_properties(fuurin_shared PROPERTIES
     OUTPUT_NAME ${PROJECT_NAME}
@@ -161,8 +172,6 @@ include_directories(
     "${3RDPARTY_DIR}/include"
 )
 
-target_link_libraries(fuurin_static PUBLIC zmq ${CMAKE_THREAD_LIBS_INIT} ${LIB_LINK_FLAGS})
-target_link_libraries(fuurin_shared PUBLIC zmq ${CMAKE_THREAD_LIBS_INIT} ${LIB_LINK_FLAGS})
 
 option(BUILD_TESTS "Build fuurin tests" OFF)
 if(BUILD_TESTS)
@@ -181,6 +190,8 @@ if(BUILD_EXAMPLES)
 else()
     message(STATUS "Examples disabled")
 endif()
+
+add_subdirectory(${PROJECT_SOURCE_DIR}/grpc)
 
 
 option(BUILD_DEB_PACKAGE "Build fuurin Debian package" OFF)

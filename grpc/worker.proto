@@ -1,0 +1,113 @@
+/**
+ * Copyright (c) Contributors as noted in the AUTHORS file.
+ *
+ * This Source Code Form is part of *fuurin* library.
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ */
+
+syntax = "proto3";
+
+import "google/protobuf/empty.proto";
+
+
+message SeqNum {
+    uint64 value = 1;
+}
+
+
+message Uuid {
+    bytes data = 1;
+}
+
+
+message Endpoints {
+    repeated string delivery = 1;
+    repeated string dispatch = 2;
+    repeated string snapshot = 3;
+}
+
+
+message Subscriptions {
+    bool wildcard = 1;
+    repeated bytes name = 2;
+}
+
+
+message Topic {
+    enum Type {
+        State = 0;
+        Event = 1;
+    }
+
+    bytes name = 1;
+    bytes data = 2;
+    Type type = 3;
+}
+
+
+message TopicEvent {
+    SeqNum seqn = 1;
+    Uuid broker = 2;
+    Uuid worker = 3;
+    Topic topic = 4;
+}
+
+
+message ConfigEvent {
+    Uuid uuid = 1;
+    SeqNum seqn = 2;
+    Endpoints endpoints = 3;
+    Subscriptions subscriptions = 4;
+}
+
+
+message Event {
+    enum Type {
+        RCPSetup = 0;
+        RCPTeardown = 1;
+        Started = 2;
+        Stopped = 3;
+        Offline = 4;
+        Online = 5;
+        Delivery = 6;
+        SyncRequest = 7;
+        SyncBegin = 8;
+        SyncElement = 9;
+        SyncSuccess = 10;
+        SyncError = 11;
+        SyncDownloadOn = 12;
+        SyncDownloadOff = 13;
+    }
+
+    Type type = 1;
+
+    oneof payload {
+        TopicEvent topicEvent = 2;
+        ConfigEvent configEvent = 3;
+    }
+}
+
+
+message EventTimeout {
+    int32 millis = 1;
+}
+
+
+service WorkerService {
+    rpc GetUuid(google.protobuf.Empty) returns (Uuid) {}
+    rpc GetSeqNum(google.protobuf.Empty) returns (SeqNum) {}
+
+    rpc SetEndpoints(Endpoints) returns (google.protobuf.Empty) {}
+    rpc SetSubscriptions(Subscriptions) returns (google.protobuf.Empty) {}
+
+    rpc Start(google.protobuf.Empty) returns (google.protobuf.Empty) {}
+    rpc Stop(google.protobuf.Empty) returns (google.protobuf.Empty) {}
+    rpc Sync(google.protobuf.Empty) returns (google.protobuf.Empty) {}
+
+    rpc Dispatch(stream Topic) returns (google.protobuf.Empty) {}
+
+    rpc WaitForEvent(EventTimeout) returns (stream Event) {}
+}
