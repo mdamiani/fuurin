@@ -28,6 +28,7 @@ ExternalProject_Add(google_benchmark
     CMAKE_ARGS
         -D CMAKE_INSTALL_PREFIX=<INSTALL_DIR>
         -D CMAKE_BUILD_TYPE=Release
+        -D BENCHMARK_ENABLE_TESTING=OFF
         -D BENCHMARK_ENABLE_GTEST_TESTS=OFF
         -D BENCHMARK_ENABLE_LTO=false
 )
