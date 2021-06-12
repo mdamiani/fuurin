@@ -27,6 +27,7 @@ find_package(Threads REQUIRED)
 
 set(3RDPARTY_DIR ${CMAKE_BINARY_DIR}/3rdparty)
 
+
 ExternalProject_Add(zeromq
     SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/vendor/zeromq"
     INSTALL_DIR "${3RDPARTY_DIR}"
@@ -43,6 +44,27 @@ ExternalProject_Add(zeromq
         -D ENABLE_CURVE=OFF
         -D CMAKE_BUILD_TYPE=Release
 )
+
+
+function (AddImportedLibrary TARGET LIB)
+    message("-- Adding imported library ${TARGET} ${LIB}")
+
+    if(WIN32)
+        set(prefix "")
+        set(suffix ".lib")
+    else()
+        set(prefix "lib")
+        set(suffix ".a")
+    endif()
+
+    add_library(${TARGET} STATIC IMPORTED GLOBAL)
+    set_target_properties(${TARGET} PROPERTIES
+        IMPORTED_LOCATION "${3RDPARTY_DIR}/lib/${prefix}${LIB}${suffix}"
+    )
+endfunction (AddImportedLibrary)
+
+
+AddImportedLibrary(zeromq_static zmq)
 
 
 set(LIB_SOURCES
@@ -109,10 +131,6 @@ set(LIB_PUBLIC_HEADERS
     include/fuurin/tokenpool.h
 )
 
-set(LIB_DEPS
-    zeromq
-)
-
 set(LIB_VERSION_FULL ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH})
 set(LIB_SOVERSION ${PROJECT_VERSION_MAJOR})
 set(LIB_NAME "lib${PROJECT_NAME}")
@@ -128,7 +146,7 @@ set(LIB_COMPILE_FLAGS
 )
 
 set(LIB_LINK_FLAGS
-    zmq
+    zeromq_static
     ${CMAKE_THREAD_LIBS_INIT}
 )
 
@@ -163,8 +181,8 @@ set_target_properties(fuurin_static PROPERTIES
     OUTPUT_NAME ${PROJECT_NAME}
 )
 
-add_dependencies(fuurin_shared ${LIB_DEPS})
-add_dependencies(fuurin_static ${LIB_DEPS})
+add_dependencies(fuurin_shared zeromq)
+add_dependencies(fuurin_static zeromq)
 
 include_directories(
     "include"

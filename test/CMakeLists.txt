@@ -32,13 +32,16 @@ ExternalProject_Add(google_benchmark
         -D BENCHMARK_ENABLE_LTO=false
 )
 
+AddImportedLibrary(boost_utf_static boost_test_framework)
+AddImportedLibrary(benchmark_static benchmark)
+
 function (AddTest TEST)
     message("-- Adding test ${TEST}")
 
     add_executable(${TEST} ${TEST}.cpp)
     add_dependencies(${TEST} fuurin_static boost_utf google_benchmark)
 
-    target_link_libraries(${TEST} fuurin_static boost_test_framework benchmark)
+    target_link_libraries(${TEST} fuurin_static boost_utf_static benchmark_static)
     target_include_directories(${TEST} PRIVATE ../)
 
     add_test(NAME ${TEST}
