@@ -19,6 +19,7 @@ ExternalProject_Add(boost_utf
     CMAKE_ARGS
         -D CMAKE_INSTALL_PREFIX=<INSTALL_DIR>
         -D CMAKE_BUILD_TYPE=Release
+        -D CMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}
 )
 
 ExternalProject_Add(google_benchmark
@@ -31,6 +32,7 @@ ExternalProject_Add(google_benchmark
         -D BENCHMARK_ENABLE_TESTING=OFF
         -D BENCHMARK_ENABLE_GTEST_TESTS=OFF
         -D BENCHMARK_ENABLE_LTO=false
+        -D CMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}
 )
 
 AddImportedLibrary(boost_utf_static boost_test_framework)
