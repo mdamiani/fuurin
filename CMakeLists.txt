@@ -173,13 +173,8 @@ target_link_libraries(fuurin_shared PUBLIC ${LIB_LINK_FLAGS} ${SANITIZERS_LINK_F
 
 
 set_target_properties(fuurin_shared PROPERTIES
-    OUTPUT_NAME ${PROJECT_NAME}
     VERSION ${LIB_VERSION_FULL}
     SOVERSION ${LIB_SOVERSION}
-)
-
-set_target_properties(fuurin_static PROPERTIES
-    OUTPUT_NAME ${PROJECT_NAME}
 )
 
 add_dependencies(fuurin_shared zeromq)
