@@ -99,6 +99,7 @@ set(LIB_SOURCES
     src/sessionworker.cpp
     src/sessionbroker.cpp
     src/tokenpool.cpp
+    src/c/cuuid.cpp
 )
 
 set(LIB_PUBLIC_HEADERS
@@ -130,6 +131,7 @@ set(LIB_PUBLIC_HEADERS
     include/fuurin/sessionworker.h
     include/fuurin/sessionbroker.h
     include/fuurin/tokenpool.h
+    include/fuurin/c/cuuid.h
 )
 
 set(LIB_VERSION_FULL ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH})
