@@ -103,19 +103,19 @@ void Runner::setEndpoints(const std::vector<std::string>& delivery,
 }
 
 
-std::vector<std::string> Runner::endpointDelivery() const
+const std::vector<std::string>& Runner::endpointDelivery() const
 {
     return endpDelivery_;
 }
 
 
-std::vector<std::string> Runner::endpointDispatch() const
+const std::vector<std::string>& Runner::endpointDispatch() const
 {
     return endpDispatch_;
 }
 
 
-std::vector<std::string> Runner::endpointSnapshot() const
+const std::vector<std::string>& Runner::endpointSnapshot() const
 {
     return endpSnapshot_;
 }

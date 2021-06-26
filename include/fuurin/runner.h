@@ -115,9 +115,9 @@ public:
      * \see setEndpoints(std::vector<std::string>, std::vector<std::string>, std::vector<std::string>)
      */
     ///@{
-    std::vector<std::string> endpointDelivery() const;
-    std::vector<std::string> endpointDispatch() const;
-    std::vector<std::string> endpointSnapshot() const;
+    const std::vector<std::string>& endpointDelivery() const;
+    const std::vector<std::string>& endpointDispatch() const;
+    const std::vector<std::string>& endpointSnapshot() const;
     ///@}
 
     /**
