@@ -102,6 +102,7 @@ set(LIB_SOURCES
     src/c/cutils.cpp
     src/c/cuuid.cpp
     src/c/cworker.cpp
+    src/c/ctopic.cpp
 )
 
 set(LIB_PUBLIC_HEADERS

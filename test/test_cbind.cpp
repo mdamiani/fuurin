@@ -12,8 +12,10 @@
 #include <boost/test/unit_test.hpp>
 
 #include "fuurin/c/cuuid.h"
+#include "fuurin/c/ctopic.h"
 #include "fuurin/c/cworker.h"
 #include "fuurin/uuid.h"
+#include "fuurin/topic.h"
 
 #include <string_view>
 #include <algorithm>
@@ -35,6 +37,11 @@ bool uuidEqual(fuurin::Uuid a, CUuid b)
 bool uuidEqual(CUuid a, CUuid b)
 {
     return std::equal(a.bytes, a.bytes + sizeof(a.bytes), b.bytes);
+}
+
+CTopic* topicConvert(fuurin::Topic* t)
+{
+    return reinterpret_cast<CTopic*>(t);
 }
 } // namespace
 
@@ -109,6 +116,70 @@ BOOST_AUTO_TEST_CASE(testCUuid_copy)
 
     id2.bytes[0]++;
     BOOST_TEST(!uuidEqual(id1, id2));
+}
+
+
+/**
+ * CTopic
+ */
+
+BOOST_AUTO_TEST_CASE(testCTopic_uuid)
+{
+    fuurin::Topic t;
+    CTopic* ct = topicConvert(&t);
+
+    auto bid = fuurin::Uuid::createRandomUuid();
+    auto wid = fuurin::Uuid::createRandomUuid();
+
+    t.withBroker(bid);
+    t.withWorker(wid);
+
+    BOOST_TEST(uuidEqual(bid, CTopic_brokerUuid(ct)));
+    BOOST_TEST(uuidEqual(wid, CTopic_workerUuid(ct)));
+}
+
+
+BOOST_AUTO_TEST_CASE(testCTopic_seqnum)
+{
+    fuurin::Topic t;
+    CTopic* ct = topicConvert(&t);
+
+    t.withSeqNum(1000);
+    BOOST_TEST(CTopic_seqNum(ct) == 1000u);
+}
+
+
+BOOST_AUTO_TEST_CASE(testCTopic_type)
+{
+    fuurin::Topic t;
+    CTopic* ct = topicConvert(&t);
+
+    t.withType(fuurin::Topic::State);
+    BOOST_TEST(CTopic_type(ct) == TopicState);
+
+    t.withType(fuurin::Topic::Event);
+    BOOST_TEST(CTopic_type(ct) == TopicEvent);
+}
+
+
+BOOST_AUTO_TEST_CASE(testCTopic_name)
+{
+    fuurin::Topic t;
+    CTopic* ct = topicConvert(&t);
+
+    t.withName("topic1"sv);
+    BOOST_TEST(std::string(CTopic_name(ct)) == "topic1"s);
+}
+
+
+BOOST_AUTO_TEST_CASE(testCTopic_data)
+{
+    fuurin::Topic t;
+    CTopic* ct = topicConvert(&t);
+
+    t.withData(fuurin::zmq::Part{"payload"sv});
+    BOOST_TEST(std::string(CTopic_data(ct)) == "payload"s);
+    BOOST_TEST(CTopic_size(ct) == 7u);
 }
 
 
