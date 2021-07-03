@@ -82,7 +82,7 @@ public:
      * \see setTopicsNames(std::vector<Topic::Name>)
      * \see setTopicsAll()
      */
-    std::tuple<bool, std::vector<Topic::Name>> topicsNames() const;
+    std::tuple<bool, const std::vector<Topic::Name>&> topicsNames() const;
 
     /**
      * \brief Sends a message to the broker(s).
