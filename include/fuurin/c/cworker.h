@@ -39,6 +39,13 @@ extern "C"
     void CWorker_wait(CWorker* w);
     bool CWorker_isRunning(CWorker* w);
 
+
+    void CWorker_setTopicsAll(CWorker* w);
+    void CWorker_addTopicsNames(CWorker* w, const char* name);
+    void CWorker_clearTopicsNames(CWorker* w);
+    bool CWorker_topicsAll(CWorker* w);
+    const char* CWorker_topicsNames(CWorker* w);
+
 #ifdef __cplusplus
 }
 #endif

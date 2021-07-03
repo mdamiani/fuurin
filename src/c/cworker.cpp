@@ -155,3 +155,43 @@ bool CWorker_isRunning(CWorker* w)
 {
     return reinterpret_cast<CWorkerD*>(w)->w->isRunning();
 }
+
+
+void CWorker_setTopicsAll(CWorker* w)
+{
+    return reinterpret_cast<CWorkerD*>(w)->w->setTopicsAll();
+}
+
+
+void CWorker_addTopicsNames(CWorker* w, const char* name)
+{
+    Worker* ww = reinterpret_cast<CWorkerD*>(w)->w.get();
+
+    bool all;
+    std::vector<Topic::Name> names;
+    std::tie(all, names) = ww->topicsNames();
+
+    names.push_back(std::string{name});
+
+    ww->setTopicsNames(names);
+}
+
+
+void CWorker_clearTopicsNames(CWorker* w)
+{
+    return reinterpret_cast<CWorkerD*>(w)->w->setTopicsNames({});
+}
+
+
+bool CWorker_topicsAll(CWorker* w)
+{
+    auto [all, names] = reinterpret_cast<CWorkerD*>(w)->w->topicsNames();
+    return all;
+}
+
+
+const char* CWorker_topicsNames(CWorker* w)
+{
+    auto [all, names] = reinterpret_cast<CWorkerD*>(w)->w->topicsNames();
+    return names.empty() ? nullptr : std::string_view(names.front()).data();
+}

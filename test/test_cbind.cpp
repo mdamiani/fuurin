@@ -204,3 +204,28 @@ BOOST_AUTO_TEST_CASE(testCWorker_run, *utf::timeout(10))
 
     CWorker_delete(w);
 }
+
+
+BOOST_AUTO_TEST_CASE(testCWorker_subscribe)
+{
+    CWorker* w = CWorker_new(CUuid_createRandomUuid(), 0, "test");
+    BOOST_REQUIRE(w != nullptr);
+
+    CWorker_setTopicsAll(w);
+
+    BOOST_TEST(CWorker_topicsAll(w) == true);
+    BOOST_TEST(CWorker_topicsNames(w) == nullptr);
+
+    CWorker_addTopicsNames(w, "topic1");
+    CWorker_addTopicsNames(w, "topic2");
+
+    BOOST_TEST(CWorker_topicsAll(w) == false);
+    BOOST_TEST(std::string(CWorker_topicsNames(w)) == "topic1"s);
+
+    CWorker_clearTopicsNames(w);
+
+    BOOST_TEST(CWorker_topicsAll(w) == false);
+    BOOST_TEST(CWorker_topicsNames(w) == nullptr);
+
+    CWorker_delete(w);
+}
