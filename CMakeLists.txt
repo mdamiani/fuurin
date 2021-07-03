@@ -99,6 +99,7 @@ set(LIB_SOURCES
     src/sessionworker.cpp
     src/sessionbroker.cpp
     src/tokenpool.cpp
+    src/c/cutils.cpp
     src/c/cuuid.cpp
     src/c/cworker.cpp
 )

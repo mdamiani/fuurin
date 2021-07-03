@@ -10,55 +10,45 @@
 
 #include "fuurin/c/cuuid.h"
 #include "fuurin/uuid.h"
+#include "cutils.h"
 
 #include <string_view>
-#include <algorithm>
 
 
-namespace {
-CUuid copyFromUuid(const fuurin::Uuid& id)
-{
-    CUuid ret;
-
-    static_assert(std::tuple_size_v<fuurin::Uuid::Bytes> == sizeof(CUuid::bytes));
-    std::copy_n(id.bytes().data(), id.size(), ret.bytes);
-
-    return ret;
-}
-} // namespace
+using namespace fuurin;
 
 
 CUuid CUuid_createNullUuid()
 {
-    return copyFromUuid(fuurin::Uuid());
+    return c::uuidConvert(fuurin::Uuid());
 }
 
 
 CUuid CUuid_createRandomUuid()
 {
-    return copyFromUuid(fuurin::Uuid::createRandomUuid());
+    return c::uuidConvert(Uuid::createRandomUuid());
 }
 
 
 CUuid CUuid_createDnsUuid(const char* name)
 {
-    return copyFromUuid(fuurin::Uuid::createNamespaceUuid(fuurin::Uuid::Ns::Dns, std::string_view(name)));
+    return c::uuidConvert(Uuid::createNamespaceUuid(Uuid::Ns::Dns, std::string_view(name)));
 }
 
 
 CUuid CUuid_createUrlUuid(const char* name)
 {
-    return copyFromUuid(fuurin::Uuid::createNamespaceUuid(fuurin::Uuid::Ns::Url, std::string_view(name)));
+    return c::uuidConvert(Uuid::createNamespaceUuid(Uuid::Ns::Url, std::string_view(name)));
 }
 
 
 CUuid CUuid_createOidUuid(const char* name)
 {
-    return copyFromUuid(fuurin::Uuid::createNamespaceUuid(fuurin::Uuid::Ns::Oid, std::string_view(name)));
+    return c::uuidConvert(Uuid::createNamespaceUuid(Uuid::Ns::Oid, std::string_view(name)));
 }
 
 
 CUuid CUuid_createX500dnUuid(const char* name)
 {
-    return copyFromUuid(fuurin::Uuid::createNamespaceUuid(fuurin::Uuid::Ns::X500dn, std::string_view(name)));
+    return c::uuidConvert(Uuid::createNamespaceUuid(Uuid::Ns::X500dn, std::string_view(name)));
 }

@@ -13,6 +13,7 @@
 #include "fuurin/worker.h"
 #include "fuurin/errors.h"
 #include "fuurin/logger.h"
+#include "cutils.h"
 
 #include <memory>
 #include <string_view>
@@ -35,14 +36,11 @@ struct CWorkerD
 CWorker* CWorker_new(CUuid id, unsigned long long seqn, const char* name)
 {
     try {
-        Uuid::Bytes bytes;
         static_assert(sizeof(seqn) == sizeof(Topic::SeqN));
-        static_assert(bytes.size() == sizeof(id.bytes));
 
         auto ret = new CWorkerD;
 
-        std::copy_n(id.bytes, sizeof(id.bytes), bytes.begin());
-        ret->w = std::make_unique<Worker>(Uuid::fromBytes(bytes), seqn, name);
+        ret->w = std::make_unique<Worker>(c::uuidConvert(id), seqn, name);
 
         return reinterpret_cast<CWorker*>(ret);
 
@@ -66,11 +64,7 @@ const char* CWorker_name(CWorker* w)
 
 CUuid CWorker_uuid(CWorker* w)
 {
-    CUuid ret;
-    const auto id = reinterpret_cast<CWorkerD*>(w)->w->uuid();
-    static_assert(sizeof(ret.bytes) == id.size());
-    std::copy_n(id.bytes().begin(), id.size(), ret.bytes);
-    return ret;
+    return c::uuidConvert(reinterpret_cast<CWorkerD*>(w)->w->uuid());
 }
 
 
