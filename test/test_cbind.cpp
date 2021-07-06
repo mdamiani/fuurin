@@ -10,22 +10,28 @@
 
 #define BOOST_TEST_MODULE common
 #include <boost/test/unit_test.hpp>
+#include <boost/test/data/test_case.hpp>
 
 #include "fuurin/c/cuuid.h"
 #include "fuurin/c/ctopic.h"
+#include "fuurin/c/cevent.h"
 #include "fuurin/c/cworker.h"
 #include "fuurin/uuid.h"
 #include "fuurin/topic.h"
+#include "fuurin/event.h"
+#include "c/ceventd.h"
 
 #include <string_view>
 #include <algorithm>
 #include <future>
+#include <tuple>
 
 
 using namespace std::literals::string_view_literals;
 using namespace std::literals::string_literals;
 
 namespace utf = boost::unit_test;
+namespace bdata = utf::data;
 
 
 namespace {
@@ -42,6 +48,11 @@ bool uuidEqual(CUuid a, CUuid b)
 CTopic* topicConvert(fuurin::Topic* t)
 {
     return reinterpret_cast<CTopic*>(t);
+}
+
+CEvent* eventConvert(CEventD* ev)
+{
+    return reinterpret_cast<CEvent*>(ev);
 }
 } // namespace
 
@@ -180,6 +191,99 @@ BOOST_AUTO_TEST_CASE(testCTopic_data)
     t.withData(fuurin::zmq::Part{"payload"sv});
     BOOST_TEST(std::string(CTopic_data(ct)) == "payload"s);
     BOOST_TEST(CTopic_size(ct) == 7u);
+}
+
+
+/**
+ * CEvent
+ */
+
+BOOST_DATA_TEST_CASE(testCEvent_type,
+    bdata::make({
+        std::make_tuple(fuurin::Event::Type::Invalid, EventInvalid),
+        std::make_tuple(fuurin::Event::Type::COUNT, EventInvalid),
+        std::make_tuple(fuurin::Event::Type(int(fuurin::Event::Type::COUNT) + 1), EventInvalid),
+        std::make_tuple(fuurin::Event::Type::Started, EventStarted),
+        std::make_tuple(fuurin::Event::Type::Stopped, EventStopped),
+        std::make_tuple(fuurin::Event::Type::Offline, EventOffline),
+        std::make_tuple(fuurin::Event::Type::Online, EventOnline),
+        std::make_tuple(fuurin::Event::Type::Delivery, EventDelivery),
+        std::make_tuple(fuurin::Event::Type::SyncRequest, EventSyncRequest),
+        std::make_tuple(fuurin::Event::Type::SyncBegin, EventSyncBegin),
+        std::make_tuple(fuurin::Event::Type::SyncElement, EventSyncElement),
+        std::make_tuple(fuurin::Event::Type::SyncSuccess, EventSyncSuccess),
+        std::make_tuple(fuurin::Event::Type::SyncError, EventSyncError),
+        std::make_tuple(fuurin::Event::Type::SyncDownloadOn, EventSyncDownloadOn),
+        std::make_tuple(fuurin::Event::Type::SyncDownloadOff, EventSyncDownloadOff),
+    }),
+    cppType, wantCType)
+{
+    CEventD evd{
+        .ev = fuurin::Event{cppType, {}},
+    };
+
+    auto* ev = eventConvert(&evd);
+
+    BOOST_TEST(wantCType == CEvent_type(ev));
+}
+
+
+BOOST_DATA_TEST_CASE(testCEvent_notif,
+    bdata::make({
+        std::make_tuple(fuurin::Event::Notification::Discard, EventDiscard),
+        std::make_tuple(fuurin::Event::Notification::COUNT, EventDiscard),
+        std::make_tuple(fuurin::Event::Notification(int(fuurin::Event::Notification::COUNT) + 1), EventDiscard),
+        std::make_tuple(fuurin::Event::Notification::Timeout, EventTimeout),
+        std::make_tuple(fuurin::Event::Notification::Success, EventSuccess),
+    }),
+    cppNotif, wantCNotif)
+{
+    CEventD evd{
+        .ev = fuurin::Event{{}, cppNotif},
+    };
+
+    auto* ev = eventConvert(&evd);
+
+    BOOST_TEST(wantCNotif == CEvent_notif(ev));
+}
+
+
+BOOST_AUTO_TEST_CASE(testCEvent_topic_ok)
+{
+    auto bid = fuurin::Uuid::createRandomUuid();
+    auto wid = fuurin::Uuid::createRandomUuid();
+
+    CEventD evd{
+        .ev = fuurin::Event{{}, {},
+            fuurin::Topic{bid, wid, 100, "topic"sv,
+                fuurin::zmq::Part{"payload"sv},
+                fuurin::Topic::Event}
+                .toPart()},
+    };
+
+    auto* ev = eventConvert(&evd);
+    auto* tp = CEvent_topic(ev);
+
+    BOOST_REQUIRE(tp != nullptr);
+
+    BOOST_TEST(uuidEqual(bid, CTopic_brokerUuid(tp)));
+    BOOST_TEST(uuidEqual(wid, CTopic_workerUuid(tp)));
+    BOOST_TEST(100ull == CTopic_seqNum(tp));
+    BOOST_TEST(TopicEvent == CTopic_type(tp));
+    BOOST_TEST("topic"s == std::string(CTopic_name(tp)));
+    BOOST_TEST("payload"s == std::string(CTopic_data(tp)));
+    BOOST_TEST(7u == CTopic_size(tp));
+}
+
+
+BOOST_AUTO_TEST_CASE(testCEvent_topic_err)
+{
+    CEventD evd;
+
+    auto* ev = eventConvert(&evd);
+    auto* tp = CEvent_topic(ev);
+
+    BOOST_REQUIRE(tp == nullptr);
 }
 
 

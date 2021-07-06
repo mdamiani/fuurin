@@ -103,6 +103,7 @@ set(LIB_SOURCES
     src/c/cuuid.cpp
     src/c/cworker.cpp
     src/c/ctopic.cpp
+    src/c/cevent.cpp
 )
 
 set(LIB_PUBLIC_HEADERS
