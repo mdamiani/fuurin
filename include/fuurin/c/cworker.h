@@ -26,6 +26,7 @@ extern "C"
 
     const char* CWorker_name(CWorker* w);
     CUuid CWorker_uuid(CWorker* w);
+    unsigned long long CWorker_seqNum(CWorker* w);
 
     void CWorker_addEndpoints(CWorker* w, const char* delivery, const char* dispatch, const char* snapshot);
     void CWorker_clearEndpoints(CWorker* w);

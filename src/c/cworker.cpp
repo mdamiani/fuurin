@@ -68,6 +68,14 @@ CUuid CWorker_uuid(CWorker* w)
 }
 
 
+unsigned long long CWorker_seqNum(CWorker* w)
+{
+    static_assert(sizeof(decltype(CWorker_seqNum(nullptr))) == sizeof(Topic::SeqN));
+
+    return reinterpret_cast<CWorkerD*>(w)->w->seqNumber();
+}
+
+
 void CWorker_addEndpoints(CWorker* w, const char* delivery, const char* dispatch, const char* snapshot)
 {
     Worker* ww = reinterpret_cast<CWorkerD*>(w)->w.get();

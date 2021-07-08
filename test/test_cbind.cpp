@@ -381,6 +381,21 @@ BOOST_AUTO_TEST_CASE(testCWorker_run, *utf::timeout(10))
 }
 
 
+/**
+ * Worker
+ */
+
+BOOST_AUTO_TEST_CASE(testCWorker_seqnum)
+{
+    CWorker* w = CWorker_new(CUuid_createRandomUuid(), 150, "test");
+    BOOST_REQUIRE(w != nullptr);
+
+    BOOST_TEST(150ull == CWorker_seqNum(w));
+
+    CWorker_delete(w);
+}
+
+
 BOOST_AUTO_TEST_CASE(testCWorker_subscribe)
 {
     CWorker* w = CWorker_new(CUuid_createRandomUuid(), 0, "test");
