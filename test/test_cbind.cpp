@@ -19,16 +19,20 @@
 #include "fuurin/uuid.h"
 #include "fuurin/topic.h"
 #include "fuurin/event.h"
+#include "fuurin/broker.h"
+#include "fuurin/worker.h"
 #include "c/ceventd.h"
 
 #include <string_view>
 #include <algorithm>
 #include <future>
 #include <tuple>
+#include <chrono>
 
 
 using namespace std::literals::string_view_literals;
 using namespace std::literals::string_literals;
+using namespace std::literals::chrono_literals;
 
 namespace utf = boost::unit_test;
 namespace bdata = utf::data;
@@ -418,4 +422,236 @@ BOOST_AUTO_TEST_CASE(testCWorker_subscribe)
     BOOST_TEST(CWorker_topicsNames(w) == nullptr);
 
     CWorker_delete(w);
+}
+
+
+BOOST_AUTO_TEST_CASE(testCWorker_waitForStarted, *utf::timeout(10))
+{
+    CWorker* w = CWorker_new(CUuid_createRandomUuid(), 0, "test");
+    BOOST_REQUIRE(w != nullptr);
+
+    CWorker_start(w);
+    BOOST_TEST(CWorker_waitForStarted(w, 5000));
+    BOOST_TEST(!CWorker_waitForStarted(w, 500));
+
+    CWorker_stop(w);
+    CWorker_wait(w);
+    CWorker_delete(w);
+}
+
+
+BOOST_AUTO_TEST_CASE(testCWorker_waitForStopped, *utf::timeout(10))
+{
+    CWorker* w = CWorker_new(CUuid_createRandomUuid(), 0, "test");
+    BOOST_REQUIRE(w != nullptr);
+
+    CWorker_start(w);
+
+    CWorker_stop(w);
+    BOOST_TEST(CWorker_waitForStopped(w, 5000));
+    BOOST_TEST(!CWorker_waitForStopped(w, 500));
+
+    CWorker_wait(w);
+    CWorker_delete(w);
+}
+
+
+BOOST_AUTO_TEST_CASE(testCWorker_waitForOnline, *utf::timeout(10))
+{
+    fuurin::Broker b;
+    auto bf = b.start();
+
+    CWorker* w = CWorker_new(CUuid_createRandomUuid(), 0, "test");
+    BOOST_REQUIRE(w != nullptr);
+
+    CWorker_start(w);
+    BOOST_TEST(CWorker_waitForOnline(w, 5000));
+    BOOST_TEST(!CWorker_waitForOnline(w, 500));
+
+    CWorker_stop(w);
+    CWorker_wait(w);
+    CWorker_delete(w);
+
+    b.stop();
+    bf.get();
+}
+
+
+BOOST_AUTO_TEST_CASE(testCWorker_waitForOffline, *utf::timeout(10))
+{
+    fuurin::Broker b;
+    auto bf = b.start();
+
+    CWorker* w = CWorker_new(CUuid_createRandomUuid(), 0, "test");
+    BOOST_REQUIRE(w != nullptr);
+
+    CWorker_start(w);
+    CWorker_waitForOnline(w, 5000);
+
+    CWorker_stop(w);
+    BOOST_TEST(CWorker_waitForOffline(w, 5000));
+    BOOST_TEST(!CWorker_waitForOffline(w, 500));
+
+    CWorker_wait(w);
+    CWorker_delete(w);
+
+    b.stop();
+    bf.get();
+}
+
+
+BOOST_AUTO_TEST_CASE(testCWorker_waitForTopic, *utf::timeout(10))
+{
+    fuurin::Broker b;
+    fuurin::Worker w2;
+
+    auto bf = b.start();
+    auto w2f = w2.start();
+
+    BOOST_REQUIRE(w2.waitForOnline(5s));
+
+    CWorker* w1 = CWorker_new(CUuid_createRandomUuid(), 0, "test");
+    BOOST_REQUIRE(w1 != nullptr);
+
+    CWorker_start(w1);
+    CWorker_waitForOnline(w1, 5000);
+
+    // send multiple topic to check CTopic poiter is valid after
+    // multiple function calls.
+    for (uint8_t n = 0; n < 3; ++n) {
+        w2.dispatch("my/topic"sv, fuurin::zmq::Part{uint8_t(n + 1)});
+
+        CTopic* t = CWorker_waitForTopic(w1, 5000);
+        BOOST_REQUIRE(t != nullptr);
+
+        BOOST_TEST(uuidEqual(b.uuid(), CTopic_brokerUuid(t)));
+        BOOST_TEST(uuidEqual(w2.uuid(), CTopic_workerUuid(t)));
+        BOOST_TEST(CTopic_seqNum(t) == unsigned(n + 1));
+        BOOST_TEST(CTopic_type(t) == TopicState);
+        BOOST_TEST(std::string(CTopic_name(t)) == "my/topic"s);
+        BOOST_TEST(CTopic_size(t) == 1u);
+        BOOST_TEST(uint8_t(*CTopic_data(t)) == n + 1);
+    }
+
+    // verify timeout
+    BOOST_TEST(CWorker_waitForTopic(w1, 1000) == nullptr);
+
+    CWorker_stop(w1);
+    CWorker_wait(w1);
+    CWorker_delete(w1);
+
+    b.stop();
+    w2.stop();
+
+    bf.get();
+    w2f.get();
+}
+
+
+BOOST_AUTO_TEST_CASE(testCWorker_waitForEvent, *utf::timeout(10))
+{
+    CWorker* w = CWorker_new(CUuid_createRandomUuid(), 0, "test");
+    BOOST_REQUIRE(w != nullptr);
+    CEvent* ev;
+
+    // receive first event
+    CWorker_start(w);
+    ev = CWorker_waitForEvent(w, 5000);
+    BOOST_REQUIRE(ev != nullptr);
+    BOOST_TEST(CEvent_type(ev) == EventStarted);
+
+    // receive another event
+    CWorker_stop(w);
+    ev = CWorker_waitForEvent(w, 5000);
+    BOOST_REQUIRE(ev != nullptr);
+    BOOST_TEST(CEvent_type(ev) == EventStopped);
+
+    // timeout exceeded
+    ev = CWorker_waitForEvent(w, 500);
+    BOOST_REQUIRE(ev != nullptr);
+    BOOST_TEST(CEvent_type(ev) == EventInvalid);
+
+    CWorker_wait(w);
+    CWorker_delete(w);
+}
+
+
+BOOST_AUTO_TEST_CASE(testCWorker_dispatch, *utf::timeout(15))
+{
+    fuurin::Broker b;
+    fuurin::Worker w2;
+
+    auto bf = b.start();
+    auto w2f = w2.start();
+
+    BOOST_REQUIRE(w2.waitForOnline(5s));
+
+    auto id1 = CUuid_createRandomUuid();
+    CWorker* w1 = CWorker_new(id1, 0, "test");
+    BOOST_REQUIRE(w1 != nullptr);
+    CWorker_start(w1);
+    CWorker_waitForOnline(w1, 5000);
+    CWorker_dispatch(w1, "topic1", "hello1", 6, TopicEvent);
+
+    auto t = w2.waitForTopic(5s);
+    BOOST_TEST(t.has_value());
+    BOOST_TEST(t->broker() == b.uuid());
+    BOOST_TEST(uuidEqual(t->worker(), id1));
+    BOOST_TEST(t->seqNum() == 1ull);
+    BOOST_TEST(t->type() == fuurin::Topic::Event);
+    BOOST_TEST(t->name() == "topic1"s);
+    BOOST_TEST(t->data().size() == 6u);
+    BOOST_TEST(t->data().toString() == "hello1"s);
+
+    CWorker_stop(w1);
+    CWorker_wait(w1);
+    CWorker_delete(w1);
+
+    b.stop();
+    w2.stop();
+
+    bf.get();
+    w2f.get();
+}
+
+
+BOOST_AUTO_TEST_CASE(testCWorker_sync, *utf::timeout(15))
+{
+    fuurin::Broker b;
+    auto bf = b.start();
+
+    // store topic
+    CWorker* w1 = CWorker_new(CUuid_createRandomUuid(), 0, "test1");
+    BOOST_REQUIRE(w1 != nullptr);
+
+    CWorker_start(w1);
+    BOOST_REQUIRE(CWorker_waitForOnline(w1, 5000));
+
+    CWorker_dispatch(w1, "topic1", "hello1", 6, TopicState);
+    CTopic* t1 = CWorker_waitForTopic(w1, 5000);
+    BOOST_REQUIRE(t1 != nullptr);
+
+    // sync topic
+    CWorker* w2 = CWorker_new(CUuid_createRandomUuid(), 0, "test2");
+    BOOST_REQUIRE(w2 != nullptr);
+
+    CWorker_start(w2);
+    BOOST_REQUIRE(CWorker_waitForOnline(w2, 5000));
+
+    CWorker_sync(w2);
+    CTopic* t2 = CWorker_waitForTopic(w2, 5000);
+    BOOST_REQUIRE(t2 != nullptr);
+    BOOST_TEST(std::string(CTopic_name(t2)) == "topic1"s);
+    BOOST_TEST(std::string(CTopic_data(t2)) == "hello1"s);
+    BOOST_TEST(CTopic_seqNum(t2) == 1ull);
+
+    CWorker_stop(w1);
+    CWorker_stop(w2);
+    CWorker_wait(w1);
+    CWorker_wait(w2);
+    CWorker_delete(w1);
+    CWorker_delete(w2);
+
+    b.stop();
+    bf.get();
 }

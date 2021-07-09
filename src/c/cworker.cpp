@@ -13,10 +13,13 @@
 #include "fuurin/worker.h"
 #include "fuurin/errors.h"
 #include "fuurin/logger.h"
+#include "ceventd.h"
 #include "cutils.h"
 
 #include <memory>
+#include <chrono>
 #include <string_view>
+#include <type_traits>
 
 
 using namespace std::literals::string_view_literals;
@@ -29,24 +32,73 @@ struct CWorkerD
 {
     std::unique_ptr<Worker> w;
     std::future<void> f;
+    CEventD evd;
 };
+
+
+void logError(std::string_view err) noexcept
+{
+    log::Arg args[] = {log::Arg{"error"sv, err}};
+    log::Logger::error({__FILE__, __LINE__}, args, 1);
+}
+
+
+void logError(const std::exception& e) noexcept
+{
+    logError(std::string_view(e.what()));
+}
+
+
+void logError(const err::Error& e) noexcept
+{
+    log::Arg args[] = {log::Arg{"error"sv, std::string_view(e.what())}, e.arg()};
+    log::Logger::error(e.loc(), args, 2);
+}
+
+
+void logError() noexcept
+{
+    try {
+        throw;
+    } catch (const err::Error& e) {
+        logError(e);
+    } catch (const std::exception& e) {
+        logError(e);
+    } catch (...) {
+        logError("unknown"sv);
+    }
+}
+
+
+template<typename F, typename C>
+auto withCatch(F&& f, C&& c) noexcept -> decltype(f())
+{
+    static_assert(std::is_same_v<decltype(f()), decltype(c())>);
+    try {
+        return f();
+    } catch (...) {
+        logError();
+        return c();
+    }
+}
 } // namespace
 
 
 CWorker* CWorker_new(CUuid id, unsigned long long seqn, const char* name)
 {
-    try {
-        static_assert(sizeof(seqn) == sizeof(Topic::SeqN));
+    static_assert(sizeof(seqn) == sizeof(Topic::SeqN));
 
-        auto ret = new CWorkerD;
+    auto ret = new CWorkerD;
 
-        ret->w = std::make_unique<Worker>(c::uuidConvert(id), seqn, name);
-
-        return reinterpret_cast<CWorker*>(ret);
-
-    } catch (const std::exception&) {
-        return nullptr;
-    }
+    return withCatch(
+        [ret, id, seqn, name]() {
+            ret->w = std::make_unique<Worker>(c::uuidConvert(id), seqn, name);
+            return reinterpret_cast<CWorker*>(ret);
+        },
+        [ret]() {
+            delete ret;
+            return static_cast<CWorker*>(nullptr);
+        });
 }
 
 
@@ -139,17 +191,15 @@ void CWorker_stop(CWorker* w)
 
 void CWorker_wait(CWorker* w)
 {
-    CWorkerD* wd = reinterpret_cast<CWorkerD*>(w);
-    if (!wd->f.valid())
+    CWorkerD* wwd = reinterpret_cast<CWorkerD*>(w);
+    if (!wwd->f.valid())
         return;
 
-    try {
-        wd->f.get();
-    } catch (const err::Error& e) {
-        log::Arg args[] = {log::Arg{"error"sv, std::string_view(e.what())}, e.arg()};
-        log::Logger::error(e.loc(), args, 2);
-    } catch (const std::exception&) {
-    }
+    return withCatch(
+        [wwd]() {
+            wwd->f.get();
+        },
+        []() {});
 }
 
 
@@ -196,4 +246,110 @@ const char* CWorker_topicsNames(CWorker* w)
 {
     auto [all, names] = reinterpret_cast<CWorkerD*>(w)->w->topicsNames();
     return names.empty() ? nullptr : std::string_view(names.front()).data();
+}
+
+
+void CWorker_dispatch(CWorker* w, const char* name, const char* data, size_t size, TopicType_t type)
+{
+    Topic::Type ftype;
+    switch (type) {
+    case TopicState:
+        ftype = Topic::Type::State;
+        break;
+
+    case TopicEvent:
+        ftype = Topic::Type::Event;
+        break;
+    }
+
+    return withCatch(
+        [wwd = reinterpret_cast<CWorkerD*>(w), name, data, size, ftype]() {
+            wwd->w->dispatch(std::string_view(name), zmq::Part(data, size), ftype);
+        },
+        []() {});
+}
+
+
+void CWorker_sync(CWorker* w)
+{
+    reinterpret_cast<CWorkerD*>(w)->w->sync();
+}
+
+
+CEvent* CWorker_waitForEvent(CWorker* w, unsigned long timeout_ms)
+{
+    return withCatch(
+        [wwd = reinterpret_cast<CWorkerD*>(w), timeout_ms]() {
+            wwd->evd.ev = wwd->w->waitForEvent(std::chrono::milliseconds(timeout_ms));
+            return reinterpret_cast<CEvent*>(&wwd->evd);
+        },
+        [wwd = reinterpret_cast<CWorkerD*>(w)]() {
+            wwd->evd.ev = {};
+            return reinterpret_cast<CEvent*>(&wwd->evd);
+        });
+}
+
+
+bool CWorker_waitForStarted(CWorker* w, unsigned long timeout_ms)
+{
+    return withCatch(
+        [wwd = reinterpret_cast<CWorkerD*>(w), timeout_ms]() {
+            return wwd->w->waitForStarted(std::chrono::milliseconds(timeout_ms));
+        },
+        []() {
+            return false;
+        });
+}
+
+
+bool CWorker_waitForStopped(CWorker* w, unsigned long timeout_ms)
+{
+    return withCatch(
+        [wwd = reinterpret_cast<CWorkerD*>(w), timeout_ms]() {
+            return wwd->w->waitForStopped(std::chrono::milliseconds(timeout_ms));
+        },
+        []() {
+            return false;
+        });
+}
+
+
+bool CWorker_waitForOnline(CWorker* w, unsigned long timeout_ms)
+{
+    return withCatch(
+        [wwd = reinterpret_cast<CWorkerD*>(w), timeout_ms]() {
+            return wwd->w->waitForOnline(std::chrono::milliseconds(timeout_ms));
+        },
+        []() {
+            return false;
+        });
+}
+
+
+bool CWorker_waitForOffline(CWorker* w, unsigned long timeout_ms)
+{
+    return withCatch(
+        [wwd = reinterpret_cast<CWorkerD*>(w), timeout_ms]() {
+            return wwd->w->waitForOffline(std::chrono::milliseconds(timeout_ms));
+        },
+        []() {
+            return false;
+        });
+}
+
+
+CTopic* CWorker_waitForTopic(CWorker* w, unsigned long timeout_ms)
+{
+    return withCatch(
+        [wwd = reinterpret_cast<CWorkerD*>(w), timeout_ms]() {
+            if (auto tp = wwd->w->waitForTopic(std::chrono::milliseconds(timeout_ms)); tp) {
+                wwd->evd.tp = *tp;
+                return reinterpret_cast<CTopic*>(&wwd->evd.tp);
+            } else {
+                return static_cast<CTopic*>(nullptr);
+            }
+        },
+        []() {
+            return static_cast<CTopic*>(nullptr);
+        });
 }

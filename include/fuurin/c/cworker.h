@@ -12,6 +12,7 @@
 #define FUURIN_C_WORKER_H
 
 #include "fuurin/c/cuuid.h"
+#include "fuurin/c/cevent.h"
 
 
 #ifdef __cplusplus
@@ -46,6 +47,17 @@ extern "C"
     void CWorker_clearTopicsNames(CWorker* w);
     bool CWorker_topicsAll(CWorker* w);
     const char* CWorker_topicsNames(CWorker* w);
+
+
+    void CWorker_dispatch(CWorker* w, const char* name, const char* data, size_t size, TopicType_t type);
+    void CWorker_sync(CWorker* w);
+
+    CEvent* CWorker_waitForEvent(CWorker* w, unsigned long timeout_ms);
+    bool CWorker_waitForStarted(CWorker* w, unsigned long timeout_ms);
+    bool CWorker_waitForStopped(CWorker* w, unsigned long timeout_ms);
+    bool CWorker_waitForOnline(CWorker* w, unsigned long timeout_ms);
+    bool CWorker_waitForOffline(CWorker* w, unsigned long timeout_ms);
+    CTopic* CWorker_waitForTopic(CWorker* w, unsigned long timeout_ms);
 
 #ifdef __cplusplus
 }
