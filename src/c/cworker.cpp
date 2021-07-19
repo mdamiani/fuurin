@@ -11,7 +11,6 @@
 #include "fuurin/c/cworker.h"
 #include "fuurin/topic.h"
 #include "fuurin/worker.h"
-#include "fuurin/errors.h"
 #include "fuurin/logger.h"
 #include "ceventd.h"
 #include "cutils.h"
@@ -19,10 +18,7 @@
 #include <memory>
 #include <chrono>
 #include <string_view>
-#include <type_traits>
 
-
-using namespace std::literals::string_view_literals;
 
 using namespace fuurin;
 
@@ -34,53 +30,6 @@ struct CWorkerD
     std::future<void> f;
     CEventD evd;
 };
-
-
-void logError(std::string_view err) noexcept
-{
-    log::Arg args[] = {log::Arg{"error"sv, err}};
-    log::Logger::error({__FILE__, __LINE__}, args, 1);
-}
-
-
-void logError(const std::exception& e) noexcept
-{
-    logError(std::string_view(e.what()));
-}
-
-
-void logError(const err::Error& e) noexcept
-{
-    log::Arg args[] = {log::Arg{"error"sv, std::string_view(e.what())}, e.arg()};
-    log::Logger::error(e.loc(), args, 2);
-}
-
-
-void logError() noexcept
-{
-    try {
-        throw;
-    } catch (const err::Error& e) {
-        logError(e);
-    } catch (const std::exception& e) {
-        logError(e);
-    } catch (...) {
-        logError("unknown"sv);
-    }
-}
-
-
-template<typename F, typename C>
-auto withCatch(F&& f, C&& c) noexcept -> decltype(f())
-{
-    static_assert(std::is_same_v<decltype(f()), decltype(c())>);
-    try {
-        return f();
-    } catch (...) {
-        logError();
-        return c();
-    }
-}
 } // namespace
 
 
@@ -90,7 +39,7 @@ CWorker* CWorker_new(CUuid id, unsigned long long seqn, const char* name)
 
     auto ret = new CWorkerD;
 
-    return withCatch(
+    return c::withCatch(
         [ret, id, seqn, name]() {
             ret->w = std::make_unique<Worker>(c::uuidConvert(id), seqn, name);
             return reinterpret_cast<CWorker*>(ret);
@@ -195,7 +144,7 @@ void CWorker_wait(CWorker* w)
     if (!wwd->f.valid())
         return;
 
-    return withCatch(
+    return c::withCatch(
         [wwd]() {
             wwd->f.get();
         },
@@ -262,7 +211,7 @@ void CWorker_dispatch(CWorker* w, const char* name, const char* data, size_t siz
         break;
     }
 
-    return withCatch(
+    return c::withCatch(
         [wwd = reinterpret_cast<CWorkerD*>(w), name, data, size, ftype]() {
             wwd->w->dispatch(std::string_view(name), zmq::Part(data, size), ftype);
         },
@@ -278,7 +227,7 @@ void CWorker_sync(CWorker* w)
 
 CEvent* CWorker_waitForEvent(CWorker* w, unsigned long timeout_ms)
 {
-    return withCatch(
+    return c::withCatch(
         [wwd = reinterpret_cast<CWorkerD*>(w), timeout_ms]() {
             wwd->evd.ev = wwd->w->waitForEvent(std::chrono::milliseconds(timeout_ms));
             return reinterpret_cast<CEvent*>(&wwd->evd);
@@ -292,7 +241,7 @@ CEvent* CWorker_waitForEvent(CWorker* w, unsigned long timeout_ms)
 
 bool CWorker_waitForStarted(CWorker* w, unsigned long timeout_ms)
 {
-    return withCatch(
+    return c::withCatch(
         [wwd = reinterpret_cast<CWorkerD*>(w), timeout_ms]() {
             return wwd->w->waitForStarted(std::chrono::milliseconds(timeout_ms));
         },
@@ -304,7 +253,7 @@ bool CWorker_waitForStarted(CWorker* w, unsigned long timeout_ms)
 
 bool CWorker_waitForStopped(CWorker* w, unsigned long timeout_ms)
 {
-    return withCatch(
+    return c::withCatch(
         [wwd = reinterpret_cast<CWorkerD*>(w), timeout_ms]() {
             return wwd->w->waitForStopped(std::chrono::milliseconds(timeout_ms));
         },
@@ -316,7 +265,7 @@ bool CWorker_waitForStopped(CWorker* w, unsigned long timeout_ms)
 
 bool CWorker_waitForOnline(CWorker* w, unsigned long timeout_ms)
 {
-    return withCatch(
+    return c::withCatch(
         [wwd = reinterpret_cast<CWorkerD*>(w), timeout_ms]() {
             return wwd->w->waitForOnline(std::chrono::milliseconds(timeout_ms));
         },
@@ -328,7 +277,7 @@ bool CWorker_waitForOnline(CWorker* w, unsigned long timeout_ms)
 
 bool CWorker_waitForOffline(CWorker* w, unsigned long timeout_ms)
 {
-    return withCatch(
+    return c::withCatch(
         [wwd = reinterpret_cast<CWorkerD*>(w), timeout_ms]() {
             return wwd->w->waitForOffline(std::chrono::milliseconds(timeout_ms));
         },
@@ -340,7 +289,7 @@ bool CWorker_waitForOffline(CWorker* w, unsigned long timeout_ms)
 
 CTopic* CWorker_waitForTopic(CWorker* w, unsigned long timeout_ms)
 {
-    return withCatch(
+    return c::withCatch(
         [wwd = reinterpret_cast<CWorkerD*>(w), timeout_ms]() {
             if (auto tp = wwd->w->waitForTopic(std::chrono::milliseconds(timeout_ms)); tp) {
                 wwd->evd.tp = *tp;

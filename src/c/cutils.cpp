@@ -14,6 +14,9 @@
 #include <algorithm>
 
 
+using namespace std::literals::string_view_literals;
+
+
 namespace fuurin {
 namespace c {
 
@@ -35,6 +38,40 @@ Uuid uuidConvert(const CUuid& id)
 
     std::copy_n(id.bytes, sizeof(id.bytes), bytes.begin());
     return Uuid::fromBytes(bytes);
+}
+
+
+void logError(std::string_view err) noexcept
+{
+    log::Arg args[] = {log::Arg{"error"sv, err}};
+    log::Logger::error({__FILE__, __LINE__}, args, 1);
+}
+
+
+void logError(const std::exception& e) noexcept
+{
+    logError(std::string_view(e.what()));
+}
+
+
+void logError(const err::Error& e) noexcept
+{
+    log::Arg args[] = {log::Arg{"error"sv, std::string_view(e.what())}, e.arg()};
+    log::Logger::error(e.loc(), args, 2);
+}
+
+
+void logError() noexcept
+{
+    try {
+        throw;
+    } catch (const err::Error& e) {
+        logError(e);
+    } catch (const std::exception& e) {
+        logError(e);
+    } catch (...) {
+        logError("unknown"sv);
+    }
 }
 
 } // namespace c

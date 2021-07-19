@@ -22,6 +22,7 @@
 #include "fuurin/broker.h"
 #include "fuurin/worker.h"
 #include "c/ceventd.h"
+#include "c/cutils.h"
 
 #include <string_view>
 #include <algorithm>
@@ -59,6 +60,36 @@ CEvent* eventConvert(CEventD* ev)
     return reinterpret_cast<CEvent*>(ev);
 }
 } // namespace
+
+
+/**
+ * CUtils
+ */
+
+BOOST_DATA_TEST_CASE(testWithCatch,
+    bdata::make({
+        std::make_tuple("no exception", 1, 2, 1, false, false, false),
+        std::make_tuple("fuurin error", 1, 2, 2, true, false, false),
+        std::make_tuple("standard error", 1, 2, 2, false, true, false),
+        std::make_tuple("unknown error", 1, 2, 2, false, false, true),
+    }),
+    name, fVal, cVal, retVal, exFuu, exStd, exErr)
+{
+    auto e = [exFuu, exStd, exErr]() {
+        if (exFuu)
+            throw fuurin::err::Error({__FILE__, __LINE__}, "test/err");
+        if (exStd)
+            throw std::exception{};
+        if (exErr)
+            throw 3;
+    };
+
+    auto f = [fVal, e]() { e(); return fVal; };
+    auto c = [cVal]() { return cVal; };
+
+    BOOST_TEST_MESSAGE(name);
+    BOOST_TEST(retVal == fuurin::c::withCatch(f, c));
+}
 
 
 /**
