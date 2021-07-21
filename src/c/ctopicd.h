@@ -8,46 +8,33 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-#ifndef FUURIN_C_EVENT_D_H
-#define FUURIN_C_EVENT_D_H
-
-#include "fuurin/event.h"
-#include "fuurin/topic.h"
+#ifndef FUURIN_C_TOPIC_D_H
+#define FUURIN_C_TOPIC_D_H
 
 
-struct CEvent;
+struct CTopic;
 
 namespace fuurin {
 namespace c {
 
 /**
- * \brief Structure for Worker C bindings.
- */
-struct CEventD
-{
-    Event ev; // C++ event.
-    Topic tp; // C++ topic.
-};
-
-
-/**
  * \return Pointer to the C structure.
  */
-inline CEventD* getPrivD(CEvent* p)
+inline Topic* getPrivD(CTopic* p)
 {
-    return reinterpret_cast<CEventD*>(p);
+    return reinterpret_cast<Topic*>(p);
 }
 
 
 /**
  * \brief Pointer to the opaque structure.
  */
-inline CEvent* getOpaque(CEventD* p)
+inline CTopic* getOpaque(Topic* p)
 {
-    return reinterpret_cast<CEvent*>(p);
+    return reinterpret_cast<CTopic*>(p);
 }
 
 } // namespace c
 } // namespace fuurin
 
-#endif // FUURIN_C_EVENT_D_H
+#endif // FUURIN_C_TOPIC_D_H

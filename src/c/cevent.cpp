@@ -12,6 +12,7 @@
 #include "fuurin/event.h"
 #include "fuurin/topic.h"
 #include "ceventd.h"
+#include "ctopicd.h"
 
 
 using namespace fuurin;
@@ -19,7 +20,7 @@ using namespace fuurin;
 
 EventType_t CEvent_type(CEvent* ev)
 {
-    switch (reinterpret_cast<CEventD*>(ev)->ev.type()) {
+    switch (c::getPrivD(ev)->ev.type()) {
     case Event::Type::Invalid:
     default:
         return EventInvalid;
@@ -67,7 +68,7 @@ EventType_t CEvent_type(CEvent* ev)
 
 EventNotif_t CEvent_notif(CEvent* ev)
 {
-    switch (reinterpret_cast<CEventD*>(ev)->ev.notification()) {
+    switch (c::getPrivD(ev)->ev.notification()) {
     case Event::Notification::Discard:
     default:
         return EventDiscard;
@@ -86,9 +87,9 @@ EventNotif_t CEvent_notif(CEvent* ev)
 CTopic* CEvent_topic(CEvent* ev)
 {
     try {
-        CEventD* evd = reinterpret_cast<CEventD*>(ev);
+        auto* evd = c::getPrivD(ev);
         evd->tp = Topic::fromPart(evd->ev.payload());
-        return reinterpret_cast<CTopic*>(&evd->tp);
+        return c::getOpaque(&evd->tp);
 
     } catch (const std::exception&) {
         return nullptr;

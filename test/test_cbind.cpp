@@ -21,6 +21,7 @@
 #include "fuurin/event.h"
 #include "fuurin/broker.h"
 #include "fuurin/worker.h"
+#include "c/ctopicd.h"
 #include "c/ceventd.h"
 #include "c/cutils.h"
 
@@ -48,16 +49,6 @@ bool uuidEqual(fuurin::Uuid a, CUuid b)
 bool uuidEqual(CUuid a, CUuid b)
 {
     return std::equal(a.bytes, a.bytes + sizeof(a.bytes), b.bytes);
-}
-
-CTopic* topicConvert(fuurin::Topic* t)
-{
-    return reinterpret_cast<CTopic*>(t);
-}
-
-CEvent* eventConvert(CEventD* ev)
-{
-    return reinterpret_cast<CEvent*>(ev);
 }
 } // namespace
 
@@ -172,7 +163,7 @@ BOOST_AUTO_TEST_CASE(testCUuid_copy)
 BOOST_AUTO_TEST_CASE(testCTopic_uuid)
 {
     fuurin::Topic t;
-    CTopic* ct = topicConvert(&t);
+    CTopic* ct = fuurin::c::getOpaque(&t);
 
     auto bid = fuurin::Uuid::createRandomUuid();
     auto wid = fuurin::Uuid::createRandomUuid();
@@ -188,7 +179,7 @@ BOOST_AUTO_TEST_CASE(testCTopic_uuid)
 BOOST_AUTO_TEST_CASE(testCTopic_seqnum)
 {
     fuurin::Topic t;
-    CTopic* ct = topicConvert(&t);
+    CTopic* ct = fuurin::c::getOpaque(&t);
 
     t.withSeqNum(1000);
     BOOST_TEST(CTopic_seqNum(ct) == 1000u);
@@ -198,7 +189,7 @@ BOOST_AUTO_TEST_CASE(testCTopic_seqnum)
 BOOST_AUTO_TEST_CASE(testCTopic_type)
 {
     fuurin::Topic t;
-    CTopic* ct = topicConvert(&t);
+    CTopic* ct = fuurin::c::getOpaque(&t);
 
     t.withType(fuurin::Topic::State);
     BOOST_TEST(CTopic_type(ct) == TopicState);
@@ -211,7 +202,7 @@ BOOST_AUTO_TEST_CASE(testCTopic_type)
 BOOST_AUTO_TEST_CASE(testCTopic_name)
 {
     fuurin::Topic t;
-    CTopic* ct = topicConvert(&t);
+    CTopic* ct = fuurin::c::getOpaque(&t);
 
     t.withName("topic1"sv);
     BOOST_TEST(std::string(CTopic_name(ct)) == "topic1"s);
@@ -221,7 +212,7 @@ BOOST_AUTO_TEST_CASE(testCTopic_name)
 BOOST_AUTO_TEST_CASE(testCTopic_data)
 {
     fuurin::Topic t;
-    CTopic* ct = topicConvert(&t);
+    CTopic* ct = fuurin::c::getOpaque(&t);
 
     t.withData(fuurin::zmq::Part{"payload"sv});
     BOOST_TEST(std::string(CTopic_data(ct)) == "payload"s);
@@ -253,11 +244,11 @@ BOOST_DATA_TEST_CASE(testCEvent_type,
     }),
     cppType, wantCType)
 {
-    CEventD evd{
+    fuurin::c::CEventD evd{
         .ev = fuurin::Event{cppType, {}},
     };
 
-    auto* ev = eventConvert(&evd);
+    auto* ev = fuurin::c::getOpaque(&evd);
 
     BOOST_TEST(wantCType == CEvent_type(ev));
 }
@@ -273,11 +264,11 @@ BOOST_DATA_TEST_CASE(testCEvent_notif,
     }),
     cppNotif, wantCNotif)
 {
-    CEventD evd{
+    fuurin::c::CEventD evd{
         .ev = fuurin::Event{{}, cppNotif},
     };
 
-    auto* ev = eventConvert(&evd);
+    auto* ev = fuurin::c::getOpaque(&evd);
 
     BOOST_TEST(wantCNotif == CEvent_notif(ev));
 }
@@ -288,7 +279,7 @@ BOOST_AUTO_TEST_CASE(testCEvent_topic_ok)
     auto bid = fuurin::Uuid::createRandomUuid();
     auto wid = fuurin::Uuid::createRandomUuid();
 
-    CEventD evd{
+    fuurin::c::CEventD evd{
         .ev = fuurin::Event{{}, {},
             fuurin::Topic{bid, wid, 100, "topic"sv,
                 fuurin::zmq::Part{"payload"sv},
@@ -296,7 +287,7 @@ BOOST_AUTO_TEST_CASE(testCEvent_topic_ok)
                 .toPart()},
     };
 
-    auto* ev = eventConvert(&evd);
+    auto* ev = fuurin::c::getOpaque(&evd);
     auto* tp = CEvent_topic(ev);
 
     BOOST_REQUIRE(tp != nullptr);
@@ -313,9 +304,9 @@ BOOST_AUTO_TEST_CASE(testCEvent_topic_ok)
 
 BOOST_AUTO_TEST_CASE(testCEvent_topic_err)
 {
-    CEventD evd;
+    fuurin::c::CEventD evd;
 
-    auto* ev = eventConvert(&evd);
+    auto* ev = fuurin::c::getOpaque(&evd);
     auto* tp = CEvent_topic(ev);
 
     BOOST_REQUIRE(tp == nullptr);

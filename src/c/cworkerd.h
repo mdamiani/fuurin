@@ -18,19 +18,40 @@
 #include <future>
 
 
-namespace {
+struct CWorker;
+
+namespace fuurin {
+namespace c {
 
 /**
- * \brief Opaque structure for Worker C bindings.
+ * \brief Structure for Worker C bindings.
  */
 struct CWorkerD
 {
-    std::unique_ptr<fuurin::Worker> w; // Worker object.
-    std::future<void> f;               // Worker future.
-    CEventD evd;                       // Last event received.
+    std::unique_ptr<Worker> w; // Worker object.
+    std::future<void> f;       // Worker future.
+    CEventD evd;               // Last event received.
 };
 
-} // namespace
 
+/**
+ * \return Pointer to the C structure.
+ */
+inline CWorkerD* getPrivD(CWorker* p)
+{
+    return reinterpret_cast<CWorkerD*>(p);
+}
+
+
+/**
+ * \brief Pointer to the opaque structure.
+ */
+inline CWorker* getOpaque(CWorkerD* p)
+{
+    return reinterpret_cast<CWorker*>(p);
+}
+
+} // namespace c
+} // namespace fuurin
 
 #endif // FUURIN_C_WORKER_D_H

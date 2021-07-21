@@ -10,6 +10,7 @@
 
 #include "fuurin/c/ctopic.h"
 #include "fuurin/topic.h"
+#include "ctopicd.h"
 #include "cutils.h"
 
 #include <string_view>
@@ -20,25 +21,25 @@ using namespace fuurin;
 
 CUuid CTopic_brokerUuid(CTopic* t)
 {
-    return c::uuidConvert(reinterpret_cast<Topic*>(t)->broker());
+    return c::uuidConvert(c::getPrivD(t)->broker());
 }
 
 
 CUuid CTopic_workerUuid(CTopic* t)
 {
-    return c::uuidConvert(reinterpret_cast<Topic*>(t)->worker());
+    return c::uuidConvert(c::getPrivD(t)->worker());
 }
 
 
 unsigned long long CTopic_seqNum(CTopic* t)
 {
-    return reinterpret_cast<Topic*>(t)->seqNum();
+    return c::getPrivD(t)->seqNum();
 }
 
 
 TopicType_t CTopic_type(CTopic* t)
 {
-    switch (reinterpret_cast<Topic*>(t)->type()) {
+    switch (c::getPrivD(t)->type()) {
     case Topic::Event:
         return TopicEvent;
     case Topic::State:
@@ -50,17 +51,17 @@ TopicType_t CTopic_type(CTopic* t)
 
 const char* CTopic_name(CTopic* t)
 {
-    return std::string_view(reinterpret_cast<Topic*>(t)->name()).data();
+    return std::string_view(c::getPrivD(t)->name()).data();
 }
 
 
 const char* CTopic_data(CTopic* t)
 {
-    return reinterpret_cast<Topic*>(t)->data().data();
+    return c::getPrivD(t)->data().data();
 }
 
 
 size_t CTopic_size(CTopic* t)
 {
-    return reinterpret_cast<Topic*>(t)->data().size();
+    return c::getPrivD(t)->data().size();
 }
