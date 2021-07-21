@@ -129,13 +129,13 @@ void CWorker_stop(CWorker* w)
 
 void CWorker_wait(CWorker* w)
 {
-    auto wwd = c::getPrivD(w);
-    if (!wwd->f.valid())
+    auto wd = c::getPrivD(w);
+    if (!wd->f.valid())
         return;
 
     return c::withCatch(
-        [wwd]() {
-            wwd->f.get();
+        [wd]() {
+            wd->f.get();
         },
         []() {});
 }
@@ -201,8 +201,8 @@ void CWorker_dispatch(CWorker* w, const char* name, const char* data, size_t siz
     }
 
     return c::withCatch(
-        [wwd = c::getPrivD(w), name, data, size, ftype]() {
-            wwd->w->dispatch(std::string_view(name), zmq::Part(data, size), ftype);
+        [wd = c::getPrivD(w), name, data, size, ftype]() {
+            wd->w->dispatch(std::string_view(name), zmq::Part(data, size), ftype);
         },
         []() {});
 }
@@ -217,13 +217,13 @@ void CWorker_sync(CWorker* w)
 CEvent* CWorker_waitForEvent(CWorker* w, unsigned long timeout_ms)
 {
     return c::withCatch(
-        [wwd = c::getPrivD(w), timeout_ms]() {
-            wwd->evd.ev = wwd->w->waitForEvent(std::chrono::milliseconds(timeout_ms));
-            return c::getOpaque(&wwd->evd);
+        [wd = c::getPrivD(w), timeout_ms]() {
+            wd->evd.ev = wd->w->waitForEvent(std::chrono::milliseconds(timeout_ms));
+            return c::getOpaque(&wd->evd);
         },
-        [wwd = c::getPrivD(w)]() {
-            wwd->evd.ev = {};
-            return c::getOpaque(&wwd->evd);
+        [wd = c::getPrivD(w)]() {
+            wd->evd.ev = {};
+            return c::getOpaque(&wd->evd);
         });
 }
 
@@ -231,8 +231,8 @@ CEvent* CWorker_waitForEvent(CWorker* w, unsigned long timeout_ms)
 bool CWorker_waitForStarted(CWorker* w, unsigned long timeout_ms)
 {
     return c::withCatch(
-        [wwd = c::getPrivD(w), timeout_ms]() {
-            return wwd->w->waitForStarted(std::chrono::milliseconds(timeout_ms));
+        [wd = c::getPrivD(w), timeout_ms]() {
+            return wd->w->waitForStarted(std::chrono::milliseconds(timeout_ms));
         },
         []() {
             return false;
@@ -243,8 +243,8 @@ bool CWorker_waitForStarted(CWorker* w, unsigned long timeout_ms)
 bool CWorker_waitForStopped(CWorker* w, unsigned long timeout_ms)
 {
     return c::withCatch(
-        [wwd = c::getPrivD(w), timeout_ms]() {
-            return wwd->w->waitForStopped(std::chrono::milliseconds(timeout_ms));
+        [wd = c::getPrivD(w), timeout_ms]() {
+            return wd->w->waitForStopped(std::chrono::milliseconds(timeout_ms));
         },
         []() {
             return false;
@@ -255,8 +255,8 @@ bool CWorker_waitForStopped(CWorker* w, unsigned long timeout_ms)
 bool CWorker_waitForOnline(CWorker* w, unsigned long timeout_ms)
 {
     return c::withCatch(
-        [wwd = c::getPrivD(w), timeout_ms]() {
-            return wwd->w->waitForOnline(std::chrono::milliseconds(timeout_ms));
+        [wd = c::getPrivD(w), timeout_ms]() {
+            return wd->w->waitForOnline(std::chrono::milliseconds(timeout_ms));
         },
         []() {
             return false;
@@ -267,8 +267,8 @@ bool CWorker_waitForOnline(CWorker* w, unsigned long timeout_ms)
 bool CWorker_waitForOffline(CWorker* w, unsigned long timeout_ms)
 {
     return c::withCatch(
-        [wwd = c::getPrivD(w), timeout_ms]() {
-            return wwd->w->waitForOffline(std::chrono::milliseconds(timeout_ms));
+        [wd = c::getPrivD(w), timeout_ms]() {
+            return wd->w->waitForOffline(std::chrono::milliseconds(timeout_ms));
         },
         []() {
             return false;
@@ -279,10 +279,10 @@ bool CWorker_waitForOffline(CWorker* w, unsigned long timeout_ms)
 CTopic* CWorker_waitForTopic(CWorker* w, unsigned long timeout_ms)
 {
     return c::withCatch(
-        [wwd = c::getPrivD(w), timeout_ms]() {
-            if (auto tp = wwd->w->waitForTopic(std::chrono::milliseconds(timeout_ms)); tp) {
-                wwd->evd.tp = *tp;
-                return c::getOpaque(&wwd->evd.tp);
+        [wd = c::getPrivD(w), timeout_ms]() {
+            if (auto tp = wd->w->waitForTopic(std::chrono::milliseconds(timeout_ms)); tp) {
+                wd->evd.tp = *tp;
+                return c::getOpaque(&wd->evd.tp);
             } else {
                 return static_cast<CTopic*>(nullptr);
             }
