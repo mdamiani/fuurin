@@ -10,27 +10,15 @@
 
 #include "fuurin/c/cworker.h"
 #include "fuurin/topic.h"
-#include "fuurin/worker.h"
 #include "fuurin/logger.h"
-#include "ceventd.h"
+#include "cworkerd.h"
 #include "cutils.h"
 
-#include <memory>
 #include <chrono>
 #include <string_view>
 
 
 using namespace fuurin;
-
-
-namespace {
-struct CWorkerD
-{
-    std::unique_ptr<Worker> w;
-    std::future<void> f;
-    CEventD evd;
-};
-} // namespace
 
 
 CWorker* CWorker_new(CUuid id, unsigned long long seqn, const char* name)
