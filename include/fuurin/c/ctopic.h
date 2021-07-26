@@ -22,18 +22,55 @@ extern "C"
 #endif
     typedef struct CTopic CTopic;
 
+    /**
+     * \brief C enum for topic type.
+     */
     typedef enum TopicType_t
     {
         TopicState,
         TopicEvent,
     } TopicType_t;
 
+    /**
+     * \return The broker uuid.
+     * \param[in] t Pointer to a C topic object.
+     */
     CUuid CTopic_brokerUuid(CTopic* t);
+
+    /**
+     * \return The worker uuid.
+     * \param[in] t Pointer to a C topic object.
+     */
     CUuid CTopic_workerUuid(CTopic* t);
+
+    /**
+     * \return The sequence number.
+     * \param[in] t Pointer to a C topic object.
+     */
     unsigned long long CTopic_seqNum(CTopic* t);
+
+    /**
+     * \return The topic type.
+     * \param[in] t Pointer to a C topic object.
+     */
     TopicType_t CTopic_type(CTopic* t);
+
+    /**
+     * \return The topic name.
+     * \param[in] t Pointer to a C topic object.
+     */
     const char* CTopic_name(CTopic* t);
+
+    /**
+     * \return The topic data payload.
+     * \param[in] t Pointer to a C topic object.
+     */
     const char* CTopic_data(CTopic* t);
+
+    /**
+     * \return The topic data size.
+     * \param[in] t Pointer to a C topic object.
+     */
     size_t CTopic_size(CTopic* t);
 
 #ifdef __cplusplus

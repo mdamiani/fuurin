@@ -20,6 +20,9 @@ extern "C"
 #endif
     typedef struct CEvent CEvent;
 
+    /**
+     * \brief C enum for event type.
+     */
     typedef enum EventType_t
     {
         EventInvalid,
@@ -37,6 +40,9 @@ extern "C"
         EventSyncDownloadOff,
     } EventType_t;
 
+    /**
+     * \brief C enum for event notification.
+     */
     typedef enum EventNotif_t
     {
         EventDiscard,
@@ -44,8 +50,24 @@ extern "C"
         EventSuccess,
     } EventNotif_t;
 
+    /**
+     * \return The event type.
+     * \param[in] ev Pointer to a C event object.
+     */
     EventType_t CEvent_type(CEvent* ev);
+
+    /**
+     * \return The event nofitication.
+     * \param[in] ev Pointer to a C event object.
+     */
     EventNotif_t CEvent_notif(CEvent* ev);
+
+    /**
+     * \return The topic payload in case of specific events, or \c nullptr otherwise.
+     *         Pointer remains valid until the next call to this function or \ref CWorker_waitForTopic().
+     *
+     * \param[in] ev Pointer to a C event object.
+     */
     CTopic* CEvent_topic(CEvent* ev);
 
 #ifdef __cplusplus

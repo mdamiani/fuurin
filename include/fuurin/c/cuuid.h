@@ -17,16 +17,46 @@ extern "C"
 {
 #endif
 
+    /**
+     * \brief C type for uuid.
+     */
     typedef struct CUuid
     {
-        unsigned char bytes[16];
+        unsigned char bytes[16]; ///< Uuid bytes.
     } CUuid;
 
+    /**
+     * \return A new null uuid.
+     */
     CUuid CUuid_createNullUuid();
+
+    /**
+     * \return A new random uuid.
+     */
     CUuid CUuid_createRandomUuid();
+
+    /**
+     * \return A new DNS uuid.
+     * \param[in] name Uuid name.
+     */
     CUuid CUuid_createDnsUuid(const char* name);
+
+    /**
+     * \return A new URL uuid.
+     * \param[in] name Uuid name.
+     */
     CUuid CUuid_createUrlUuid(const char* name);
+
+    /**
+     * \return A new OID uuid.
+     * \param[in] name Uuid name.
+     */
     CUuid CUuid_createOidUuid(const char* name);
+
+    /**
+     * \return A new X500dn uuid.
+     * \param[in] name Uuid name.
+     */
     CUuid CUuid_createX500dnUuid(const char* name);
 
 #ifdef __cplusplus
