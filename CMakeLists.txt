@@ -101,6 +101,7 @@ set(LIB_SOURCES
     src/tokenpool.cpp
     src/c/cutils.cpp
     src/c/cuuid.cpp
+    src/c/cbroker.cpp
     src/c/cworker.cpp
     src/c/ctopic.cpp
     src/c/cevent.cpp

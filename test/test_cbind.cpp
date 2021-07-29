@@ -15,6 +15,7 @@
 #include "fuurin/c/cuuid.h"
 #include "fuurin/c/ctopic.h"
 #include "fuurin/c/cevent.h"
+#include "fuurin/c/cbroker.h"
 #include "fuurin/c/cworker.h"
 #include "fuurin/uuid.h"
 #include "fuurin/topic.h"
@@ -314,7 +315,139 @@ BOOST_AUTO_TEST_CASE(testCEvent_topic_err)
 
 
 /**
- * Runner
+ * Runner: Broker
+ */
+
+BOOST_AUTO_TEST_CASE(testCBroker_create)
+{
+    CBroker* b = CBroker_new(CUuid_createRandomUuid(), "test");
+    BOOST_REQUIRE(b != nullptr);
+
+    CBroker_delete(b);
+}
+
+
+BOOST_AUTO_TEST_CASE(testCBroker_name)
+{
+    CBroker* b = CBroker_new(CUuid_createRandomUuid(), "test");
+    BOOST_REQUIRE(b != nullptr);
+
+    BOOST_TEST(std::string(CBroker_name(b)) == "test"s);
+
+    CBroker_delete(b);
+}
+
+
+BOOST_AUTO_TEST_CASE(testCBroker_uuid)
+{
+    CUuid wantId = CUuid_createRandomUuid();
+    CBroker* b = CBroker_new(wantId, "test");
+    BOOST_REQUIRE(b != nullptr);
+
+    auto gotId = CBroker_uuid(b);
+
+    BOOST_TEST(uuidEqual(wantId, gotId));
+
+    CBroker_delete(b);
+}
+
+
+BOOST_AUTO_TEST_CASE(testCBroker_endpoints)
+{
+    CBroker* b = CBroker_new(CUuid_createRandomUuid(), "test");
+    BOOST_REQUIRE(b != nullptr);
+
+    BOOST_TEST(std::string(CBroker_endpointDelivery(b)) == "ipc:///tmp/worker_delivery"s);
+    BOOST_TEST(std::string(CBroker_endpointDispatch(b)) == "ipc:///tmp/worker_dispatch"s);
+    BOOST_TEST(std::string(CBroker_endpointSnapshot(b)) == "ipc:///tmp/broker_snapshot"s);
+
+    CBroker_clearEndpoints(b);
+
+    CBroker_addEndpoints(b, "endp1", "endp2", "endp3");
+    CBroker_addEndpoints(b, "endp4", "endp5", "endp6");
+
+    BOOST_TEST(std::string(CBroker_endpointDelivery(b)) == "endp1"s);
+    BOOST_TEST(std::string(CBroker_endpointDispatch(b)) == "endp2"s);
+    BOOST_TEST(std::string(CBroker_endpointSnapshot(b)) == "endp3"s);
+
+    CBroker_clearEndpoints(b);
+
+    BOOST_TEST(CBroker_endpointDelivery(b) == nullptr);
+    BOOST_TEST(CBroker_endpointDispatch(b) == nullptr);
+    BOOST_TEST(CBroker_endpointSnapshot(b) == nullptr);
+
+    CBroker_delete(b);
+}
+
+
+BOOST_AUTO_TEST_CASE(testCBroker_run, *utf::timeout(10))
+{
+    CBroker* b = CBroker_new(CUuid_createRandomUuid(), "test");
+    BOOST_REQUIRE(b != nullptr);
+
+    for (int i = 1; i < 2; ++i) {
+        CBroker_start(b);
+        BOOST_REQUIRE(CBroker_isRunning(b));
+    }
+
+    auto wait = std::async(std::launch::async, [b]() {
+        for (int i = 0; i < 2; ++i) {
+            CBroker_stop(b);
+        }
+    });
+
+    CBroker_wait(b);
+
+    BOOST_REQUIRE(!CBroker_isRunning(b));
+
+    CBroker_wait(b);
+
+    wait.get();
+
+    CBroker_delete(b);
+}
+
+
+/**
+ * Broker
+ */
+
+BOOST_AUTO_TEST_CASE(testCBroker_dispatch, *utf::timeout(10))
+{
+    CBroker* b = CBroker_new(CUuid_createRandomUuid(), "test");
+    BOOST_REQUIRE(b != nullptr);
+
+    CBroker_start(b);
+
+    fuurin::Worker w;
+    auto wf = w.start();
+
+    BOOST_REQUIRE(w.waitForOnline(5s));
+
+    w.dispatch("my/topic"sv, fuurin::zmq::Part{"hello1"s});
+
+    auto t = w.waitForTopic();
+
+    BOOST_REQUIRE(t.has_value());
+    BOOST_TEST(uuidEqual(t->broker(), CBroker_uuid(b)));
+    BOOST_TEST(t->worker() == w.uuid());
+    BOOST_TEST(t->seqNum() == 1ull);
+    BOOST_TEST(t->type() == fuurin::Topic::State);
+    BOOST_TEST(t->name() == "my/topic"s);
+    BOOST_TEST(t->data().size() == 6u);
+    BOOST_TEST(t->data().toString() == "hello1"s);
+
+    w.stop();
+    wf.get();
+
+    CBroker_stop(b);
+    CBroker_wait(b);
+    CBroker_delete(b);
+}
+
+
+/**
+ * Runner: Worker
  */
 
 BOOST_AUTO_TEST_CASE(testCWorker_create)
