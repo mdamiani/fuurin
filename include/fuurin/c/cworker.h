@@ -14,6 +14,8 @@
 #include "fuurin/c/cuuid.h"
 #include "fuurin/c/cevent.h"
 
+#include <stdbool.h>
+
 
 #ifdef __cplusplus
 extern "C"
