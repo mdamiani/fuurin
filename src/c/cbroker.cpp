@@ -19,13 +19,13 @@
 using namespace fuurin;
 
 
-CBroker* CBroker_new(CUuid id, const char* name)
+CBroker* CBroker_new(CUuid* id, const char* name)
 {
     auto ret = new c::CBrokerD;
 
     return c::withCatch(
         [ret, id, name]() {
-            ret->b = std::make_unique<Broker>(c::uuidConvert(id), name);
+            ret->b = std::make_unique<Broker>(c::uuidConvert(*id), name);
             return c::getOpaque(ret);
         },
         [ret]() {

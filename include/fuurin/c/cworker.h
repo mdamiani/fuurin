@@ -36,7 +36,7 @@ extern "C"
      *
      * \return Pointer to the new worker, or nullptr in case of errors.
      */
-    CWorker* CWorker_new(CUuid id, unsigned long long seqn, const char* name);
+    CWorker* CWorker_new(CUuid* id, unsigned long long seqn, const char* name);
 
     /**
      * \brief Deletes a C worker object.

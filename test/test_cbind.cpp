@@ -51,6 +51,16 @@ bool uuidEqual(CUuid a, CUuid b)
 {
     return std::equal(a.bytes, a.bytes + sizeof(a.bytes), b.bytes);
 }
+
+CBroker* CBroker_new(CUuid id, const char* name)
+{
+    return CBroker_new(&id, name);
+}
+
+CWorker* CWorker_new(CUuid id, unsigned long long seqn, const char* name)
+{
+    return CWorker_new(&id, seqn, name);
+}
 } // namespace
 
 

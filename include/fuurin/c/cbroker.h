@@ -34,7 +34,7 @@ extern "C"
      *
      * \return Pointer to the new broker, or nullptr in case of errors.
      */
-    CBroker* CBroker_new(CUuid id, const char* name);
+    CBroker* CBroker_new(CUuid* id, const char* name);
 
     /**
      * \brief Deletes a C broker object.

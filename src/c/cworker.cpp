@@ -22,7 +22,7 @@
 using namespace fuurin;
 
 
-CWorker* CWorker_new(CUuid id, unsigned long long seqn, const char* name)
+CWorker* CWorker_new(CUuid* id, unsigned long long seqn, const char* name)
 {
     static_assert(sizeof(seqn) == sizeof(Topic::SeqN));
 
@@ -30,7 +30,7 @@ CWorker* CWorker_new(CUuid id, unsigned long long seqn, const char* name)
 
     return c::withCatch(
         [ret, id, seqn, name]() {
-            ret->w = std::make_unique<Worker>(c::uuidConvert(id), seqn, name);
+            ret->w = std::make_unique<Worker>(c::uuidConvert(*id), seqn, name);
             return c::getOpaque(ret);
         },
         [ret]() {
