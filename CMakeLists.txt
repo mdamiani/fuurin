@@ -155,7 +155,6 @@ set(LIB_COMPILE_FLAGS
 )
 
 set(LIB_LINK_FLAGS
-    zeromq_static
     ${CMAKE_THREAD_LIBS_INIT}
 )
 
@@ -177,7 +176,7 @@ target_compile_options(fuurin_shared PUBLIC ${LIB_COMPILE_FLAGS} ${SANITIZERS_CO
 target_compile_options(fuurin_static PUBLIC ${LIB_COMPILE_FLAGS} ${SANITIZERS_COMPILE_FLAGS})
 
 target_link_libraries(fuurin_static PUBLIC ${LIB_LINK_FLAGS} ${SANITIZERS_LINK_FLAGS})
-target_link_libraries(fuurin_shared PUBLIC ${LIB_LINK_FLAGS} ${SANITIZERS_LINK_FLAGS})
+target_link_libraries(fuurin_shared PUBLIC ${LIB_LINK_FLAGS} ${SANITIZERS_LINK_FLAGS} zeromq_static)
 
 
 set_target_properties(fuurin_shared PROPERTIES
@@ -187,6 +186,19 @@ set_target_properties(fuurin_shared PROPERTIES
 
 add_dependencies(fuurin_shared zeromq)
 add_dependencies(fuurin_static zeromq)
+
+# Merge zmq into fuurin static archive
+add_custom_target(make-zeromq-obj-dir ALL
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/zeromq-obj"
+)
+add_custom_command(
+    TARGET fuurin_static
+    POST_BUILD
+    COMMAND ${CMAKE_AR} -x   $<TARGET_FILE:zeromq_static>
+    COMMAND ${CMAKE_AR} -qcs $<TARGET_FILE:fuurin_static> *.o
+    WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/zeromq-obj"
+)
+
 
 include_directories(
     "include"
