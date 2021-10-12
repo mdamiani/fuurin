@@ -113,7 +113,7 @@ set(LIB_PUBLIC_HEADERS
     include/fuurin/errors.h
     include/fuurin/elapser.h
     include/fuurin/event.h
-    include/fuurin/opearation.h
+    include/fuurin/operation.h
     include/fuurin/logger.h
     include/fuurin/stopwatch.h
     include/fuurin/zmqcontext.h
