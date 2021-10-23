@@ -136,6 +136,9 @@ set(LIB_PUBLIC_HEADERS
     include/fuurin/sessionworker.h
     include/fuurin/sessionbroker.h
     include/fuurin/tokenpool.h
+    include/fuurin/c/cbroker.h
+    include/fuurin/c/cevent.h
+    include/fuurin/c/ctopic.h
     include/fuurin/c/cuuid.h
     include/fuurin/c/cworker.h
 )
@@ -284,7 +287,7 @@ install(
 )
 
 install(
-    FILES ${LIB_PUBLIC_HEADERS}
-    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/${PROJECT_NAME}"
+    DIRECTORY "${CMAKE_SOURCE_DIR}/include/"
+    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
     COMPONENT libfuurin-dev
 )
