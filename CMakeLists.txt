@@ -199,6 +199,7 @@ add_custom_command(
     POST_BUILD
     COMMAND ${CMAKE_AR} -x   $<TARGET_FILE:zeromq_static>
     COMMAND ${CMAKE_AR} -qcs $<TARGET_FILE:fuurin_static> *.o
+    COMMAND ${CMAKE_RANLIB}  $<TARGET_FILE:fuurin_static>
     WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/zeromq-obj"
 )
 add_dependencies(fuurin_static make-zeromq-obj-dir)
