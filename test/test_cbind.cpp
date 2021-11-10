@@ -257,6 +257,7 @@ BOOST_DATA_TEST_CASE(testCEvent_type,
 {
     fuurin::c::CEventD evd{
         .ev = fuurin::Event{cppType, {}},
+        .tp = fuurin::Topic{},
     };
 
     auto* ev = fuurin::c::getOpaque(&evd);
@@ -277,6 +278,7 @@ BOOST_DATA_TEST_CASE(testCEvent_notif,
 {
     fuurin::c::CEventD evd{
         .ev = fuurin::Event{{}, cppNotif},
+        .tp = fuurin::Topic{},
     };
 
     auto* ev = fuurin::c::getOpaque(&evd);
@@ -296,6 +298,7 @@ BOOST_AUTO_TEST_CASE(testCEvent_topic_ok)
                 fuurin::zmq::Part{"payload"sv},
                 fuurin::Topic::Event}
                 .toPart()},
+        .tp = fuurin::Topic{},
     };
 
     auto* ev = fuurin::c::getOpaque(&evd);
