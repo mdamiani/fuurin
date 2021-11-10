@@ -42,7 +42,7 @@ ExternalProject_Add(zeromq
         -D WITH_TLS=OFF
         -D WITH_LIBBSD=OFF
         -D ENABLE_CURVE=OFF
-        -D CMAKE_BUILD_TYPE=Release
+        -D CMAKE_BUILD_TYPE=RelWithDebInfo
         -D CMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}
 )
 
