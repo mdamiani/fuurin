@@ -201,6 +201,7 @@ add_custom_command(
     COMMAND ${CMAKE_AR} -qcs $<TARGET_FILE:fuurin_static> *.o
     WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/zeromq-obj"
 )
+add_dependencies(fuurin_static make-zeromq-obj-dir)
 
 
 include_directories(
