@@ -214,7 +214,7 @@ void CWorker_sync(CWorker* w)
 }
 
 
-CEvent* CWorker_waitForEvent(CWorker* w, unsigned long timeout_ms)
+CEvent* CWorker_waitForEvent(CWorker* w, long timeout_ms)
 {
     return c::withCatch(
         [wd = c::getPrivD(w), timeout_ms]() {
@@ -228,7 +228,7 @@ CEvent* CWorker_waitForEvent(CWorker* w, unsigned long timeout_ms)
 }
 
 
-bool CWorker_waitForStarted(CWorker* w, unsigned long timeout_ms)
+bool CWorker_waitForStarted(CWorker* w, long timeout_ms)
 {
     return c::withCatch(
         [wd = c::getPrivD(w), timeout_ms]() {
@@ -240,7 +240,7 @@ bool CWorker_waitForStarted(CWorker* w, unsigned long timeout_ms)
 }
 
 
-bool CWorker_waitForStopped(CWorker* w, unsigned long timeout_ms)
+bool CWorker_waitForStopped(CWorker* w, long timeout_ms)
 {
     return c::withCatch(
         [wd = c::getPrivD(w), timeout_ms]() {
@@ -252,7 +252,7 @@ bool CWorker_waitForStopped(CWorker* w, unsigned long timeout_ms)
 }
 
 
-bool CWorker_waitForOnline(CWorker* w, unsigned long timeout_ms)
+bool CWorker_waitForOnline(CWorker* w, long timeout_ms)
 {
     return c::withCatch(
         [wd = c::getPrivD(w), timeout_ms]() {
@@ -264,7 +264,7 @@ bool CWorker_waitForOnline(CWorker* w, unsigned long timeout_ms)
 }
 
 
-bool CWorker_waitForOffline(CWorker* w, unsigned long timeout_ms)
+bool CWorker_waitForOffline(CWorker* w, long timeout_ms)
 {
     return c::withCatch(
         [wd = c::getPrivD(w), timeout_ms]() {
@@ -276,7 +276,7 @@ bool CWorker_waitForOffline(CWorker* w, unsigned long timeout_ms)
 }
 
 
-CTopic* CWorker_waitForTopic(CWorker* w, unsigned long timeout_ms)
+CTopic* CWorker_waitForTopic(CWorker* w, long timeout_ms)
 {
     return c::withCatch(
         [wd = c::getPrivD(w), timeout_ms]() {

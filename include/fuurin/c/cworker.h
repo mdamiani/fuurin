@@ -169,7 +169,7 @@ extern "C"
      *         It returns an invalid event in case of timeout.
      *         It returns \c nullptr in case of errors.
      */
-    CEvent* CWorker_waitForEvent(CWorker* w, unsigned long timeout_ms);
+    CEvent* CWorker_waitForEvent(CWorker* w, long timeout_ms);
 
     /**
      * \brief Waits for a specific worker's event.
@@ -181,10 +181,10 @@ extern "C"
      *         or \c false in case of errors.
      */
     ///@{
-    bool CWorker_waitForStarted(CWorker* w, unsigned long timeout_ms);
-    bool CWorker_waitForStopped(CWorker* w, unsigned long timeout_ms);
-    bool CWorker_waitForOnline(CWorker* w, unsigned long timeout_ms);
-    bool CWorker_waitForOffline(CWorker* w, unsigned long timeout_ms);
+    bool CWorker_waitForStarted(CWorker* w, long timeout_ms);
+    bool CWorker_waitForStopped(CWorker* w, long timeout_ms);
+    bool CWorker_waitForOnline(CWorker* w, long timeout_ms);
+    bool CWorker_waitForOffline(CWorker* w, long timeout_ms);
     ///@}
 
     /**
@@ -197,7 +197,7 @@ extern "C"
      *         Pointer remains valid until the next call to this function or \ref CEvent_topic().
      *         It returns \c nullptr in case of timeout or errors.
      */
-    CTopic* CWorker_waitForTopic(CWorker* w, unsigned long timeout_ms);
+    CTopic* CWorker_waitForTopic(CWorker* w, long timeout_ms);
 
 #ifdef __cplusplus
 }
