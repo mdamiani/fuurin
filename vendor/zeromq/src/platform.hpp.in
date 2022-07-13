@@ -53,6 +53,9 @@
 /* Define to 1 if you have the <ifaddrs.h> header file. */
 #undef HAVE_IFADDRS_H
 
+/* if_nametoindex is available */
+#undef HAVE_IF_NAMETOINDEX
+
 /* Define to 1 if you have the <inttypes.h> header file. */
 #undef HAVE_INTTYPES_H
 
@@ -320,6 +323,9 @@
 
 /* Have SO_PEERCRED socket option */
 #undef ZMQ_HAVE_SO_PEERCRED
+
+/* Whether SO_PRIORITY is supported. */
+#undef ZMQ_HAVE_SO_PRIORITY
 
 /* strlcpy is available */
 #undef ZMQ_HAVE_STRLCPY
