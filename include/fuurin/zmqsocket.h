@@ -151,6 +151,19 @@ public:
     bool conflate() const noexcept;
 
     /**
+     * \brief Gets the underlying file descriptor of this socket.
+     *
+     * \return The option \c ZMQ_FD.
+     *
+     * \exception ZMQSocketOptionGetFailed The specified \c option ZMQ_FD
+     *            could not be get, or if the socket is not \ref isOpen().
+     *
+     * \see bind
+     * \see connect
+     */
+    int fileDescriptor() const;
+
+    /**
      * \brief Sets a \c ZMQ_SUBSCRIBE filter to this socket.
      * The socket subscriptions are actually applied at connection/bind time.
      *
