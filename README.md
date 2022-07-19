@@ -297,10 +297,10 @@ $> make
 
 Sanitizers can enabled with some cmake options:
 
-  - Address Sanitizer: cmake -D ENABLE_ASAN=ON ...
-  - Thread Sanitezer: cmake -D ENABLE_TSAN=ON ...
-  - Memory Sanitezer: cmake -D ENABLE_MSAN=ON ...
-  - Undefined Behavior Sanitizer: cmake -D ENABLE_UBSAN=ON ...
+  - Address Sanitizer: `cmake -D ENABLE_ASAN=ON`
+  - Thread Sanitezer: `cmake -D ENABLE_TSAN=ON`
+  - Memory Sanitezer: `cmake -D ENABLE_MSAN=ON`
+  - Undefined Behavior Sanitizer: `cmake -D ENABLE_UBSAN=ON`
 
 
 ### How to check coverage
@@ -312,6 +312,22 @@ $> make
 $> ctest -v
 $> lcov --directory . --capture --output-file coverage.info
 $> genhtml coverage.info --output-directory coverage
+```
+
+
+### How to build Doxygen documentation
+
+```
+$> cmake -D ENABLE_DOXYGEN=1 /path/to/fuurin/folder
+$> make doxygen
+```
+
+
+### How to build gRPC service
+
+```
+$> cmake -D ENABLE_SERVICE_GRPC=1 /path/to/fuurin/folder
+$> make
 ```
 
 
