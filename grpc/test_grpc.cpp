@@ -603,6 +603,8 @@ BOOST_AUTO_TEST_CASE(errorGetOnStop, *utf::timeout(15))
     BOOST_TEST(client.Start());
     BOOST_TEST(client.Stop());
 
+    std::this_thread::sleep_for(WorkerServiceImpl::LatencyDuration + 2s);
+
     BOOST_TEST(TestWorkerServiceImpl::getActiveFuture(service.get())->valid() == false);
 
     servCanc();
