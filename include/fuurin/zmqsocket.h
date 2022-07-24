@@ -161,6 +161,7 @@ public:
      * \see bind
      * \see connect
      */
+    // TODO: make file descritor type more generic.
     int fileDescriptor() const;
 
     /**
