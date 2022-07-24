@@ -237,7 +237,7 @@ both build and test this library.
 ```
 $> mkdir build
 $> cd build
-$> cmake /path/to/fuurin/folder
+$> cmake -D BUILD_SHARED=1 -D BUILD_STATIC=1 /path/to/fuurin/folder
 $> make
 $> make install
 ```

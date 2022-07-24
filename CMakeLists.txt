@@ -149,61 +149,7 @@ set(LIB_NAME "lib${PROJECT_NAME}")
 
 link_directories(${3RDPARTY_DIR}/lib)
 
-add_library(fuurin_shared SHARED ${LIB_SOURCES})
-add_library(fuurin_static STATIC ${LIB_SOURCES})
-
-set(LIB_COMPILE_FLAGS
-    -Wall
-    -Wextra
-)
-
-set(LIB_LINK_FLAGS
-    ${CMAKE_THREAD_LIBS_INIT}
-)
-
-set(LIB_COMPILE_DEFS
-    BOOST_SCOPE_EXIT_CONFIG_USE_LAMBDAS
-    ZMQ_BUILD_DRAFT_API
-
-    LIB_VERSION_MAJOR=${PROJECT_VERSION_MAJOR}
-    LIB_VERSION_MINOR=${PROJECT_VERSION_MINOR}
-    LIB_VERSION_PATCH=${PROJECT_VERSION_PATCH}
-)
-
-include(Coverage)
-
-target_compile_definitions(fuurin_shared PRIVATE ${LIB_COMPILE_DEFS})
-target_compile_definitions(fuurin_static PRIVATE ${LIB_COMPILE_DEFS})
-
-target_compile_options(fuurin_shared PUBLIC ${LIB_COMPILE_FLAGS} ${SANITIZERS_COMPILE_FLAGS})
-target_compile_options(fuurin_static PUBLIC ${LIB_COMPILE_FLAGS} ${SANITIZERS_COMPILE_FLAGS})
-
-target_link_libraries(fuurin_static PUBLIC ${LIB_LINK_FLAGS} ${SANITIZERS_LINK_FLAGS})
-target_link_libraries(fuurin_shared PUBLIC ${LIB_LINK_FLAGS} ${SANITIZERS_LINK_FLAGS} zeromq_static)
-
-
-set_target_properties(fuurin_shared PROPERTIES
-    VERSION ${LIB_VERSION_FULL}
-    SOVERSION ${LIB_SOVERSION}
-)
-
-add_dependencies(fuurin_shared zeromq)
-add_dependencies(fuurin_static zeromq)
-
-# Merge zmq into fuurin static archive
-add_custom_target(make-zeromq-obj-dir ALL
-    COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/zeromq-obj"
-)
-add_custom_command(
-    TARGET fuurin_static
-    POST_BUILD
-    COMMAND ${CMAKE_AR} -x   $<TARGET_FILE:zeromq_static>
-    COMMAND ${CMAKE_AR} -qcs $<TARGET_FILE:fuurin_static> *.o
-    COMMAND ${CMAKE_RANLIB}  $<TARGET_FILE:fuurin_static>
-    WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/zeromq-obj"
-)
-add_dependencies(fuurin_static make-zeromq-obj-dir)
-
+include(Library)
 
 include_directories(
     "include"
@@ -275,23 +221,27 @@ else()
     set(CMAKE_INSTALL_INCLUDEDIR "${CMAKE_INSTALL_PREFIX}/include")
 endif()
 
-install(
-    TARGETS fuurin_shared
-    LIBRARY DESTINATION "${INSTALL_LIBDIR}" NAMELINK_SKIP
-    COMPONENT libfuurin
-)
+if(BUILD_SHARED)
+    install(
+        TARGETS fuurin_shared
+        LIBRARY DESTINATION "${INSTALL_LIBDIR}" NAMELINK_SKIP
+        COMPONENT libfuurin
+    )
 
-install(
-    TARGETS fuurin_shared
-    LIBRARY DESTINATION "${INSTALL_LIBDIR}" NAMELINK_ONLY
-    COMPONENT libfuurin-dev
-)
+    install(
+        TARGETS fuurin_shared
+        LIBRARY DESTINATION "${INSTALL_LIBDIR}" NAMELINK_ONLY
+        COMPONENT libfuurin-dev
+    )
+endif()
 
-install(
-    TARGETS fuurin_static
-    ARCHIVE DESTINATION "${INSTALL_LIBDIR}"
-    COMPONENT libfuurin-dev
-)
+if(BUILD_STATIC)
+    install(
+        TARGETS fuurin_static
+        ARCHIVE DESTINATION "${INSTALL_LIBDIR}"
+        COMPONENT libfuurin-dev
+    )
+endif()
 
 install(
     DIRECTORY "${CMAKE_SOURCE_DIR}/include/"
