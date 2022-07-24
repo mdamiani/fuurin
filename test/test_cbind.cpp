@@ -25,6 +25,7 @@
 #include "c/ctopicd.h"
 #include "c/ceventd.h"
 #include "c/cutils.h"
+#include "c/cworkerd.h"
 
 #include <string_view>
 #include <algorithm>
@@ -822,4 +823,18 @@ BOOST_AUTO_TEST_CASE(testCWorker_sync, *utf::timeout(15))
 
     b.stop();
     bf.get();
+}
+
+
+BOOST_AUTO_TEST_CASE(testCWorker_eventFD)
+{
+    CWorker* w = CWorker_new(CUuid_createRandomUuid(), 0, "test");
+    BOOST_REQUIRE(w != nullptr);
+
+    const auto wd = fuurin::c::getPrivD(w);
+
+    BOOST_TEST(CWorker_eventFD(w) > 0);
+    BOOST_TEST(CWorker_eventFD(w) == wd->w->eventFD());
+
+    CWorker_delete(w);
 }

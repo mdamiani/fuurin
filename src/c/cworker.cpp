@@ -14,6 +14,7 @@
 #include "cworkerd.h"
 #include "ctopicd.h"
 #include "cutils.h"
+#include "../failure.h"
 
 #include <chrono>
 #include <string_view>
@@ -289,5 +290,18 @@ CTopic* CWorker_waitForTopic(CWorker* w, long timeout_ms)
         },
         []() {
             return static_cast<CTopic*>(nullptr);
+        });
+}
+
+
+int CWorker_eventFD(CWorker* w)
+{
+    return c::withCatch(
+        [wd = c::getPrivD(w)]() {
+            return wd->w->eventFD();
+        },
+        []() {
+            ASSERT(false, "failed to get events socket file descriptor");
+            return int{};
         });
 }

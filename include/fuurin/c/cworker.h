@@ -199,6 +199,25 @@ extern "C"
      */
     CTopic* CWorker_waitForTopic(CWorker* w, long timeout_ms);
 
+    /**
+     * \brief Gets the file descriptor of the events socket.
+     *
+     * The returned file descriptor can be used to wait for
+     * events with an existing event loop.
+     *
+     * When the file descriptor is readable,
+     * \ref CWorker_waitForEvent shall be used passing
+     * a 0s timeout, until no more events are available
+     * (that is a \ref fuurin::Event::Notification::Timeout notification).
+     *
+     * This function shall not fail.
+     *
+     * \return The file descriptor to poll.
+     *
+     * \see CWorker_waitForEvent(CWorker*, long)
+     */
+    int CWorker_eventFD(CWorker* w);
+
 #ifdef __cplusplus
 }
 #endif
