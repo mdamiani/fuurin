@@ -1153,6 +1153,66 @@ BOOST_AUTO_TEST_CASE(testWorkerSeqSync)
 }
 
 
+BOOST_AUTO_TEST_CASE(testWaitForTopicFileDescriptor)
+{
+    Worker w(WorkerFixture::wid);
+    Broker b(WorkerFixture::bid);
+
+    void* zpoller = zmq_poller_new();
+    BOOST_TEST(zpoller != nullptr);
+    BOOST_TEST(zmq_poller_add_fd(zpoller, w.eventFD(), nullptr, ZMQ_POLLIN | ZMQ_POLLERR) != -1);
+
+    const auto testReadTopicAsync =
+        [&w, zpoller](
+            std::string name,
+            std::string data,
+            int seqn) //
+    {
+        w.dispatch(name, zmq::Part{data});
+
+        zmq_poller_event_t zev;
+        BOOST_TEST(zmq_poller_wait(zpoller, &zev, 3000) == 0);
+        BOOST_TEST(zev.fd == w.eventFD());
+
+        auto ev = testWaitForTopic(w, mkT(name, 0, data), seqn);
+        auto t = Topic::fromPart(ev.payload());
+
+        BOOST_TEST(t.worker() == WorkerFixture::wid);
+        BOOST_TEST(t.broker() == WorkerFixture::bid);
+    };
+
+    auto wf = w.start();
+
+    testReadEventAsync(w, zpoller, true, 5s, Event::Type::Started, mkCnf(w));
+
+    auto bf = b.start();
+
+    testReadEventAsync(w, zpoller, true, 5s, Event::Type::Online);
+
+    testReadTopicAsync("topic1", "hello1", 1);
+    testReadTopicAsync("topic2", "hello2", 2);
+
+    w.stop();
+    b.stop();
+
+    testReadEventAsync(w, zpoller, true, 5s, Event::Type::Offline);
+
+    /**
+     * Passing false here simulates reading until
+     * no more events are present.
+     */
+    testReadEventAsync(w, zpoller, false, 5s, Event::Type::Stopped);
+
+    // test no more events.
+    testReadEventAsync(w, zpoller, true, 3s);
+
+    bf.get();
+    wf.get();
+
+    zmq_poller_destroy(&zpoller);
+}
+
+
 static void BM_workerStart(benchmark::State& state)
 {
     for (auto _ : state) {

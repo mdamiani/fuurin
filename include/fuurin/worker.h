@@ -179,6 +179,8 @@ public:
     std::optional<Topic> waitForTopic(std::chrono::milliseconds timeout = std::chrono::milliseconds(-1)) const;
     ///@}
 
+    using Runner::eventFD;
+
     /**
      * \return The last sequence number used for marking data.
      */

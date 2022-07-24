@@ -46,6 +46,7 @@ function (AddTest TEST)
 
     target_link_libraries(${TEST} fuurin_static boost_utf_static benchmark_static)
     target_include_directories(${TEST} PRIVATE ../)
+    target_compile_definitions(${TEST} PRIVATE ZMQ_BUILD_DRAFT_API)
 
     add_test(NAME ${TEST}
         WORKING_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
