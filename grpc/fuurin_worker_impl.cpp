@@ -22,7 +22,6 @@
 #include "fuurin/logger.h"
 #include "fuurin/zmqtimer.h"
 
-#include <grpcpp/server.h>
 #include <grpcpp/server_builder.h>
 
 #include <string_view>

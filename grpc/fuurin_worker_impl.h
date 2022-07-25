@@ -15,6 +15,7 @@
 #include "utils.h"
 
 #include <grpc/grpc.h>
+#include <grpcpp/server.h>
 #include <grpcpp/server_context.h>
 
 #include <memory>
@@ -25,6 +26,7 @@
 #include <tuple>
 #include <atomic>
 #include <chrono>
+#include <optional>
 
 
 namespace fuurin {
