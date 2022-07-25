@@ -38,6 +38,8 @@ namespace bdata = utf::data;
 using namespace std::literals::string_literals;
 using namespace std::literals::chrono_literals;
 
+static constexpr std::chrono::seconds RCPSetupTimeout = WorkerServiceImpl::LatencyDuration + 5s;
+
 
 class TestWorkerServiceImpl
 {
@@ -175,7 +177,7 @@ BOOST_FIXTURE_TEST_CASE(testRCPSetupTeardown, ServiceFixture)
 
 BOOST_FIXTURE_TEST_CASE(testStart, ServiceFixture)
 {
-    auto events = waitForGRPCEvents(client.get(), 5s,
+    auto events = waitForGRPCEvents(client.get(), RCPSetupTimeout,
         {Event::Started},
         {Event::RCPSetup},
         [this](Event_Type) {
@@ -187,7 +189,7 @@ BOOST_FIXTURE_TEST_CASE(testStart, ServiceFixture)
 
 BOOST_FIXTURE_TEST_CASE(testStop, ServiceFixture)
 {
-    auto events = waitForGRPCEvents(client.get(), 5s,
+    auto events = waitForGRPCEvents(client.get(), RCPSetupTimeout,
         {Event::Stopped},
         {Event::RCPSetup},
         [this](Event_Type) {
@@ -200,7 +202,7 @@ BOOST_FIXTURE_TEST_CASE(testStop, ServiceFixture)
 
 BOOST_FIXTURE_TEST_CASE(testOnline, ServiceFixture)
 {
-    auto events = waitForGRPCEvents(client.get(), 5s,
+    auto events = waitForGRPCEvents(client.get(), RCPSetupTimeout,
         {Event::Online},
         {Event::RCPSetup},
         [this](Event_Type) {
@@ -212,7 +214,7 @@ BOOST_FIXTURE_TEST_CASE(testOnline, ServiceFixture)
 
 BOOST_FIXTURE_TEST_CASE(testOffline, ServiceFixture)
 {
-    auto events = waitForGRPCEvents(client.get(), 5s,
+    auto events = waitForGRPCEvents(client.get(), RCPSetupTimeout,
         {Event::Offline},
         {Event::RCPSetup, Event::Online},
         [this](Event_Type type) {
@@ -234,7 +236,7 @@ BOOST_FIXTURE_TEST_CASE(testSetEndpoints, ServiceFixture)
 
     BOOST_TEST(client->SetEndpoints(del, dis, snp));
 
-    auto events = waitForGRPCEvents(client.get(), 5s,
+    auto events = waitForGRPCEvents(client.get(), RCPSetupTimeout,
         {Event::Started},
         {Event::RCPSetup},
         [this](Event_Type) {
@@ -265,7 +267,7 @@ BOOST_FIXTURE_TEST_CASE(testSetSubscriptionsTopicsNames, ServiceFixture)
 {
     BOOST_TEST(client->SetSubscriptions(false, {"topicA", "topicB"}));
 
-    auto events = waitForGRPCEvents(client.get(), 5s,
+    auto events = waitForGRPCEvents(client.get(), RCPSetupTimeout,
         {Event::Started},
         {Event::RCPSetup},
         [this](Event_Type) {
@@ -287,7 +289,7 @@ BOOST_FIXTURE_TEST_CASE(testSetSubscriptionsTopicsAll, ServiceFixture)
 {
     BOOST_TEST(client->SetSubscriptions(true, {}));
 
-    auto events = waitForGRPCEvents(client.get(), 5s,
+    auto events = waitForGRPCEvents(client.get(), RCPSetupTimeout,
         {Event::Started},
         {Event::RCPSetup},
         [this](Event_Type) {
@@ -305,7 +307,7 @@ BOOST_FIXTURE_TEST_CASE(testSetSubscriptionsTopicsAll, ServiceFixture)
 
 BOOST_FIXTURE_TEST_CASE(testDispatchSingle, ServiceFixture)
 {
-    auto events = waitForGRPCEvents(client.get(), 5s,
+    auto events = waitForGRPCEvents(client.get(), RCPSetupTimeout,
         {Event::Delivery, Event::Delivery},
         {Event::RCPSetup, Event::Online},
         [this](Event_Type type) {
@@ -356,7 +358,7 @@ BOOST_DATA_TEST_CASE_F(ServiceFixture, testDispatchConcurrent,
     auto setup = promise.get_future();
 
     auto f1 = std::async(std::launch::async, [this, &promise]() {
-        return waitForGRPCEvents(client.get(), 5s,
+        return waitForGRPCEvents(client.get(), RCPSetupTimeout,
             {Event::Delivery, Event::Delivery},
             {Event::RCPSetup, Event::Online},
             [this, &promise](Event_Type type) {
@@ -402,7 +404,7 @@ BOOST_FIXTURE_TEST_CASE(testEventsMultiplex, ServiceFixture)
     auto setup = promise.get_future();
 
     auto f1 = std::async(std::launch::async, [this, &promise]() {
-        return waitForGRPCEvents(client.get(), 5s,
+        return waitForGRPCEvents(client.get(), RCPSetupTimeout,
             {Event::Delivery, Event::Delivery},
             {Event::RCPSetup},
             [&promise](Event_Type) {
@@ -413,7 +415,7 @@ BOOST_FIXTURE_TEST_CASE(testEventsMultiplex, ServiceFixture)
     setup.get();
 
     auto f2 = std::async(std::launch::async, [this]() {
-        return waitForGRPCEvents(client.get(), 5s,
+        return waitForGRPCEvents(client.get(), RCPSetupTimeout,
             {Event::Delivery, Event::Delivery},
             {Event::RCPSetup, Event::Online},
             [this](Event_Type type) {
@@ -443,7 +445,7 @@ BOOST_FIXTURE_TEST_CASE(testEventsMultiplex, ServiceFixture)
 BOOST_FIXTURE_TEST_CASE(testSyncOk, ServiceFixture)
 {
     // store topics
-    waitForGRPCEvents(client.get(), 5s,
+    waitForGRPCEvents(client.get(), RCPSetupTimeout,
         {Event::Delivery, Event::Delivery},
         {Event::RCPSetup, Event::Online},
         [this](Event_Type type) {
@@ -465,7 +467,7 @@ BOOST_FIXTURE_TEST_CASE(testSyncOk, ServiceFixture)
     };
 
     // sync topics
-    auto events = waitForGRPCEvents(client.get(), 5s,
+    auto events = waitForGRPCEvents(client.get(), RCPSetupTimeout,
         filters, {Event::RCPSetup},
         [this](Event_Type) {
             BOOST_TEST(client->Sync());
@@ -539,7 +541,7 @@ BOOST_FIXTURE_TEST_CASE(testSyncErr, ServiceFixture)
     };
 
     // sync topics
-    auto events = waitForGRPCEvents(client.get(), 15s,
+    auto events = waitForGRPCEvents(client.get(), RCPSetupTimeout + 15s,
         filters, {Event::RCPSetup},
         [this](Event_Type) {
             BOOST_TEST(client->Start());
@@ -602,6 +604,8 @@ BOOST_AUTO_TEST_CASE(errorGetOnStop, *utf::timeout(15))
     BOOST_TEST(succ);
     BOOST_TEST(client.Start());
     BOOST_TEST(client.Stop());
+
+    std::this_thread::sleep_for(WorkerServiceImpl::LatencyDuration + 2s);
 
     BOOST_TEST(TestWorkerServiceImpl::getActiveFuture(service.get())->valid() == false);
 

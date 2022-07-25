@@ -208,7 +208,7 @@ Event Runner::waitForEvent(zmq::Pollable& canc, EventMatchFunc match) const
 
 Event Runner::waitForEvent(zmq::Pollable* canc, EventMatchFunc match) const
 {
-    zmq::Poller pw{zmq::PollerEvents::Read, 0ms, zevr_.get(), canc};
+    zmq::Poller pw{zmq::PollerEvents::Read, zevr_.get(), canc};
 
     for (;;) {
         for (auto s : pw.wait()) {
