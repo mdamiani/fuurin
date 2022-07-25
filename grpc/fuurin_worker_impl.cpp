@@ -242,7 +242,7 @@ grpc::Status WorkerServiceImpl::WaitForEvent(grpc::ServerContext* context,
         return e;
     };
 
-    stream->Write(createEvent(Event_Type_RCPSetup));
+    bool rcpSetupSent = false;
 
     grpc::Status ret;
 
@@ -267,8 +267,20 @@ grpc::Status WorkerServiceImpl::WaitForEvent(grpc::ServerContext* context,
             zevDish.recv(&pay);
 
             const auto ev = getEvent(pay);
-            if (ev)
+
+            /**
+             * Either a liveness ping or an actual event
+             * from the channel, so it's alive.
+             * Thus send an Event::RCPSetup at first.
+             */
+            if (!rcpSetupSent) {
+                rcpSetupSent = true;
+                stream->Write(createEvent(Event_Type_RCPSetup));
+            }
+
+            if (ev) {
                 stream->Write(ev.value());
+            }
         }
     }
 
@@ -328,12 +340,26 @@ void WorkerServiceImpl::runClient()
 
 void WorkerServiceImpl::runEvents()
 {
-    for (;;) {
-        const auto& ev = worker_->waitForEvent(zcanc1_.get());
-        if (ev.notification() == fuurin::Event::Notification::Timeout)
-            return;
+    fuurin::zmq::Poller poll{fuurin::zmq::PollerEvents::Type::Read, 0ms, zcanc1_.get()};
 
+    for (;;) {
+        const auto& ev = worker_->waitForEvent(LatencyDuration / 2);
+
+        /**
+         * In case timeout has expired, then we get an event `ev` such that:
+         * ev.notification() == fuurin::Event::Notification::Timeout.
+         * It's ok to forward this timeout that shall act as a liveness ping.
+         */
         zrpcEvents_->send(ev.toPart().withGroup("EVNT"));
+
+        /**
+         * Checking here for global cancellation implies waiting for a time
+         * proporitional to LatencyDuration, before reacting to such command.
+         *
+         * TODO: let worker_->waitForEvent() exit immediately as soon as zcanc1_ is cancelled.
+         */
+        if (!poll.wait().empty())
+            return;
     }
 }
 
