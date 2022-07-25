@@ -11,7 +11,7 @@ namespace internal {
 
 class ThreadManager {
  public:
-  ThreadManager(int num_threads)
+  explicit ThreadManager(int num_threads)
       : alive_threads_(num_threads), start_stop_barrier_(num_threads) {}
 
   Mutex& GetBenchmarkMutex() const RETURN_CAPABILITY(benchmark_mutex_) {
@@ -36,7 +36,6 @@ class ThreadManager {
                         [this]() { return alive_threads_ == 0; });
   }
 
- public:
   struct Result {
     IterationCount iterations = 0;
     double real_time_used = 0;
