@@ -1286,6 +1286,25 @@ BOOST_AUTO_TEST_CASE(testConflateOption)
 }
 
 
+BOOST_AUTO_TEST_CASE(testFileDescriptorOption)
+{
+    Context ctx;
+    Socket s{&ctx, Socket::Type::PUSH};
+
+    s.setEndpoints({"inproc://transfer1"});
+
+    BOOST_CHECK_THROW(s.fileDescriptor(), fuurin::err::ZMQSocketOptionGetFailed);
+
+    s.bind();
+
+    BOOST_TEST(s.fileDescriptor() > 0);
+
+    s.close();
+
+    BOOST_CHECK_THROW(s.fileDescriptor(), fuurin::err::ZMQSocketOptionGetFailed);
+}
+
+
 BOOST_AUTO_TEST_CASE(testInprocNoIOThread)
 {
     Context ctx;

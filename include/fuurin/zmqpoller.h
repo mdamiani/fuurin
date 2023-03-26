@@ -207,8 +207,21 @@ private:
 /**
  * \brief Iterator over the available events after a \ref Poller::wait() action.
  */
-class PollerIterator final : public std::iterator<std::input_iterator_tag, Pollable*>
+class PollerIterator final
 {
+public:
+    /**
+     * Iterator traits.
+     */
+    ///@{
+    using iterator_category = std::input_iterator_tag;
+    using value_type = Pollable*;
+    using difference_type = value_type;
+    using pointer = value_type*;
+    using reference = value_type&;
+    ///@}
+
+
 public:
     /**
      * \brief Initializes this iterator.

@@ -66,7 +66,7 @@ void Worker::setTopicsNames(const std::vector<Topic::Name>& names)
 }
 
 
-std::tuple<bool, std::vector<Topic::Name>> Worker::topicsNames() const
+std::tuple<bool, const std::vector<Topic::Name>&> Worker::topicsNames() const
 {
     return {subscrAll_, subscrNames_};
 }

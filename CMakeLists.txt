@@ -27,6 +27,7 @@ find_package(Threads REQUIRED)
 
 set(3RDPARTY_DIR ${CMAKE_BINARY_DIR}/3rdparty)
 
+
 ExternalProject_Add(zeromq
     SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/vendor/zeromq"
     INSTALL_DIR "${3RDPARTY_DIR}"
@@ -41,8 +42,30 @@ ExternalProject_Add(zeromq
         -D WITH_TLS=OFF
         -D WITH_LIBBSD=OFF
         -D ENABLE_CURVE=OFF
-        -D CMAKE_BUILD_TYPE=Release
+        -D CMAKE_BUILD_TYPE=RelWithDebInfo
+        -D CMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}
 )
+
+
+function (AddImportedLibrary TARGET LIB)
+    message("-- Adding imported library ${TARGET} ${LIB}")
+
+    if(WIN32)
+        set(prefix "")
+        set(suffix ".lib")
+    else()
+        set(prefix "lib")
+        set(suffix ".a")
+    endif()
+
+    add_library(${TARGET} STATIC IMPORTED GLOBAL)
+    set_target_properties(${TARGET} PROPERTIES
+        IMPORTED_LOCATION "${3RDPARTY_DIR}/lib/${prefix}${LIB}${suffix}"
+    )
+endfunction (AddImportedLibrary)
+
+
+AddImportedLibrary(zeromq_static zmq)
 
 
 set(LIB_SOURCES
@@ -76,6 +99,12 @@ set(LIB_SOURCES
     src/sessionworker.cpp
     src/sessionbroker.cpp
     src/tokenpool.cpp
+    src/c/cutils.cpp
+    src/c/cuuid.cpp
+    src/c/cbroker.cpp
+    src/c/cworker.cpp
+    src/c/ctopic.cpp
+    src/c/cevent.cpp
 )
 
 set(LIB_PUBLIC_HEADERS
@@ -84,7 +113,7 @@ set(LIB_PUBLIC_HEADERS
     include/fuurin/errors.h
     include/fuurin/elapser.h
     include/fuurin/event.h
-    include/fuurin/opearation.h
+    include/fuurin/operation.h
     include/fuurin/logger.h
     include/fuurin/stopwatch.h
     include/fuurin/zmqcontext.h
@@ -107,10 +136,11 @@ set(LIB_PUBLIC_HEADERS
     include/fuurin/sessionworker.h
     include/fuurin/sessionbroker.h
     include/fuurin/tokenpool.h
-)
-
-set(LIB_DEPS
-    zeromq
+    include/fuurin/c/cbroker.h
+    include/fuurin/c/cevent.h
+    include/fuurin/c/ctopic.h
+    include/fuurin/c/cuuid.h
+    include/fuurin/c/cworker.h
 )
 
 set(LIB_VERSION_FULL ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH})
@@ -119,52 +149,7 @@ set(LIB_NAME "lib${PROJECT_NAME}")
 
 link_directories(${3RDPARTY_DIR}/lib)
 
-add_library(fuurin_shared SHARED ${LIB_SOURCES})
-add_library(fuurin_static STATIC ${LIB_SOURCES})
-
-set(LIB_COMPILE_FLAGS
-    -Wall
-    -Wextra
-)
-
-set(LIB_LINK_FLAGS
-    zmq
-    ${CMAKE_THREAD_LIBS_INIT}
-)
-
-set(LIB_COMPILE_DEFS
-    BOOST_SCOPE_EXIT_CONFIG_USE_LAMBDAS
-    ZMQ_BUILD_DRAFT_API
-
-    LIB_VERSION_MAJOR=${PROJECT_VERSION_MAJOR}
-    LIB_VERSION_MINOR=${PROJECT_VERSION_MINOR}
-    LIB_VERSION_PATCH=${PROJECT_VERSION_PATCH}
-)
-
-include(Coverage)
-
-target_compile_definitions(fuurin_shared PRIVATE ${LIB_COMPILE_DEFS})
-target_compile_definitions(fuurin_static PRIVATE ${LIB_COMPILE_DEFS})
-
-target_compile_options(fuurin_shared PUBLIC ${LIB_COMPILE_FLAGS} ${SANITIZERS_COMPILE_FLAGS})
-target_compile_options(fuurin_static PUBLIC ${LIB_COMPILE_FLAGS} ${SANITIZERS_COMPILE_FLAGS})
-
-target_link_libraries(fuurin_static PUBLIC ${LIB_LINK_FLAGS} ${SANITIZERS_LINK_FLAGS})
-target_link_libraries(fuurin_shared PUBLIC ${LIB_LINK_FLAGS} ${SANITIZERS_LINK_FLAGS})
-
-
-set_target_properties(fuurin_shared PROPERTIES
-    OUTPUT_NAME ${PROJECT_NAME}
-    VERSION ${LIB_VERSION_FULL}
-    SOVERSION ${LIB_SOVERSION}
-)
-
-set_target_properties(fuurin_static PROPERTIES
-    OUTPUT_NAME ${PROJECT_NAME}
-)
-
-add_dependencies(fuurin_shared ${LIB_DEPS})
-add_dependencies(fuurin_static ${LIB_DEPS})
+include(Library)
 
 include_directories(
     "include"
@@ -226,31 +211,40 @@ endif()
 
 
 # Install
-include(GNUInstallDirs)
+option(USE_GNUINSTALLDIRS "Use GNUInstallDirs" ON)
+if(USE_GNUINSTALLDIRS)
+    message(STATUS "GNUInstallDirs enabled")
+    include(GNUInstallDirs)
+    set(INSTALL_LIBDIR "${CMAKE_INSTALL_LIBDIR}/${CMAKE_LIBRARY_ARCHITECTURE}")
+    set(INSTALL_INCDIR "${CMAKE_INSTALL_INCLUDEDIR}/${PROJECT_NAME}")
+else()
+    set(CMAKE_INSTALL_INCLUDEDIR "${CMAKE_INSTALL_PREFIX}/include")
+endif()
 
-set(INSTALL_LIBDIR "${CMAKE_INSTALL_LIBDIR}/${CMAKE_LIBRARY_ARCHITECTURE}")
-set(INSTALL_INCDIR "${CMAKE_INSTALL_INCLUDEDIR}/${PROJECT_NAME}")
+if(BUILD_SHARED)
+    install(
+        TARGETS fuurin_shared
+        LIBRARY DESTINATION "${INSTALL_LIBDIR}" NAMELINK_SKIP
+        COMPONENT libfuurin
+    )
+
+    install(
+        TARGETS fuurin_shared
+        LIBRARY DESTINATION "${INSTALL_LIBDIR}" NAMELINK_ONLY
+        COMPONENT libfuurin-dev
+    )
+endif()
+
+if(BUILD_STATIC)
+    install(
+        TARGETS fuurin_static
+        ARCHIVE DESTINATION "${INSTALL_LIBDIR}"
+        COMPONENT libfuurin-dev
+    )
+endif()
 
 install(
-    TARGETS fuurin_shared
-    LIBRARY DESTINATION "${INSTALL_LIBDIR}" NAMELINK_SKIP
-    COMPONENT libfuurin
-)
-
-install(
-    TARGETS fuurin_shared
-    LIBRARY DESTINATION "${INSTALL_LIBDIR}" NAMELINK_ONLY
-    COMPONENT libfuurin-dev
-)
-
-install(
-    TARGETS fuurin_static
-    ARCHIVE DESTINATION "${INSTALL_LIBDIR}"
-    COMPONENT libfuurin-dev
-)
-
-install(
-    FILES ${LIB_PUBLIC_HEADERS}
-    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/${PROJECT_NAME}"
+    DIRECTORY "${CMAKE_SOURCE_DIR}/include/"
+    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
     COMPONENT libfuurin-dev
 )

@@ -19,6 +19,7 @@ ExternalProject_Add(boost_utf
     CMAKE_ARGS
         -D CMAKE_INSTALL_PREFIX=<INSTALL_DIR>
         -D CMAKE_BUILD_TYPE=Release
+        -D CMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}
 )
 
 ExternalProject_Add(google_benchmark
@@ -28,9 +29,14 @@ ExternalProject_Add(google_benchmark
     CMAKE_ARGS
         -D CMAKE_INSTALL_PREFIX=<INSTALL_DIR>
         -D CMAKE_BUILD_TYPE=Release
+        -D BENCHMARK_ENABLE_TESTING=OFF
         -D BENCHMARK_ENABLE_GTEST_TESTS=OFF
         -D BENCHMARK_ENABLE_LTO=false
+        -D CMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}
 )
+
+AddImportedLibrary(boost_utf_static boost_test_framework)
+AddImportedLibrary(benchmark_static benchmark)
 
 function (AddTest TEST)
     message("-- Adding test ${TEST}")
@@ -38,8 +44,9 @@ function (AddTest TEST)
     add_executable(${TEST} ${TEST}.cpp)
     add_dependencies(${TEST} fuurin_static boost_utf google_benchmark)
 
-    target_link_libraries(${TEST} fuurin_static boost_test_framework benchmark)
+    target_link_libraries(${TEST} fuurin_static boost_utf_static benchmark_static)
     target_include_directories(${TEST} PRIVATE ../)
+    target_compile_definitions(${TEST} PRIVATE ZMQ_BUILD_DRAFT_API)
 
     add_test(NAME ${TEST}
         WORKING_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
@@ -58,5 +65,6 @@ AddTest(test_syncmachine)
 AddTest(test_uuid)
 AddTest(test_network)
 AddTest(test_tokenpool)
+AddTest(test_cbind)
 
 target_compile_definitions(test_common PRIVATE ${LIB_COMPILE_DEFS})

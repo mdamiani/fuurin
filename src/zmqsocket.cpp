@@ -150,6 +150,20 @@ bool Socket::conflate() const noexcept
 }
 
 
+int Socket::fileDescriptor() const
+{
+    if (!isOpen()) {
+        throw ERROR(ZMQSocketOptionGetFailed, "could not get socket option",
+            log::Arg{
+                log::Arg{"reason"sv, "socket is closed"sv},
+                log::Arg{"option"sv, ZMQ_FD},
+            });
+    }
+
+    return getOption<int>(ZMQ_FD);
+}
+
+
 void Socket::setSubscriptions(const std::list<std::string>& filters)
 {
     subscriptions_ = filters;

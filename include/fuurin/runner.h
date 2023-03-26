@@ -34,7 +34,8 @@ namespace zmq {
 class Context;
 class Socket;
 class Part;
-class PollerWaiter;
+template<typename...>
+class Poller;
 class Pollable;
 } // namespace zmq
 
@@ -115,9 +116,9 @@ public:
      * \see setEndpoints(std::vector<std::string>, std::vector<std::string>, std::vector<std::string>)
      */
     ///@{
-    std::vector<std::string> endpointDelivery() const;
-    std::vector<std::string> endpointDispatch() const;
-    std::vector<std::string> endpointSnapshot() const;
+    const std::vector<std::string>& endpointDelivery() const;
+    const std::vector<std::string>& endpointDispatch() const;
+    const std::vector<std::string>& endpointSnapshot() const;
     ///@}
 
     /**
@@ -253,6 +254,25 @@ protected:
     Event waitForEvent(zmq::Pollable* timeout, EventMatchFunc match = {}) const;
     ///@}
 
+    /**
+     * \brief Gets the file descriptor of the events socket.
+     *
+     * The returned file descriptor can be used to wait for
+     * events with an existing event loop.
+     *
+     * When the file descriptor is readable,
+     * \ref waitForEvent shall be used passing
+     * a 0s timeout, until no more events are available
+     * (that is a \ref Event::Notification::Timeout notification).
+     *
+     * This function shall not fail.
+     *
+     * \return The file descriptor to poll.
+     *
+     * \see waitForEvent(std::chrono::milliseconds)
+     */
+    int eventFD() const;
+
 
 private:
     friend class TestRunner;
@@ -273,7 +293,6 @@ private:
     Event recvEvent() const;
 
 
-protected:
 private:
     const std::string name_;                   ///< Name.
     const Uuid uuid_;                          ///< Identifier.
@@ -284,6 +303,13 @@ private:
     const std::unique_ptr<zmq::Socket> zevr_;  ///< Inter-thread events reception.
     const std::unique_ptr<zmq::Socket> zfins_; ///< Inter-thread send completion message.
     const std::unique_ptr<zmq::Socket> zfinr_; ///< Inter-thread recv completion message.
+
+    /**
+     * FIXME: to be removed when ZMQ_FD option can be accessed
+     * for thread safe sockets:
+     * https://github.com/zeromq/libzmq/issues/2941
+     */
+    const std::unique_ptr<zmq::Poller<zmq::Socket>> zevpoll_;
 
     mutable std::atomic<bool> running_; ///< Whether the task is running.
     SessionEnv::token_t token_;         ///< Current execution token for the task.

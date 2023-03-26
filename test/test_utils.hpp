@@ -18,9 +18,13 @@
 #include "fuurin/zmqpart.h"
 #include "fuurin/event.h"
 #include "fuurin/topic.h"
+#include "types.h"
+
+#include <zmq.h>
 
 #include <chrono>
 #include <vector>
+#include <optional>
 
 
 using namespace std::literals::chrono_literals;
@@ -112,6 +116,38 @@ WorkerConfig mkCnf(const Worker& w, Topic::SeqN seqn = 0, bool wildc = true,
 {
     return WorkerConfig{w.uuid(), seqn, wildc, names, endp1, endp2, endp3};
 }
+
+
+void testReadEventAsync(
+    Worker& w,
+    void* zpoller,
+    bool wait,
+    std::chrono::milliseconds timeout,
+    std::optional<Event::Type> evType = {},
+    std::optional<WorkerConfig> cfg = {}) //
+{
+    if (wait) {
+        zmq_poller_event_t zev;
+        const int rc = zmq_poller_wait(zpoller, &zev, zmq::getMillis<long>(timeout));
+
+        if (evType) {
+            BOOST_TEST(rc == 0);
+            BOOST_TEST(zev.fd == w.eventFD());
+        } else {
+            BOOST_TEST(rc == -1);
+        }
+    }
+
+    if (evType) {
+        if (cfg) {
+            testWaitForEvent(w, 0s, Event::Notification::Success, evType.value(), cfg.value());
+        } else {
+            testWaitForEvent(w, 0s, Event::Notification::Success, evType.value());
+        }
+    } else {
+        testWaitForTimeout(w);
+    }
+};
 
 
 #endif // FUURIN_TEST_UTILS_H

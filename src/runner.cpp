@@ -19,6 +19,8 @@
 #include "failure.h"
 #include "log.h"
 
+#include <zmq.h>
+
 #include <boost/scope_exit.hpp>
 
 #include <cstring>
@@ -40,6 +42,7 @@ Runner::Runner(Uuid id, const std::string& name)
     , zevr_(std::make_unique<zmq::Socket>(zctx_.get(), zmq::Socket::DISH))
     , zfins_{std::make_unique<zmq::Socket>(zctx_.get(), zmq::Socket::PUSH)}
     , zfinr_{std::make_unique<zmq::Socket>(zctx_.get(), zmq::Socket::PULL)}
+    , zevpoll_{std::make_unique<zmq::PollerAuto<zmq::Socket>>(zmq::PollerEvents::Read, 0ms, zevr_.get())}
     , running_(false)
     , token_(0)
     , endpDelivery_{{"ipc:///tmp/worker_delivery"}}
@@ -72,6 +75,9 @@ Runner::Runner(Uuid id, const std::string& name)
 
     zfinr_->bind();
     zfins_->connect();
+
+    // FIXME: to be removed.
+    zevpoll_->wait();
 }
 
 
@@ -103,19 +109,19 @@ void Runner::setEndpoints(const std::vector<std::string>& delivery,
 }
 
 
-std::vector<std::string> Runner::endpointDelivery() const
+const std::vector<std::string>& Runner::endpointDelivery() const
 {
     return endpDelivery_;
 }
 
 
-std::vector<std::string> Runner::endpointDispatch() const
+const std::vector<std::string>& Runner::endpointDispatch() const
 {
     return endpDispatch_;
 }
 
 
-std::vector<std::string> Runner::endpointSnapshot() const
+const std::vector<std::string>& Runner::endpointSnapshot() const
 {
     return endpSnapshot_;
 }
@@ -208,6 +214,12 @@ Event Runner::waitForEvent(zmq::Pollable& canc, EventMatchFunc match) const
 
 Event Runner::waitForEvent(zmq::Pollable* canc, EventMatchFunc match) const
 {
+    // FIXME: to be removed.
+    BOOST_SCOPE_EXIT(this)
+    {
+        zevpoll_->wait();
+    };
+
     zmq::Poller pw{zmq::PollerEvents::Read, zevr_.get(), canc};
 
     for (;;) {
@@ -226,6 +238,18 @@ Event Runner::waitForEvent(zmq::Pollable* canc, EventMatchFunc match) const
             return ev;
         }
     }
+}
+
+
+int Runner::eventFD() const
+{
+    zmq_fd_t fd;
+    const int rc = zmq_poller_fd(zevpoll_->zmqPointer(), &fd);
+
+    // if it fails then it's an internal error.
+    ASSERT(rc == 0, "failed to get events socket file descriptor");
+
+    return fd;
 }
 
 
