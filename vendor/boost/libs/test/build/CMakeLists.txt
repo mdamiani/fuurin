@@ -51,17 +51,11 @@ if(MSVC)
 endif()
 
 
-
-
-
 # global path
 set(BOOST_TEST_ROOT_DIR ${BoostTest_SOURCE_DIR}/..)
 set(BOOST_ROOT_DIR ${BOOST_TEST_ROOT_DIR}/../..)
 get_filename_component(BOOST_TEST_ROOT_DIR_ABS ${BoostTest_SOURCE_DIR}/.. ABSOLUTE)
 get_filename_component(BOOST_ROOT_DIR_ABS ${BOOST_ROOT_DIR} ABSOLUTE)
-
-# global include on boost
-include_directories(${BOOST_ROOT_DIR_ABS}/)
 
 # include globs
 file(GLOB_RECURSE
@@ -99,14 +93,17 @@ set(BOOST_UTF_SRC
     ${BOOST_TEST_ROOT_DIR}/src/unit_test_parameters.cpp
     ${BOOST_TEST_ROOT_DIR}/src/xml_log_formatter.cpp
     ${BOOST_TEST_ROOT_DIR}/src/xml_report_formatter.cpp
-    )
+)
 
 add_library(boost_test_framework
             STATIC
             ${BOOST_UTF_HEADERS}
             ${BOOST_UTF_SRC})
 #target_compile_definitions(boost_test_framework PUBLIC "-DBOOST_TEST_DYN_LINK=0")
-target_include_directories(boost_test_framework PUBLIC ${BOOST_TEST_ROOT_DIR}/include/)
+target_include_directories(boost_test_framework 
+    PUBLIC 
+        ${BOOST_TEST_ROOT_DIR}/include/ 
+        ${BOOST_ROOT_DIR_ABS}/)
 set_target_properties(boost_test_framework PROPERTIES FOLDER "UTF")
 
 add_library(boost_test_framework_shared
@@ -114,7 +111,10 @@ add_library(boost_test_framework_shared
             ${BOOST_UTF_HEADERS}
             ${BOOST_UTF_SRC})
 target_compile_definitions(boost_test_framework_shared PUBLIC "-DBOOST_TEST_DYN_LINK=1")
-target_include_directories(boost_test_framework_shared PUBLIC ${BOOST_TEST_ROOT_DIR}/include/)
+target_include_directories(boost_test_framework_shared 
+    PUBLIC 
+        ${BOOST_TEST_ROOT_DIR}/include/ 
+        ${BOOST_ROOT_DIR_ABS}/)
 set_target_properties(boost_test_framework_shared PROPERTIES FOLDER "UTF")
 
 
